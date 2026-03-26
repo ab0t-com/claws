@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Console — Your AI Team</title>
+  <meta name="theme-color" content="#0f0d0a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <style>
+    /* ================================================================
+       CONSOLE DESIGN SYSTEM
+       Dark-first app chrome with warm light content panels
+       Same typographic DNA as landing2.html
+       ================================================================ */
+
+    :root {
+      /* Chrome — dark shell */
+      --chrome: #0f0d0a;
+      --chrome-raised: #171411;
+      --chrome-surface: #1e1b17;
+      --chrome-border: #2d2822;
+      --chrome-border-hover: #3e382f;
+      --chrome-text: #ede9e2;
+      --chrome-muted: #9e968c;
+      --chrome-dim: #6b645c;
+
+      /* Content — warm light panels */
+      --panel: #faf9f7;
+      --panel-raised: #f5f2ed;
+      --panel-border: #e8e3db;
+      --panel-text: #1c1915;
+      --panel-muted: #8e857a;
+      --panel-dim: #c4bdb3;
+
+      /* Accent */
+      --rose: #c4727a;
+      --rose-soft: #d9969c;
+      --rose-deep: #a85860;
+      --rose-bg: rgba(196, 114, 122, 0.08);
+      --rose-bg-strong: rgba(196, 114, 122, 0.15);
+
+      /* Status */
+      --online: #6da876;
+      --online-bg: rgba(109, 168, 118, 0.12);
+      --busy: #c8a040;
+      --busy-bg: rgba(200, 160, 64, 0.12);
+      --offline: #6b645c;
+      --error: #c45a5a;
+      --error-bg: rgba(196, 90, 90, 0.1);
+
+      /* Semantic */
+      --teal: #5a8f8a;
+      --teal-bg: rgba(90, 143, 138, 0.1);
+      --ochre: #b8935a;
+      --ochre-bg: rgba(184, 147, 90, 0.1);
+
+      /* Layout */
+      --sidebar-w: 260px;
+      --topbar-h: 56px;
+      --detail-w: 340px;
+      --border: 1.5px;
+      --border-thick: 3px;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+
+      /* Type */
+      --font-display: 'Georgia', 'Palatino Linotype', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    /* ================================================================
+       RESET
+       ================================================================ */
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--chrome-text);
+      background: var(--chrome);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    button {
+      font-family: inherit; font-size: inherit;
+      cursor: pointer; border: none; background: none;
+      color: inherit;
+    }
+
+    input, textarea, select {
+      font-family: inherit; font-size: inherit;
+      border: none; outline: none; background: none;
+      color: inherit;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--chrome-border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--chrome-border-hover); }
+
+    /* ================================================================
+       APP SHELL LAYOUT
+       ================================================================ */
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: var(--topbar-h) 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ================================================================
+       SIDEBAR
+       ================================================================ */
+
+    .sidebar {
+      grid-row: 1 / -1;
+      background: var(--chrome);
+      border-right: var(--border) solid var(--chrome-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar__logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 20px;
+      height: var(--topbar-h);
+      border-bottom: var(--border) solid var(--chrome-border);
+      flex-shrink: 0;
+    }
+
+    .sidebar__logo-mark {
+      width: 28px; height: 28px;
+      background: var(--rose);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 13px;
+    }
+
+    .sidebar__logo-text {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--chrome-text);
+    }
+
+    .sidebar__nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+    }
+
+    .sidebar__section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--chrome-dim);
+      padding: 16px 12px 6px;
+    }
+
+    .sidebar__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      color: var(--chrome-muted);
+      transition: all 0.15s;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      position: relative;
+    }
+
+    .sidebar__item:hover {
+      background: var(--chrome-surface);
+      color: var(--chrome-text);
+    }
+
+    .sidebar__item.active {
+      background: var(--rose-bg);
+      color: var(--rose);
+    }
+
+    .sidebar__item-icon {
+      width: 20px;
+      text-align: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .sidebar__item-badge {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--rose);
+      color: white;
+      padding: 1px 7px;
+      border-radius: 100px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .sidebar__team-list {
+      padding: 4px 0;
+    }
+
+    .sidebar__agent {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.15s;
+      width: 100%;
+      text-align: left;
+    }
+
+    .sidebar__agent:hover {
+      background: var(--chrome-surface);
+    }
+
+    .sidebar__agent.active {
+      background: var(--rose-bg);
+    }
+
+    .sidebar__agent-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .sidebar__agent-dot {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      border: 2px solid var(--chrome);
+    }
+
+    .sidebar__agent-dot--online { background: var(--online); }
+    .sidebar__agent-dot--busy { background: var(--busy); }
+    .sidebar__agent-dot--offline { background: var(--offline); }
+
+    .sidebar__agent-info { flex: 1; min-width: 0; }
+
+    .sidebar__agent-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--chrome-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar__agent-role {
+      font-size: 11px;
+      color: var(--chrome-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar__agent-unread {
+      width: 8px; height: 8px;
+      background: var(--rose);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .sidebar__footer {
+      padding: 12px 10px;
+      border-top: var(--border) solid var(--chrome-border);
+      flex-shrink: 0;
+    }
+
+    .sidebar__user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    .sidebar__user:hover { background: var(--chrome-surface); }
+
+    .sidebar__user-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--chrome-surface);
+      border: 2px solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .sidebar__user-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .sidebar__user-plan {
+      font-size: 11px;
+      color: var(--chrome-dim);
+    }
+
+    /* ================================================================
+       TOPBAR
+       ================================================================ */
+
+    .topbar {
+      background: var(--chrome);
+      border-bottom: var(--border) solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+    }
+
+    .topbar__title {
+      font-size: 15px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .topbar__breadcrumb {
+      font-size: 13px;
+      color: var(--chrome-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar__breadcrumb-sep { color: var(--chrome-dim); }
+
+    .topbar__actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar__btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      border: var(--border) solid var(--chrome-border);
+      color: var(--chrome-muted);
+      transition: all 0.15s;
+    }
+
+    .topbar__btn:hover {
+      border-color: var(--chrome-border-hover);
+      color: var(--chrome-text);
+      background: var(--chrome-surface);
+    }
+
+    .topbar__btn--primary {
+      background: var(--rose);
+      border-color: var(--rose);
+      color: white;
+    }
+
+    .topbar__btn--primary:hover {
+      background: var(--rose-deep);
+      border-color: var(--rose-deep);
+    }
+
+    .topbar__search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: var(--border) solid var(--chrome-border);
+      background: var(--chrome-surface);
+      width: 220px;
+      transition: border-color 0.2s;
+    }
+
+    .topbar__search:focus-within {
+      border-color: var(--rose);
+    }
+
+    .topbar__search-icon { color: var(--chrome-dim); font-size: 13px; }
+
+    .topbar__search input {
+      width: 100%;
+      font-size: 13px;
+      color: var(--chrome-text);
+    }
+
+    .topbar__search input::placeholder { color: var(--chrome-dim); }
+
+    /* ================================================================
+       MAIN CONTENT AREA
+       ================================================================ */
+
+    .main {
+      background: var(--chrome-raised);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ================================================================
+       VIEW: DASHBOARD
+       ================================================================ */
+
+    .view {
+      display: none;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .view.active { display: block; }
+
+    .view--split {
+      display: none;
+      height: 100%;
+    }
+
+    .view--split.active {
+      display: grid;
+      grid-template-columns: 1fr var(--detail-w);
+    }
+
+    .dashboard {
+      padding: 28px;
+    }
+
+    .dashboard__greeting {
+      margin-bottom: 32px;
+    }
+
+    .dashboard__greeting-text {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--chrome-text);
+      margin-bottom: 4px;
+    }
+
+    .dashboard__greeting-sub {
+      font-size: 14px;
+      color: var(--chrome-muted);
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card:hover { border-color: var(--chrome-border-hover); }
+
+    .stat-card__label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--chrome-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .stat-card__value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--chrome-text);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .stat-card__change {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .stat-card__change--up { color: var(--online); }
+    .stat-card__change--neutral { color: var(--chrome-dim); }
+
+    /* Dashboard sections in a 2-column grid */
+    .dashboard__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .dash-panel {
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .dash-panel__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: var(--border) solid var(--chrome-border);
+    }
+
+    .dash-panel__title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .dash-panel__action {
+      font-size: 12px;
+      color: var(--rose);
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .dash-panel__action:hover { color: var(--rose-soft); }
+
+    .dash-panel__body {
+      padding: 0;
+    }
+
+    /* Team status list (dashboard) */
+    .team-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: var(--border) solid var(--chrome-border);
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+
+    .team-row:last-child { border-bottom: none; }
+    .team-row:hover { background: var(--chrome-raised); }
+
+    .team-row__avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .team-row__dot {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--chrome-surface);
+    }
+
+    .team-row__info { flex: 1; min-width: 0; }
+
+    .team-row__name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .team-row__status-text {
+      font-size: 12px;
+      color: var(--chrome-muted);
+    }
+
+    .team-row__health {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    .team-row__health--healthy { background: var(--online-bg); color: var(--online); }
+    .team-row__health--busy { background: var(--busy-bg); color: var(--busy); }
+    .team-row__health--offline { background: var(--chrome-raised); color: var(--chrome-dim); }
+
+    /* Activity feed */
+    .activity-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: var(--border) solid var(--chrome-border);
+      align-items: flex-start;
+    }
+
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-item__icon {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .activity-item__icon--msg { background: var(--rose-bg); color: var(--rose); }
+    .activity-item__icon--file { background: var(--teal-bg); color: var(--teal); }
+    .activity-item__icon--task { background: var(--ochre-bg); color: var(--ochre); }
+    .activity-item__icon--alert { background: var(--error-bg); color: var(--error); }
+
+    .activity-item__content { flex: 1; min-width: 0; }
+
+    .activity-item__text {
+      font-size: 13px;
+      color: var(--chrome-text);
+      line-height: 1.45;
+    }
+
+    .activity-item__text strong { font-weight: 600; }
+
+    .activity-item__time {
+      font-size: 11px;
+      color: var(--chrome-dim);
+      margin-top: 2px;
+    }
+
+    /* ================================================================
+       VIEW: CHAT
+       ================================================================ */
+
+    .chat-view {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 24px;
+      border-bottom: var(--border) solid var(--chrome-border);
+      background: var(--chrome-surface);
+      flex-shrink: 0;
+    }
+
+    .chat-header__avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      position: relative;
+    }
+
+    .chat-header__dot {
+      position: absolute;
+      bottom: 1px; right: 1px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--chrome-surface);
+    }
+
+    .chat-header__info { flex: 1; }
+
+    .chat-header__name {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .chat-header__role {
+      font-size: 12px;
+      color: var(--chrome-muted);
+    }
+
+    .chat-header__actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .chat-header__action-btn {
+      width: 34px; height: 34px;
+      border-radius: var(--radius);
+      border: var(--border) solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--chrome-muted);
+      transition: all 0.15s;
+    }
+
+    .chat-header__action-btn:hover {
+      background: var(--chrome-raised);
+      color: var(--chrome-text);
+      border-color: var(--chrome-border-hover);
+    }
+
+    /* Messages area */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .chat-date-sep {
+      text-align: center;
+      font-size: 12px;
+      color: var(--chrome-dim);
+      padding: 8px 0;
+      position: relative;
+    }
+
+    .chat-date-sep::before,
+    .chat-date-sep::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      height: 1px;
+      background: var(--chrome-border);
+      width: calc(50% - 60px);
+    }
+
+    .chat-date-sep::before { left: 0; }
+    .chat-date-sep::after { right: 0; }
+
+    .chat-msg {
+      display: flex;
+      gap: 10px;
+      max-width: 72%;
+      animation: msg-in 0.3s ease-out;
+    }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-msg--user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .chat-msg__avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+
+    .chat-msg__bubble {
+      padding: 10px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .chat-msg--ai .chat-msg__bubble {
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      color: var(--chrome-text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-msg--user .chat-msg__bubble {
+      background: var(--rose);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-msg__meta {
+      font-size: 11px;
+      color: var(--chrome-dim);
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    .chat-msg--user .chat-msg__meta { text-align: right; }
+
+    .chat-msg__file {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: var(--chrome-raised);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .chat-msg__file:hover { border-color: var(--rose); }
+
+    .chat-msg__file-icon { font-size: 18px; }
+
+    .chat-msg__file-info { flex: 1; }
+
+    .chat-msg__file-name {
+      font-weight: 600;
+      color: var(--chrome-text);
+    }
+
+    .chat-msg__file-size {
+      font-size: 11px;
+      color: var(--chrome-dim);
+    }
+
+    /* Typing indicator */
+    .chat-typing {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 4px;
+      font-size: 13px;
+      color: var(--chrome-muted);
+      min-height: 28px;
+    }
+
+    .chat-typing__dots {
+      display: flex;
+      gap: 3px;
+    }
+
+    .chat-typing__dots span {
+      width: 5px; height: 5px;
+      background: var(--chrome-muted);
+      border-radius: 50%;
+      animation: typing-b 1.3s ease-in-out infinite;
+    }
+
+    .chat-typing__dots span:nth-child(2) { animation-delay: 0.15s; }
+    .chat-typing__dots span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes typing-b {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-3px); opacity: 1; }
+    }
+
+    /* Input bar */
+    .chat-input {
+      padding: 16px 24px;
+      border-top: var(--border) solid var(--chrome-border);
+      background: var(--chrome-surface);
+      flex-shrink: 0;
+    }
+
+    .chat-input__row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--chrome-raised);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      padding: 6px 6px 6px 16px;
+      transition: border-color 0.2s;
+    }
+
+    .chat-input__row:focus-within {
+      border-color: var(--rose);
+    }
+
+    .chat-input__textarea {
+      flex: 1;
+      resize: none;
+      min-height: 22px;
+      max-height: 120px;
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--chrome-text);
+      background: transparent;
+    }
+
+    .chat-input__textarea::placeholder { color: var(--chrome-dim); }
+
+    .chat-input__actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding-bottom: 2px;
+    }
+
+    .chat-input__action {
+      width: 32px; height: 32px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      color: var(--chrome-dim);
+      transition: all 0.15s;
+    }
+
+    .chat-input__action:hover {
+      background: var(--chrome-surface);
+      color: var(--chrome-text);
+    }
+
+    .chat-input__send {
+      width: 34px; height: 34px;
+      border-radius: var(--radius);
+      background: var(--rose);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 15px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .chat-input__send:hover {
+      background: var(--rose-deep);
+      transform: scale(1.04);
+    }
+
+    .chat-input__hint {
+      font-size: 11px;
+      color: var(--chrome-dim);
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    .chat-input__hint kbd {
+      background: var(--chrome-raised);
+      border: 1px solid var(--chrome-border);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    /* ================================================================
+       DETAIL PANEL (right sidebar in split view)
+       ================================================================ */
+
+    .detail-panel {
+      border-left: var(--border) solid var(--chrome-border);
+      background: var(--chrome-surface);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-panel__header {
+      padding: 20px;
+      text-align: center;
+      border-bottom: var(--border) solid var(--chrome-border);
+    }
+
+    .detail-panel__avatar {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 12px;
+      position: relative;
+    }
+
+    .detail-panel__dot {
+      position: absolute;
+      bottom: 2px; right: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 3px solid var(--chrome-surface);
+    }
+
+    .detail-panel__name {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .detail-panel__role {
+      font-size: 13px;
+      color: var(--rose);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .detail-panel__status-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--chrome-muted);
+      margin-top: 8px;
+    }
+
+    .detail-panel__status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+    }
+
+    .detail-section {
+      padding: 16px 20px;
+      border-bottom: var(--border) solid var(--chrome-border);
+    }
+
+    .detail-section__title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--chrome-dim);
+      margin-bottom: 12px;
+    }
+
+    .detail-stat {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .detail-stat__label { color: var(--chrome-muted); }
+    .detail-stat__value { font-weight: 600; color: var(--chrome-text); }
+
+    .detail-channel-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-channel {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      border: var(--border) solid var(--chrome-border);
+      font-size: 13px;
+      transition: border-color 0.15s;
+    }
+
+    .detail-channel:hover { border-color: var(--chrome-border-hover); }
+
+    .detail-channel__icon { font-size: 16px; }
+    .detail-channel__name { flex: 1; font-weight: 500; }
+
+    .detail-channel__status {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+    }
+
+    .detail-files {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-file {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      background: var(--chrome-raised);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .detail-file:hover { background: var(--chrome); }
+
+    .detail-file__icon { font-size: 14px; }
+
+    .detail-file__info { flex: 1; min-width: 0; }
+
+    .detail-file__name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .detail-file__meta {
+      font-size: 11px;
+      color: var(--chrome-dim);
+    }
+
+    /* ================================================================
+       VIEW: TEAM MANAGEMENT
+       ================================================================ */
+
+    .team-mgmt {
+      padding: 28px;
+    }
+
+    .team-mgmt__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .team-mgmt__title {
+      font-family: var(--font-display);
+      font-size: 24px;
+    }
+
+    .team-mgmt__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .employee-card {
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+
+    .employee-card:hover {
+      border-color: var(--rose);
+      transform: translateY(-2px);
+    }
+
+    .employee-card__top {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .employee-card__avatar {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .employee-card__dot {
+      position: absolute;
+      bottom: 1px; right: 1px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--chrome-surface);
+    }
+
+    .employee-card__name {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .employee-card__role {
+      font-size: 12px;
+      color: var(--rose);
+      font-weight: 600;
+    }
+
+    .employee-card__desc {
+      font-size: 13px;
+      color: var(--chrome-muted);
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+
+    .employee-card__meta {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--chrome-dim);
+    }
+
+    .employee-card__meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .employee-card--add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 200px;
+      border-style: dashed;
+      border-width: 2px;
+    }
+
+    .employee-card--add:hover {
+      border-color: var(--rose);
+      background: var(--rose-bg);
+    }
+
+    .employee-card--add__icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 2px dashed var(--chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: var(--chrome-dim);
+      transition: all 0.2s;
+    }
+
+    .employee-card--add:hover .employee-card--add__icon {
+      border-color: var(--rose);
+      color: var(--rose);
+    }
+
+    .employee-card--add__label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--chrome-muted);
+    }
+
+    /* ================================================================
+       VIEW: WORKSPACE (file browser)
+       ================================================================ */
+
+    .workspace {
+      padding: 28px;
+    }
+
+    .workspace__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .workspace__title {
+      font-family: var(--font-display);
+      font-size: 24px;
+    }
+
+    .workspace__path {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--chrome-muted);
+      margin-bottom: 16px;
+      font-family: var(--font-mono);
+    }
+
+    .workspace__path-seg {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .workspace__path-seg:hover { color: var(--rose); }
+    .workspace__path-sep { color: var(--chrome-dim); }
+
+    .workspace__table {
+      width: 100%;
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .workspace__row {
+      display: grid;
+      grid-template-columns: 1fr 120px 140px 80px;
+      gap: 16px;
+      padding: 10px 20px;
+      font-size: 13px;
+      border-bottom: var(--border) solid var(--chrome-border);
+      align-items: center;
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+
+    .workspace__row:last-child { border-bottom: none; }
+    .workspace__row:hover { background: var(--chrome-raised); }
+
+    .workspace__row--header {
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--chrome-dim);
+      cursor: default;
+    }
+
+    .workspace__row--header:hover { background: transparent; }
+
+    .workspace__file-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 500;
+    }
+
+    .workspace__file-icon { font-size: 16px; }
+
+    .workspace__file-modified { color: var(--chrome-muted); }
+    .workspace__file-owner { color: var(--chrome-muted); }
+    .workspace__file-size { color: var(--chrome-dim); }
+
+    /* ================================================================
+       MOBILE OVERLAY
+       ================================================================ */
+
+    .mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 13, 10, 0.7);
+      z-index: 200;
+    }
+
+    /* ================================================================
+       RESPONSIVE
+       ================================================================ */
+
+    @media (max-width: 1100px) {
+      .view--split.active {
+        grid-template-columns: 1fr;
+      }
+      .detail-panel { display: none; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        bottom: 0;
+        width: var(--sidebar-w);
+        z-index: 300;
+        transition: left 0.3s ease;
+      }
+      .sidebar.open { left: 0; }
+      .mobile-overlay.open { display: block; }
+      .topbar { padding: 0 16px; }
+      .dashboard { padding: 16px; }
+      .dashboard__grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .team-mgmt { padding: 16px; }
+      .workspace { padding: 16px; }
+      .chat-messages { padding: 16px; }
+      .chat-input { padding: 12px 16px; }
+    }
+
+    /* ================================================================
+       NOTIFICATION TOAST
+       ================================================================ */
+
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--chrome-surface);
+      border: var(--border) solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      animation: toast-in 0.3s ease-out;
+      max-width: 360px;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .toast--leaving {
+      animation: toast-out 0.25s ease-in forwards;
+    }
+
+    @keyframes toast-out {
+      to { opacity: 0; transform: translateY(-8px) scale(0.96); }
+    }
+
+    .toast__icon { font-size: 18px; flex-shrink: 0; }
+    .toast__text { font-size: 13px; flex: 1; line-height: 1.4; }
+    .toast__text strong { font-weight: 700; }
+
+    .toast__close {
+      color: var(--chrome-dim);
+      font-size: 16px;
+      padding: 4px;
+      transition: color 0.15s;
+    }
+
+    .toast__close:hover { color: var(--chrome-text); }
+  </style>
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- ============================================================
+         SIDEBAR
+         ============================================================ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo">
+        <span class="sidebar__logo-mark">✦</span>
+        <span class="sidebar__logo-text">OpenClaw</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <div class="sidebar__section-label">Overview</div>
+        <button class="sidebar__item active" data-view="dashboard">
+          <span class="sidebar__item-icon">🏠</span> Dashboard
+        </button>
+        <button class="sidebar__item" data-view="team">
+          <span class="sidebar__item-icon">👥</span> Team
+        </button>
+        <button class="sidebar__item" data-view="workspace">
+          <span class="sidebar__item-icon">📁</span> Workspace
+          <span class="sidebar__item-badge">3</span>
+        </button>
+        <button class="sidebar__item" data-view="activity-view">
+          <span class="sidebar__item-icon">⚡</span> Activity
+        </button>
+
+        <div class="sidebar__section-label">Your Team</div>
+        <div class="sidebar__team-list">
+          <button class="sidebar__agent" data-agent="maya">
+            <div class="sidebar__agent-avatar" style="background: var(--rose-bg);">
+              👩‍💼
+              <span class="sidebar__agent-dot sidebar__agent-dot--online"></span>
+            </div>
+            <div class="sidebar__agent-info">
+              <div class="sidebar__agent-name">Maya</div>
+              <div class="sidebar__agent-role">Research & Strategy</div>
+            </div>
+            <span class="sidebar__agent-unread"></span>
+          </button>
+
+          <button class="sidebar__agent" data-agent="priya">
+            <div class="sidebar__agent-avatar" style="background: var(--teal-bg);">
+              👩‍💻
+              <span class="sidebar__agent-dot sidebar__agent-dot--online"></span>
+            </div>
+            <div class="sidebar__agent-info">
+              <div class="sidebar__agent-name">Priya</div>
+              <div class="sidebar__agent-role">Client Comms</div>
+            </div>
+          </button>
+
+          <button class="sidebar__agent" data-agent="kai">
+            <div class="sidebar__agent-avatar" style="background: var(--ochre-bg);">
+              🧑‍🎨
+              <span class="sidebar__agent-dot sidebar__agent-dot--busy"></span>
+            </div>
+            <div class="sidebar__agent-info">
+              <div class="sidebar__agent-name">Kai</div>
+              <div class="sidebar__agent-role">Content & Creative</div>
+            </div>
+          </button>
+
+          <button class="sidebar__agent" data-agent="sam">
+            <div class="sidebar__agent-avatar" style="background: var(--online-bg);">
+              📅
+              <span class="sidebar__agent-dot sidebar__agent-dot--offline"></span>
+            </div>
+            <div class="sidebar__agent-info">
+              <div class="sidebar__agent-name">Sam</div>
+              <div class="sidebar__agent-role">Scheduling</div>
+            </div>
+          </button>
+        </div>
+
+        <div class="sidebar__section-label">Settings</div>
+        <button class="sidebar__item" data-view="settings">
+          <span class="sidebar__item-icon">⚙️</span> Settings
+        </button>
+        <button class="sidebar__item" data-view="storage">
+          <span class="sidebar__item-icon">☁️</span> Storage & Backup
+        </button>
+      </nav>
+
+      <div class="sidebar__footer">
+        <div class="sidebar__user">
+          <div class="sidebar__user-avatar">S</div>
+          <div>
+            <div class="sidebar__user-name">Sarah M.</div>
+            <div class="sidebar__user-plan">Self-hosted · 4 employees</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============================================================
+         TOPBAR
+         ============================================================ -->
+    <header class="topbar" id="topbar">
+      <button class="topbar__btn" id="menuBtn" style="display:none;" aria-label="Menu">☰</button>
+
+      <div class="topbar__breadcrumb" id="breadcrumb">
+        <span>Console</span>
+        <span class="topbar__breadcrumb-sep">/</span>
+        <span id="breadcrumbPage">Dashboard</span>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <div class="topbar__search">
+        <span class="topbar__search-icon">🔍</span>
+        <input type="text" placeholder="Search conversations, files..." id="globalSearch">
+      </div>
+
+      <div class="topbar__actions">
+        <button class="topbar__btn" id="notifBtn">
+          🔔 <span style="font-size:11px;background:var(--rose);color:white;padding:0 5px;border-radius:100px;margin-left:2px;">2</span>
+        </button>
+        <button class="topbar__btn topbar__btn--primary" id="newEmployeeBtn">+ New Employee</button>
+      </div>
+    </header>
+
+    <!-- ============================================================
+         MAIN CONTENT
+         ============================================================ -->
+    <main class="main" id="main">
+
+      <!-- ── DASHBOARD VIEW ────────────────────────────────────── -->
+      <div class="view active" id="view-dashboard">
+        <div class="dashboard">
+          <div class="dashboard__greeting">
+            <div class="dashboard__greeting-text">Good morning, Sarah.</div>
+            <div class="dashboard__greeting-sub">Your team is running. 3 of 4 employees are online right now.</div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-card__label">Messages Today</div>
+              <div class="stat-card__value">47</div>
+              <div class="stat-card__change stat-card__change--up">↑ 12% from yesterday</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__label">Tasks Completed</div>
+              <div class="stat-card__value">8</div>
+              <div class="stat-card__change stat-card__change--up">↑ 3 since 9am</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__label">Files Created</div>
+              <div class="stat-card__value">5</div>
+              <div class="stat-card__change stat-card__change--neutral">Reports, drafts, briefs</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__label">Uptime</div>
+              <div class="stat-card__value">99.8%</div>
+              <div class="stat-card__change stat-card__change--up">Last 30 days</div>
+            </div>
+          </div>
+
+          <div class="dashboard__grid">
+            <!-- Team Status -->
+            <div class="dash-panel">
+              <div class="dash-panel__header">
+                <span class="dash-panel__title">Team Status</span>
+                <span class="dash-panel__action" data-view="team">View all →</span>
+              </div>
+              <div class="dash-panel__body">
+                <div class="team-row" data-agent="maya">
+                  <div class="team-row__avatar" style="background:var(--rose-bg);">👩‍💼<span class="team-row__dot" style="background:var(--online);border-color:var(--chrome-surface);"></span></div>
+                  <div class="team-row__info">
+                    <div class="team-row__name">Maya</div>
+                    <div class="team-row__status-text">Finished Q2 competitive analysis · 6 min ago</div>
+                  </div>
+                  <span class="team-row__health team-row__health--healthy">Healthy</span>
+                </div>
+                <div class="team-row" data-agent="priya">
+                  <div class="team-row__avatar" style="background:var(--teal-bg);">👩‍💻<span class="team-row__dot" style="background:var(--online);border-color:var(--chrome-surface);"></span></div>
+                  <div class="team-row__info">
+                    <div class="team-row__name">Priya</div>
+                    <div class="team-row__status-text">Following up on MediaCo proposal · active</div>
+                  </div>
+                  <span class="team-row__health team-row__health--healthy">Healthy</span>
+                </div>
+                <div class="team-row" data-agent="kai">
+                  <div class="team-row__avatar" style="background:var(--ochre-bg);">🧑‍🎨<span class="team-row__dot" style="background:var(--busy);border-color:var(--chrome-surface);"></span></div>
+                  <div class="team-row__info">
+                    <div class="team-row__name">Kai</div>
+                    <div class="team-row__status-text">Drafting LinkedIn posts for March · working</div>
+                  </div>
+                  <span class="team-row__health team-row__health--busy">Working</span>
+                </div>
+                <div class="team-row" data-agent="sam">
+                  <div class="team-row__avatar" style="background:var(--online-bg);">📅<span class="team-row__dot" style="background:var(--offline);border-color:var(--chrome-surface);"></span></div>
+                  <div class="team-row__info">
+                    <div class="team-row__name">Sam</div>
+                    <div class="team-row__status-text">Stopped · last active 2h ago</div>
+                  </div>
+                  <span class="team-row__health team-row__health--offline">Offline</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="dash-panel">
+              <div class="dash-panel__header">
+                <span class="dash-panel__title">Recent Activity</span>
+                <span class="dash-panel__action" data-view="activity-view">View all →</span>
+              </div>
+              <div class="dash-panel__body">
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--file">📄</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Maya</strong> created <strong>q2-competitive-brief.pdf</strong></div>
+                    <div class="activity-item__time">6 minutes ago</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--msg">💬</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Priya</strong> sent follow-up email to MediaCo procurement</div>
+                    <div class="activity-item__time">22 minutes ago</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--task">✓</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Kai</strong> completed case study draft for Acme project</div>
+                    <div class="activity-item__time">1 hour ago</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--msg">💬</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Maya</strong> responded to your WhatsApp question about market sizing</div>
+                    <div class="activity-item__time">1 hour ago</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--file">📄</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Priya</strong> updated <strong>client-onboarding-checklist.md</strong></div>
+                    <div class="activity-item__time">2 hours ago</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-item__icon activity-item__icon--alert">⚠️</div>
+                  <div class="activity-item__content">
+                    <div class="activity-item__text"><strong>Sam</strong> went offline — scheduling service stopped</div>
+                    <div class="activity-item__time">2 hours ago</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CHAT VIEW (shown when clicking an agent) ──────────── -->
+      <div class="view--split" id="view-chat">
+        <div class="chat-view">
+          <div class="chat-header" id="chatHeader">
+            <div class="chat-header__avatar" id="chatAvatar" style="background:var(--rose-bg);">
+              👩‍💼
+              <span class="chat-header__dot" id="chatDot" style="background:var(--online);border-color:var(--chrome-surface);"></span>
+            </div>
+            <div class="chat-header__info">
+              <div class="chat-header__name" id="chatName">Maya</div>
+              <div class="chat-header__role" id="chatRole">Research & Strategy · Online</div>
+            </div>
+            <div class="chat-header__actions">
+              <button class="chat-header__action-btn" title="View workspace">📁</button>
+              <button class="chat-header__action-btn" title="Health check">💓</button>
+              <button class="chat-header__action-btn" title="Settings">⚙️</button>
+            </div>
+          </div>
+
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-date-sep">Today</div>
+
+            <div class="chat-msg chat-msg--ai">
+              <div class="chat-msg__avatar" style="background:var(--rose-bg);">👩‍💼</div>
+              <div>
+                <div class="chat-msg__bubble">Good morning, Sarah. I've finished the Q2 competitive analysis you asked about yesterday.</div>
+                <div class="chat-msg__meta">Maya · 8:12am</div>
+              </div>
+            </div>
+
+            <div class="chat-msg chat-msg--ai">
+              <div class="chat-msg__avatar" style="background:var(--rose-bg);">👩‍💼</div>
+              <div>
+                <div class="chat-msg__bubble">
+                  Three things worth noting:<br><br>
+                  <strong>1.</strong> Competitor X launched a new enterprise tier — pricing undercuts yours by 15% but scope is narrower<br>
+                  <strong>2.</strong> The Deloitte report names your segment as "high growth" — good for the investor deck<br>
+                  <strong>3.</strong> MediaCo's RFP deadline moved up to Wednesday (was Friday)
+                </div>
+                <div class="chat-msg__file">
+                  <span class="chat-msg__file-icon">📊</span>
+                  <div class="chat-msg__file-info">
+                    <div class="chat-msg__file-name">q2-competitive-brief.pdf</div>
+                    <div class="chat-msg__file-size">4 pages · 2.1 MB</div>
+                  </div>
+                </div>
+                <div class="chat-msg__meta">Maya · 8:12am</div>
+              </div>
+            </div>
+
+            <div class="chat-msg chat-msg--user">
+              <div class="chat-msg__avatar" style="background:var(--chrome-border);">S</div>
+              <div>
+                <div class="chat-msg__bubble">That deadline change — are we still on track for the RFP?</div>
+                <div class="chat-msg__meta">You · 8:34am</div>
+              </div>
+            </div>
+
+            <div class="chat-msg chat-msg--ai">
+              <div class="chat-msg__avatar" style="background:var(--rose-bg);">👩‍💼</div>
+              <div>
+                <div class="chat-msg__bubble">We're tight but doable. I've drafted the executive summary and pulled the three case studies they asked for. Priya is confirming the format requirements with their procurement team right now. I can have a review-ready draft to you by 6pm tonight.</div>
+                <div class="chat-msg__meta">Maya · 8:35am</div>
+              </div>
+            </div>
+
+            <div class="chat-msg chat-msg--user">
+              <div class="chat-msg__avatar" style="background:var(--chrome-border);">S</div>
+              <div>
+                <div class="chat-msg__bubble">Perfect. Do it. And can you also pull the client satisfaction numbers from last quarter? We should include those.</div>
+                <div class="chat-msg__meta">You · 8:36am</div>
+              </div>
+            </div>
+
+            <div class="chat-msg chat-msg--ai">
+              <div class="chat-msg__avatar" style="background:var(--rose-bg);">👩‍💼</div>
+              <div>
+                <div class="chat-msg__bubble">On it. I have the NPS data from the Q1 survey — 72 across all accounts, 84 for enterprise. I'll add a one-page appendix with the key metrics. Anything else for the RFP?</div>
+                <div class="chat-msg__meta">Maya · 8:36am</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-typing" id="chatTyping" style="display:none;">
+            <div class="chat-typing__dots"><span></span><span></span><span></span></div>
+            <span id="chatTypingName">Maya</span> is typing...
+          </div>
+
+          <div class="chat-input">
+            <div class="chat-input__row">
+              <textarea class="chat-input__textarea" id="chatInput" rows="1" placeholder="Message Maya..."></textarea>
+              <div class="chat-input__actions">
+                <button class="chat-input__action" title="Attach file">📎</button>
+                <button class="chat-input__send" id="chatSend" title="Send">↑</button>
+              </div>
+            </div>
+            <div class="chat-input__hint"><kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</div>
+          </div>
+        </div>
+
+        <!-- Detail panel -->
+        <div class="detail-panel" id="detailPanel">
+          <div class="detail-panel__header">
+            <div class="detail-panel__avatar" style="background:var(--rose-bg);">
+              👩‍💼
+              <span class="detail-panel__dot" id="detailDot" style="background:var(--online);border-color:var(--chrome-surface);"></span>
+            </div>
+            <div class="detail-panel__name" id="detailName">Maya</div>
+            <div class="detail-panel__role" id="detailRole">Research & Strategy Lead</div>
+            <div class="detail-panel__status-line">
+              <span class="detail-panel__status-dot" id="detailStatusDot" style="background:var(--online);"></span>
+              <span id="detailStatusText">Online · 4h 22m uptime</span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section__title">Performance</div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Messages today</span>
+              <span class="detail-stat__value">18</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Tasks completed</span>
+              <span class="detail-stat__value">3</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Files created</span>
+              <span class="detail-stat__value">2</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Avg response time</span>
+              <span class="detail-stat__value">14s</span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section__title">Connected Channels</div>
+            <div class="detail-channel-list">
+              <div class="detail-channel">
+                <span class="detail-channel__icon">💬</span>
+                <span class="detail-channel__name">WhatsApp</span>
+                <span class="detail-channel__status" style="background:var(--online);"></span>
+              </div>
+              <div class="detail-channel">
+                <span class="detail-channel__icon">💼</span>
+                <span class="detail-channel__name">Slack</span>
+                <span class="detail-channel__status" style="background:var(--online);"></span>
+              </div>
+              <div class="detail-channel">
+                <span class="detail-channel__icon">📧</span>
+                <span class="detail-channel__name">Email</span>
+                <span class="detail-channel__status" style="background:var(--online);"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section__title">Recent Files</div>
+            <div class="detail-files">
+              <div class="detail-file">
+                <span class="detail-file__icon">📊</span>
+                <div class="detail-file__info">
+                  <div class="detail-file__name">q2-competitive-brief.pdf</div>
+                  <div class="detail-file__meta">6 min ago · 2.1 MB</div>
+                </div>
+              </div>
+              <div class="detail-file">
+                <span class="detail-file__icon">📝</span>
+                <div class="detail-file__info">
+                  <div class="detail-file__name">rfp-exec-summary.md</div>
+                  <div class="detail-file__meta">1 hour ago · 12 KB</div>
+                </div>
+              </div>
+              <div class="detail-file">
+                <span class="detail-file__icon">📋</span>
+                <div class="detail-file__info">
+                  <div class="detail-file__name">market-sizing-notes.md</div>
+                  <div class="detail-file__meta">Yesterday · 8 KB</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section__title">System</div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Memory</span>
+              <span class="detail-stat__value">342 MiB</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Port</span>
+              <span class="detail-stat__value" style="font-family:var(--font-mono);font-size:12px;">:18789</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Group</span>
+              <span class="detail-stat__value">backend/</span>
+            </div>
+            <div class="detail-stat">
+              <span class="detail-stat__label">Last backup</span>
+              <span class="detail-stat__value">2h ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TEAM VIEW ─────────────────────────────────────────── -->
+      <div class="view" id="view-team">
+        <div class="team-mgmt">
+          <div class="team-mgmt__header">
+            <div class="team-mgmt__title">Your Team</div>
+          </div>
+
+          <div class="team-mgmt__grid">
+            <div class="employee-card" data-agent="maya">
+              <div class="employee-card__top">
+                <div class="employee-card__avatar" style="background:var(--rose-bg);">👩‍💼<span class="employee-card__dot" style="background:var(--online);border-color:var(--chrome-surface);"></span></div>
+                <div>
+                  <div class="employee-card__name">Maya</div>
+                  <div class="employee-card__role">Research & Strategy Lead</div>
+                </div>
+              </div>
+              <div class="employee-card__desc">Monitors industry feeds, tracks competitors, drafts strategy briefs. Sends daily morning updates via WhatsApp.</div>
+              <div class="employee-card__meta">
+                <span class="employee-card__meta-item">💬 3 channels</span>
+                <span class="employee-card__meta-item">📄 2 files today</span>
+                <span class="employee-card__meta-item">⏱️ 4h uptime</span>
+              </div>
+            </div>
+
+            <div class="employee-card" data-agent="priya">
+              <div class="employee-card__top">
+                <div class="employee-card__avatar" style="background:var(--teal-bg);">👩‍💻<span class="employee-card__dot" style="background:var(--online);border-color:var(--chrome-surface);"></span></div>
+                <div>
+                  <div class="employee-card__name">Priya</div>
+                  <div class="employee-card__role">Client Communications</div>
+                </div>
+              </div>
+              <div class="employee-card__desc">Drafts client emails, follows up on proposals, manages scheduling. Never lets a thread go cold.</div>
+              <div class="employee-card__meta">
+                <span class="employee-card__meta-item">💬 3 channels</span>
+                <span class="employee-card__meta-item">📧 4 emails today</span>
+                <span class="employee-card__meta-item">⏱️ 6h uptime</span>
+              </div>
+            </div>
+
+            <div class="employee-card" data-agent="kai">
+              <div class="employee-card__top">
+                <div class="employee-card__avatar" style="background:var(--ochre-bg);">🧑‍🎨<span class="employee-card__dot" style="background:var(--busy);border-color:var(--chrome-surface);"></span></div>
+                <div>
+                  <div class="employee-card__name">Kai</div>
+                  <div class="employee-card__role">Content & Creative</div>
+                </div>
+              </div>
+              <div class="employee-card__desc">Writes blog posts, social copy, newsletters, and case studies. Maintains your brand voice across everything.</div>
+              <div class="employee-card__meta">
+                <span class="employee-card__meta-item">💬 3 channels</span>
+                <span class="employee-card__meta-item">📄 3 drafts today</span>
+                <span class="employee-card__meta-item">🔨 Working</span>
+              </div>
+            </div>
+
+            <div class="employee-card" data-agent="sam">
+              <div class="employee-card__top">
+                <div class="employee-card__avatar" style="background:var(--online-bg);">📅<span class="employee-card__dot" style="background:var(--offline);border-color:var(--chrome-surface);"></span></div>
+                <div>
+                  <div class="employee-card__name">Sam</div>
+                  <div class="employee-card__role">Scheduling Coordinator</div>
+                </div>
+              </div>
+              <div class="employee-card__desc">Handles meeting requests, rescheduling, and client booking. Responds in real-time via Telegram and WhatsApp.</div>
+              <div class="employee-card__meta">
+                <span class="employee-card__meta-item">💬 2 channels</span>
+                <span class="employee-card__meta-item">⚠️ Offline</span>
+                <span class="employee-card__meta-item">🔄 Restart</span>
+              </div>
+            </div>
+
+            <div class="employee-card employee-card--add" id="addEmployeeCard">
+              <div class="employee-card--add__icon">+</div>
+              <div class="employee-card--add__label">Add New Employee</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── WORKSPACE VIEW ────────────────────────────────────── -->
+      <div class="view" id="view-workspace">
+        <div class="workspace">
+          <div class="workspace__header">
+            <div class="workspace__title">Shared Workspace</div>
+          </div>
+
+          <div class="workspace__path">
+            <span class="workspace__path-seg">~</span>
+            <span class="workspace__path-sep">/</span>
+            <span class="workspace__path-seg">.openclaw</span>
+            <span class="workspace__path-sep">/</span>
+            <span class="workspace__path-seg">backend</span>
+            <span class="workspace__path-sep">/</span>
+            <span class="workspace__path-seg" style="color:var(--chrome-text);">shared</span>
+          </div>
+
+          <div class="workspace__table">
+            <div class="workspace__row workspace__row--header">
+              <span>Name</span>
+              <span>Owner</span>
+              <span>Modified</span>
+              <span>Size</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📁</span> content/</span>
+              <span class="workspace__file-owner">Kai</span>
+              <span class="workspace__file-modified">12 min ago</span>
+              <span class="workspace__file-size">—</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📁</span> reports/</span>
+              <span class="workspace__file-owner">Maya</span>
+              <span class="workspace__file-modified">6 min ago</span>
+              <span class="workspace__file-size">—</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📁</span> clients/</span>
+              <span class="workspace__file-owner">Priya</span>
+              <span class="workspace__file-modified">22 min ago</span>
+              <span class="workspace__file-size">—</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📊</span> q2-competitive-brief.pdf</span>
+              <span class="workspace__file-owner">Maya</span>
+              <span class="workspace__file-modified">6 min ago</span>
+              <span class="workspace__file-size">2.1 MB</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📝</span> rfp-exec-summary.md</span>
+              <span class="workspace__file-owner">Maya</span>
+              <span class="workspace__file-modified">1 hour ago</span>
+              <span class="workspace__file-size">12 KB</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📝</span> linkedin-march-drafts.md</span>
+              <span class="workspace__file-owner">Kai</span>
+              <span class="workspace__file-modified">12 min ago</span>
+              <span class="workspace__file-size">8 KB</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📝</span> acme-case-study-v2.md</span>
+              <span class="workspace__file-owner">Kai</span>
+              <span class="workspace__file-modified">1 hour ago</span>
+              <span class="workspace__file-size">24 KB</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📋</span> client-onboarding-checklist.md</span>
+              <span class="workspace__file-owner">Priya</span>
+              <span class="workspace__file-modified">2 hours ago</span>
+              <span class="workspace__file-size">6 KB</span>
+            </div>
+            <div class="workspace__row">
+              <span class="workspace__file-name"><span class="workspace__file-icon">📧</span> mediaco-follow-up-draft.md</span>
+              <span class="workspace__file-owner">Priya</span>
+              <span class="workspace__file-modified">22 min ago</span>
+              <span class="workspace__file-size">3 KB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ACTIVITY VIEW ─────────────────────────────────────── -->
+      <div class="view" id="view-activity-view">
+        <div class="dashboard" style="max-width:720px;">
+          <div class="dashboard__greeting">
+            <div class="dashboard__greeting-text" style="font-size:24px;">Activity Feed</div>
+            <div class="dashboard__greeting-sub">Everything your team has been doing, in real time.</div>
+          </div>
+
+          <div class="dash-panel">
+            <div class="dash-panel__body">
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--file">📄</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Maya</strong> created <strong>q2-competitive-brief.pdf</strong> in /shared/reports/</div>
+                  <div class="activity-item__time">6 minutes ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--msg">💬</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Maya</strong> sent you a morning brief via WhatsApp</div>
+                  <div class="activity-item__time">12 minutes ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--msg">📧</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Priya</strong> sent follow-up email to MediaCo procurement team</div>
+                  <div class="activity-item__time">22 minutes ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--file">📝</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Kai</strong> updated <strong>linkedin-march-drafts.md</strong> — added contrarian post revision</div>
+                  <div class="activity-item__time">35 minutes ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--task">✓</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Kai</strong> completed case study draft for Acme project</div>
+                  <div class="activity-item__time">1 hour ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--file">📝</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Maya</strong> created <strong>rfp-exec-summary.md</strong> in /shared/reports/</div>
+                  <div class="activity-item__time">1 hour ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--msg">💬</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Maya</strong> answered your question about market sizing via WhatsApp</div>
+                  <div class="activity-item__time">1 hour ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--file">📋</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Priya</strong> updated <strong>client-onboarding-checklist.md</strong></div>
+                  <div class="activity-item__time">2 hours ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--alert">⚠️</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Sam</strong> went offline — gateway health check failed</div>
+                  <div class="activity-item__time">2 hours ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-item__icon activity-item__icon--task">✓</div>
+                <div class="activity-item__content">
+                  <div class="activity-item__text"><strong>Priya</strong> confirmed 3 client meetings for this week</div>
+                  <div class="activity-item__time">3 hours ago</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Mobile overlay -->
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ================================================================
+       JAVASCRIPT — Full interactivity
+       ================================================================ -->
+  <script>
+    (function() {
+      'use strict';
+
+      /* ── Agent data model ──────────────────────────────────────── */
+      var agents = {
+        maya: {
+          name: 'Maya', role: 'Research & Strategy Lead', emoji: '👩‍💼',
+          bg: 'var(--rose-bg)', status: 'online', statusColor: 'var(--online)',
+          channels: ['WhatsApp', 'Slack', 'Email'],
+          greeting: "Hey Sarah — anything I can look into for you?",
+          responses: [
+            "Let me research that. I'll have a summary in your workspace within the hour.",
+            "Good question. Based on the data I've been tracking, here's what I see...",
+            "I'll add that to the competitive brief. Want me to update the board deck too?",
+            "Done. I've put the analysis in /shared/reports/ — check when you have a moment.",
+            "I'll cross-reference that with the Deloitte data and get back to you.",
+          ]
+        },
+        priya: {
+          name: 'Priya', role: 'Client Communications', emoji: '👩‍💻',
+          bg: 'var(--teal-bg)', status: 'online', statusColor: 'var(--online)',
+          channels: ['Email', 'Telegram', 'Calendar'],
+          greeting: "Hi Sarah! I'm following up on three client threads right now. Need anything?",
+          responses: [
+            "I'll draft that email and send it to your drafts for review.",
+            "Already on it — the follow-up went out 20 minutes ago. Waiting for their reply.",
+            "I've rescheduled the meeting and sent calendar invites to both parties.",
+            "The client responded positively. I've updated the CRM notes and flagged the next step.",
+            "I'll handle the scheduling — you focus on the presentation.",
+          ]
+        },
+        kai: {
+          name: 'Kai', role: 'Content & Creative', emoji: '🧑‍🎨',
+          bg: 'var(--ochre-bg)', status: 'busy', statusColor: 'var(--busy)',
+          channels: ['Slack', 'Discord', 'Workspace'],
+          greeting: "Working on the March content batch. What do you need?",
+          responses: [
+            "I'll draft that in your brand voice. Give me 15 minutes.",
+            "Revised — I made it sharper and led with the data point. Check /shared/content/.",
+            "The LinkedIn post is ready. Want me to also create an Instagram version?",
+            "I've finished the newsletter intro. It's in the content pipeline, ready for review.",
+            "Good call. I'll adjust the tone — less corporate, more conversational.",
+          ]
+        },
+        sam: {
+          name: 'Sam', role: 'Scheduling Coordinator', emoji: '📅',
+          bg: 'var(--online-bg)', status: 'offline', statusColor: 'var(--offline)',
+          channels: ['Telegram', 'WhatsApp'],
+          greeting: "I'm currently offline. Sarah, you may need to restart me.",
+          responses: [
+            "I'm not fully operational right now — some of my services are down.",
+          ]
+        }
+      };
+
+      var currentAgent = null;
+
+      /* ── View switching ────────────────────────────────────────── */
+      var views = document.querySelectorAll('.view, .view--split');
+      var sidebarItems = document.querySelectorAll('.sidebar__item[data-view]');
+      var sidebarAgents = document.querySelectorAll('.sidebar__agent[data-agent]');
+      var breadcrumbPage = document.getElementById('breadcrumbPage');
+      var dashPanelActions = document.querySelectorAll('.dash-panel__action[data-view]');
+      var teamRows = document.querySelectorAll('.team-row[data-agent]');
+      var employeeCards = document.querySelectorAll('.employee-card[data-agent]');
+
+      function showView(viewId) {
+        for (var i = 0; i < views.length; i++) {
+          views[i].classList.remove('active');
+        }
+        var target = document.getElementById('view-' + viewId);
+        if (target) target.classList.add('active');
+
+        // Update sidebar active state
+        for (var j = 0; j < sidebarItems.length; j++) {
+          sidebarItems[j].classList.toggle('active', sidebarItems[j].getAttribute('data-view') === viewId);
+        }
+
+        // Update breadcrumb
+        var names = { dashboard: 'Dashboard', team: 'Team', workspace: 'Workspace', 'activity-view': 'Activity', chat: 'Chat', settings: 'Settings', storage: 'Storage' };
+        breadcrumbPage.textContent = names[viewId] || viewId;
+
+        closeMobileMenu();
+      }
+
+      function openChat(agentId) {
+        var agent = agents[agentId];
+        if (!agent) return;
+
+        currentAgent = agentId;
+
+        // Update chat header
+        document.getElementById('chatAvatar').textContent = agent.emoji;
+        document.getElementById('chatAvatar').style.background = agent.bg;
+        document.getElementById('chatDot').style.background = agent.statusColor;
+        document.getElementById('chatName').textContent = agent.name;
+        document.getElementById('chatRole').textContent = agent.role + ' · ' + (agent.status === 'online' ? 'Online' : agent.status === 'busy' ? 'Working' : 'Offline');
+
+        // Update detail panel
+        document.getElementById('detailName').textContent = agent.name;
+        document.getElementById('detailRole').textContent = agent.role;
+        document.getElementById('detailDot').style.background = agent.statusColor;
+        document.getElementById('detailStatusDot').style.background = agent.statusColor;
+        document.getElementById('detailStatusText').textContent = agent.status === 'online' ? 'Online' : agent.status === 'busy' ? 'Working on tasks' : 'Offline';
+
+        // Update input placeholder
+        document.getElementById('chatInput').placeholder = 'Message ' + agent.name + '...';
+        document.getElementById('chatTypingName').textContent = agent.name;
+
+        // Clear and rebuild messages
+        var msgArea = document.getElementById('chatMessages');
+        msgArea.innerHTML = '<div class="chat-date-sep">Today</div>';
+
+        // Add greeting
+        addChatMessage('ai', agent.greeting, agent, '8:12am');
+
+        // Update sidebar active
+        for (var k = 0; k < sidebarAgents.length; k++) {
+          sidebarAgents[k].classList.toggle('active', sidebarAgents[k].getAttribute('data-agent') === agentId);
+        }
+
+        // Remove unread dot
+        var agentBtn = document.querySelector('.sidebar__agent[data-agent="' + agentId + '"]');
+        if (agentBtn) {
+          var dot = agentBtn.querySelector('.sidebar__agent-unread');
+          if (dot) dot.remove();
+        }
+
+        showView('chat');
+        breadcrumbPage.textContent = agent.name;
+      }
+
+      function addChatMessage(type, text, agent, time) {
+        var msgArea = document.getElementById('chatMessages');
+        var wrapper = document.createElement('div');
+        wrapper.className = 'chat-msg chat-msg--' + (type === 'ai' ? 'ai' : 'user');
+
+        var avatarDiv = document.createElement('div');
+        avatarDiv.className = 'chat-msg__avatar';
+
+        if (type === 'ai') {
+          avatarDiv.textContent = agent.emoji;
+          avatarDiv.style.background = agent.bg;
+        } else {
+          avatarDiv.textContent = 'S';
+          avatarDiv.style.background = 'var(--chrome-border)';
+        }
+
+        var contentDiv = document.createElement('div');
+        var bubble = document.createElement('div');
+        bubble.className = 'chat-msg__bubble';
+        bubble.textContent = text;
+        contentDiv.appendChild(bubble);
+
+        var meta = document.createElement('div');
+        meta.className = 'chat-msg__meta';
+        var now = time || new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        meta.textContent = (type === 'ai' ? agent.name : 'You') + ' · ' + now;
+        contentDiv.appendChild(meta);
+
+        wrapper.appendChild(avatarDiv);
+        wrapper.appendChild(contentDiv);
+        msgArea.appendChild(wrapper);
+        msgArea.scrollTop = msgArea.scrollHeight;
+      }
+
+      // Bind sidebar nav items
+      for (var a = 0; a < sidebarItems.length; a++) {
+        sidebarItems[a].addEventListener('click', function() {
+          showView(this.getAttribute('data-view'));
+        });
+      }
+
+      // Bind sidebar agents
+      for (var b = 0; b < sidebarAgents.length; b++) {
+        sidebarAgents[b].addEventListener('click', function() {
+          openChat(this.getAttribute('data-agent'));
+        });
+      }
+
+      // Bind dashboard panel actions
+      for (var c = 0; c < dashPanelActions.length; c++) {
+        dashPanelActions[c].addEventListener('click', function() {
+          showView(this.getAttribute('data-view'));
+        });
+      }
+
+      // Bind team rows and employee cards to open chat
+      for (var d = 0; d < teamRows.length; d++) {
+        teamRows[d].addEventListener('click', function() {
+          openChat(this.getAttribute('data-agent'));
+        });
+      }
+
+      for (var e = 0; e < employeeCards.length; e++) {
+        var agentAttr = employeeCards[e].getAttribute('data-agent');
+        if (agentAttr) {
+          employeeCards[e].addEventListener('click', function() {
+            openChat(this.getAttribute('data-agent'));
+          });
+        }
+      }
+
+      /* ── Chat send ─────────────────────────────────────────────── */
+      var chatInput = document.getElementById('chatInput');
+      var chatSend = document.getElementById('chatSend');
+      var chatTyping = document.getElementById('chatTyping');
+
+      function sendMessage() {
+        var text = chatInput.value.trim();
+        if (!text || !currentAgent) return;
+
+        var agent = agents[currentAgent];
+        addChatMessage('user', text, agent);
+        chatInput.value = '';
+        autoResizeTextarea();
+
+        // Show typing
+        chatTyping.style.display = 'flex';
+
+        // AI response after delay
+        var delay = 800 + Math.random() * 1200;
+        setTimeout(function() {
+          chatTyping.style.display = 'none';
+          var resp = agent.responses[Math.floor(Math.random() * agent.responses.length)];
+          addChatMessage('ai', resp, agent);
+        }, delay);
+      }
+
+      chatSend.addEventListener('click', sendMessage);
+
+      chatInput.addEventListener('keydown', function(evt) {
+        if (evt.key === 'Enter' && !evt.shiftKey) {
+          evt.preventDefault();
+          sendMessage();
+        }
+      });
+
+      // Auto-resize textarea
+      function autoResizeTextarea() {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+      }
+
+      chatInput.addEventListener('input', autoResizeTextarea);
+
+      /* ── Mobile menu ───────────────────────────────────────────── */
+      var menuBtn = document.getElementById('menuBtn');
+      var sidebar = document.getElementById('sidebar');
+      var mobileOverlay = document.getElementById('mobileOverlay');
+
+      function closeMobileMenu() {
+        sidebar.classList.remove('open');
+        mobileOverlay.classList.remove('open');
+      }
+
+      if (menuBtn) {
+        menuBtn.addEventListener('click', function() {
+          sidebar.classList.toggle('open');
+          mobileOverlay.classList.toggle('open');
+        });
+      }
+
+      mobileOverlay.addEventListener('click', closeMobileMenu);
+
+      // Show menu button on mobile
+      function checkMobile() {
+        if (window.innerWidth <= 768) {
+          menuBtn.style.display = 'flex';
+        } else {
+          menuBtn.style.display = 'none';
+          closeMobileMenu();
+        }
+      }
+
+      window.addEventListener('resize', checkMobile);
+      checkMobile();
+
+      /* ── Search ────────────────────────────────────────────────── */
+      var globalSearch = document.getElementById('globalSearch');
+
+      globalSearch.addEventListener('keydown', function(evt) {
+        if (evt.key === 'Enter') {
+          var query = this.value.trim().toLowerCase();
+          if (!query) return;
+
+          // Search agents
+          for (var id in agents) {
+            if (agents[id].name.toLowerCase().includes(query) || agents[id].role.toLowerCase().includes(query)) {
+              openChat(id);
+              this.value = '';
+              return;
+            }
+          }
+
+          showToast('🔍', 'No results for "' + this.value + '"');
+          this.value = '';
+        }
+      });
+
+      /* ── Toast notifications ───────────────────────────────────── */
+      var toastContainer = document.getElementById('toastContainer');
+
+      function showToast(icon, message) {
+        var toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = '<span class="toast__icon">' + icon + '</span>' +
+          '<span class="toast__text">' + message + '</span>' +
+          '<button class="toast__close">×</button>';
+
+        toastContainer.appendChild(toast);
+
+        var closeBtn = toast.querySelector('.toast__close');
+        closeBtn.addEventListener('click', function() {
+          toast.classList.add('toast--leaving');
+          setTimeout(function() { toast.remove(); }, 250);
+        });
+
+        setTimeout(function() {
+          if (toast.parentNode) {
+            toast.classList.add('toast--leaving');
+            setTimeout(function() { toast.remove(); }, 250);
+          }
+        }, 5000);
+      }
+
+      /* ── Simulated live notifications ──────────────────────────── */
+      var notifications = [
+        { icon: '👩‍💼', text: '<strong>Maya</strong> updated the RFP executive summary', delay: 45000 },
+        { icon: '👩‍💻', text: '<strong>Priya</strong> received a reply from MediaCo', delay: 90000 },
+        { icon: '🧑‍🎨', text: '<strong>Kai</strong> finished the LinkedIn post revisions', delay: 140000 },
+      ];
+
+      for (var f = 0; f < notifications.length; f++) {
+        (function(n) {
+          setTimeout(function() {
+            showToast(n.icon, n.text);
+          }, n.delay);
+        })(notifications[f]);
+      }
+
+      /* ── New Employee button ───────────────────────────────────── */
+      var newEmployeeBtn = document.getElementById('newEmployeeBtn');
+      var addEmployeeCard = document.getElementById('addEmployeeCard');
+
+      function showNewEmployeeToast() {
+        showToast('✦', 'New Employee wizard coming soon — use <strong>clawctl create</strong> in the meantime');
+      }
+
+      if (newEmployeeBtn) newEmployeeBtn.addEventListener('click', showNewEmployeeToast);
+      if (addEmployeeCard) addEmployeeCard.addEventListener('click', showNewEmployeeToast);
+
+      /* ── Notification bell ─────────────────────────────────────── */
+      var notifBtn = document.getElementById('notifBtn');
+      notifBtn.addEventListener('click', function() {
+        showToast('🔔', '<strong>Maya</strong> sent a morning brief · <strong>Sam</strong> needs restart');
+      });
+
+      /* ── Greeting based on time of day ─────────────────────────── */
+      var hour = new Date().getHours();
+      var greetingEl = document.querySelector('.dashboard__greeting-text');
+      if (greetingEl) {
+        if (hour < 12) greetingEl.textContent = 'Good morning, Sarah.';
+        else if (hour < 17) greetingEl.textContent = 'Good afternoon, Sarah.';
+        else greetingEl.textContent = 'Good evening, Sarah.';
+      }
+
+      /* ── Keyboard shortcuts ────────────────────────────────────── */
+      document.addEventListener('keydown', function(evt) {
+        // Cmd/Ctrl+K to focus search
+        if ((evt.metaKey || evt.ctrlKey) && evt.key === 'k') {
+          evt.preventDefault();
+          globalSearch.focus();
+        }
+
+        // Escape to go back to dashboard
+        if (evt.key === 'Escape') {
+          if (document.activeElement === globalSearch) {
+            globalSearch.blur();
+          } else {
+            showView('dashboard');
+          }
+        }
+
+        // 1-4 to switch agents quickly (when not typing)
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          var agentKeys = { '1': 'maya', '2': 'priya', '3': 'kai', '4': 'sam' };
+          if (agentKeys[evt.key]) {
+            openChat(agentKeys[evt.key]);
+          }
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>

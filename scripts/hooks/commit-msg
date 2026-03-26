@@ -1,0 +1,16 @@
+#!/bin/bash
+# Commit-msg hook: scan the commit message for secrets
+
+GITLEAKS="/home/ubuntu/.local/bin/gitleaks"
+COMMIT_MSG_FILE="$1"
+
+if [ ! -x "$GITLEAKS" ]; then
+    exit 0
+fi
+
+# Scan the commit message file for patterns that look like secrets
+if $GITLEAKS detect --no-git --config .gitleaks.toml --source "$COMMIT_MSG_FILE" 2>/dev/null; then
+    : # clean
+else
+    echo "WARNING: commit message may contain a secret. Double-check before proceeding."
+fi

@@ -1,0 +1,36 @@
+# Gitleaks configuration for clawctl
+# https://github.com/gitleaks/gitleaks
+
+title = "clawctl secret scanning"
+
+[allowlist]
+  # Test files use fake tokens
+  paths = [
+    '''_test\.go$''',
+    '''\.gitleaks\.toml$''',
+  ]
+
+# Additional rules beyond the built-in defaults
+
+[[rules]]
+  id = "telegram-bot-token"
+  description = "Telegram Bot Token"
+  regex = '''\d{8,10}:[A-Za-z0-9_-]{35}'''
+
+[[rules]]
+  id = "openclaw-gateway-token"
+  description = "OpenClaw Gateway Token (64-char hex)"
+  regex = '''OPENCLAW_GATEWAY_TOKEN=[a-f0-9]{64}'''
+  keywords = ["OPENCLAW_GATEWAY_TOKEN"]
+
+[[rules]]
+  id = "slack-bot-token"
+  description = "Slack Bot Token"
+  regex = '''xoxb-[0-9A-Za-z\-]{20,}'''
+  keywords = ["xoxb"]
+
+[[rules]]
+  id = "slack-app-token"
+  description = "Slack App Token"
+  regex = '''xapp-[0-9A-Za-z\-]{20,}'''
+  keywords = ["xapp"]

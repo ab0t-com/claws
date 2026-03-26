@@ -1,0 +1,2866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>clawctl — Multi-Agent Fleet Orchestration for OpenClaw</title>
+  <meta name="description" content="Run, group, and orchestrate autonomous AI agent fleets on your own infrastructure. One binary. Zero dependencies. Total control.">
+  <meta name="theme-color" content="#fafafa">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
+  <style>
+    /* ================================================================
+       DESIGN SYSTEM — Female Corporate Monochrome Light + Dark Sections
+       Thick lines, generous whitespace, editorial typography
+       ================================================================ */
+
+    :root {
+      /* Light mode palette */
+      --white: #fafafa;
+      --off-white: #f4f2ef;
+      --cream: #edeae4;
+      --warm-gray: #c8c3ba;
+      --mid-gray: #8a8580;
+      --charcoal: #3a3632;
+      --ink: #1a1714;
+
+      /* Dark section palette */
+      --dark-bg: #141210;
+      --dark-surface: #1e1c18;
+      --dark-border: #2e2a24;
+      --dark-text: #e8e4de;
+      --dark-muted: #9a958e;
+
+      /* Accent — coral pop against monochrome */
+      --coral: #e8634a;
+      --coral-soft: #f09080;
+      --coral-deep: #c44e38;
+
+      /* Secondary accent — sage green for health/status contexts */
+      --sage: #7da67d;
+      --sage-soft: #a3c4a3;
+
+      /* Tertiary — warm gold for highlights */
+      --gold: #c8a86e;
+      --gold-soft: #dfc99a;
+
+      /* Layout */
+      --max-width: 1120px;
+      --section-pad: clamp(60px, 10vw, 120px);
+      --border-thick: 3px;
+      --border-thin: 1.5px;
+      --radius: 6px;
+      --radius-lg: 12px;
+
+      /* Type scale — editorial serif + clean sans */
+      --font-display: 'Georgia', 'Times New Roman', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    }
+
+    /* ================================================================
+       RESET + BASE
+       ================================================================ */
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    img, svg {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    /* ================================================================
+       TYPOGRAPHY
+       ================================================================ */
+
+    .t-display {
+      font-family: var(--font-display);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .t-heading {
+      font-family: var(--font-body);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+    }
+
+    .t-label {
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .t-mono {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+    }
+
+    /* ================================================================
+       LAYOUT UTILITIES
+       ================================================================ */
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 clamp(20px, 5vw, 48px);
+    }
+
+    .section {
+      padding: var(--section-pad) 0;
+    }
+
+    .section--dark {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+    }
+
+    .section--cream {
+      background: var(--cream);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(32px, 5vw, 64px);
+      align-items: start;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(24px, 3vw, 40px);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+
+    /* ================================================================
+       NAVIGATION
+       ================================================================ */
+
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(250, 250, 250, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: var(--border-thick) solid var(--ink);
+      transition: transform 0.3s ease;
+    }
+
+    .nav.nav--hidden {
+      transform: translateY(-100%);
+    }
+
+    .nav__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+
+    .nav__logo {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav__logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--coral);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .nav__links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav__link {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--charcoal);
+      transition: color 0.2s;
+      position: relative;
+    }
+
+    .nav__link::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--coral);
+      transform: scaleX(0);
+      transition: transform 0.25s ease;
+    }
+
+    .nav__link:hover::after {
+      transform: scaleX(1);
+    }
+
+    .nav__link:hover {
+      color: var(--ink);
+    }
+
+    .nav__cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      background: var(--ink);
+      color: var(--white);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .nav__cta:hover {
+      background: var(--charcoal);
+      transform: translateY(-1px);
+    }
+
+    .nav__mobile-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px;
+    }
+
+    .nav__mobile-toggle span {
+      display: block;
+      width: 24px;
+      height: 3px;
+      background: var(--ink);
+      border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+
+    .nav__mobile-toggle.active span:nth-child(1) {
+      transform: rotate(45deg) translate(5px, 6px);
+    }
+
+    .nav__mobile-toggle.active span:nth-child(2) {
+      opacity: 0;
+    }
+
+    .nav__mobile-toggle.active span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -6px);
+    }
+
+    /* ================================================================
+       HERO — LIGHT MODE
+       ================================================================ */
+
+    .hero {
+      padding-top: 148px;
+      padding-bottom: var(--section-pad);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      color: var(--charcoal);
+    }
+
+    .hero__eyebrow-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--coral);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.3); }
+    }
+
+    .hero__title {
+      font-size: clamp(40px, 6vw, 72px);
+      max-width: 780px;
+      margin-bottom: 28px;
+    }
+
+    .hero__title em {
+      font-style: italic;
+      color: var(--coral);
+    }
+
+    .hero__subtitle {
+      font-size: clamp(17px, 2vw, 20px);
+      color: var(--mid-gray);
+      max-width: 540px;
+      margin-bottom: 44px;
+      line-height: 1.65;
+    }
+
+    .hero__actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 32px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn--primary {
+      background: var(--ink);
+      color: var(--white);
+      border: var(--border-thick) solid var(--ink);
+    }
+
+    .btn--primary:hover {
+      background: var(--charcoal);
+      border-color: var(--charcoal);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(26, 23, 20, 0.15);
+    }
+
+    .btn--secondary {
+      background: transparent;
+      color: var(--ink);
+      border: var(--border-thick) solid var(--ink);
+    }
+
+    .btn--secondary:hover {
+      background: var(--ink);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    .btn--coral {
+      background: var(--coral);
+      color: var(--white);
+      border: var(--border-thick) solid var(--coral);
+    }
+
+    .btn--coral:hover {
+      background: var(--coral-deep);
+      border-color: var(--coral-deep);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(232, 99, 74, 0.25);
+    }
+
+    .hero__terminal {
+      margin-top: 64px;
+      max-width: 640px;
+    }
+
+    /* ================================================================
+       TERMINAL COMPONENT
+       ================================================================ */
+
+    .terminal {
+      background: var(--dark-bg);
+      border: var(--border-thick) solid var(--charcoal);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(26, 23, 20, 0.12), 0 8px 16px rgba(26, 23, 20, 0.08);
+    }
+
+    .terminal--light {
+      background: var(--off-white);
+      border-color: var(--ink);
+    }
+
+    .terminal__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      border-bottom: var(--border-thick) solid var(--charcoal);
+      background: var(--dark-surface);
+    }
+
+    .terminal--light .terminal__bar {
+      background: var(--cream);
+      border-color: var(--ink);
+    }
+
+    .terminal__dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--dark-muted);
+    }
+
+    .terminal__dot--red { border-color: #e8634a; background: #e8634a; }
+    .terminal__dot--yellow { border-color: #c8a86e; background: #c8a86e; }
+    .terminal__dot--green { border-color: #7da67d; background: #7da67d; }
+
+    .terminal__title {
+      flex: 1;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--dark-muted);
+    }
+
+    .terminal--light .terminal__title {
+      color: var(--mid-gray);
+    }
+
+    .terminal__body {
+      padding: 20px 24px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--dark-text);
+      min-height: 120px;
+    }
+
+    .terminal--light .terminal__body {
+      color: var(--ink);
+    }
+
+    .terminal__prompt {
+      color: var(--sage);
+    }
+
+    .terminal__cmd {
+      color: var(--dark-text);
+    }
+
+    .terminal__output {
+      color: var(--dark-muted);
+      padding-left: 0;
+    }
+
+    .terminal--light .terminal__output {
+      color: var(--mid-gray);
+    }
+
+    .terminal__highlight {
+      color: var(--coral);
+    }
+
+    .terminal__success {
+      color: var(--sage);
+    }
+
+    .terminal__cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--coral);
+      animation: blink 1.1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ================================================================
+       SOCIAL PROOF BAR — LIGHT
+       ================================================================ */
+
+    .proof-bar {
+      padding: 40px 0;
+      border-top: var(--border-thick) solid var(--ink);
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+
+    .proof-bar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .proof-bar__stat {
+      text-align: center;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .proof-bar__number {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.1;
+    }
+
+    .proof-bar__label {
+      font-size: 13px;
+      color: var(--mid-gray);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .proof-bar__divider {
+      width: var(--border-thick);
+      height: 48px;
+      background: var(--warm-gray);
+    }
+
+    /* ================================================================
+       PROBLEM / SOLUTION — DARK MODE SECTION
+       ================================================================ */
+
+    .problem {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .problem__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .problem__side {
+      padding: clamp(40px, 6vw, 80px);
+    }
+
+    .problem__side--left {
+      border-right: var(--border-thick) solid var(--dark-border);
+    }
+
+    .problem__tag {
+      display: inline-block;
+      padding: 4px 14px;
+      border: 2px solid var(--coral);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--coral);
+      margin-bottom: 28px;
+    }
+
+    .problem__tag--solution {
+      border-color: var(--sage);
+      color: var(--sage);
+    }
+
+    .problem__heading {
+      font-size: clamp(24px, 3vw, 32px);
+      margin-bottom: 24px;
+      line-height: 1.3;
+    }
+
+    .problem__list {
+      list-style: none;
+    }
+
+    .problem__list li {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--dark-border);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 15px;
+      color: var(--dark-muted);
+      line-height: 1.5;
+    }
+
+    .problem__list li:last-child {
+      border-bottom: none;
+    }
+
+    .problem__icon {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      margin-top: 1px;
+    }
+
+    .problem__icon--x { color: var(--coral); }
+    .problem__icon--check { color: var(--sage); }
+
+    /* ================================================================
+       FEATURES GRID — LIGHT MODE (CREAM)
+       ================================================================ */
+
+    .features {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .features__header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .features__eyebrow {
+      margin-bottom: 16px;
+      color: var(--mid-gray);
+    }
+
+    .features__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .features__subtitle {
+      font-size: 17px;
+      color: var(--mid-gray);
+    }
+
+    .feature-card {
+      padding: 36px;
+      background: var(--white);
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-lg);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(26, 23, 20, 0.1);
+    }
+
+    .feature-card__number {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--cream);
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    .feature-card__icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+      border: var(--border-thick) solid var(--ink);
+      background: var(--off-white);
+    }
+
+    .feature-card__title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--ink);
+    }
+
+    .feature-card__desc {
+      font-size: 15px;
+      color: var(--mid-gray);
+      line-height: 1.6;
+    }
+
+    .feature-card__detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, margin-top 0.4s ease, opacity 0.3s ease;
+      opacity: 0;
+      margin-top: 0;
+    }
+
+    .feature-card__detail.open {
+      max-height: 300px;
+      opacity: 1;
+      margin-top: 16px;
+    }
+
+    .feature-card__detail-inner {
+      padding-top: 16px;
+      border-top: 1px solid var(--cream);
+      font-size: 14px;
+      color: var(--mid-gray);
+      line-height: 1.65;
+    }
+
+    .feature-card__toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--coral);
+      cursor: pointer;
+      transition: gap 0.2s;
+    }
+
+    .feature-card__toggle:hover {
+      gap: 10px;
+    }
+
+    .feature-card__toggle-arrow {
+      transition: transform 0.3s ease;
+      font-size: 11px;
+    }
+
+    .feature-card__toggle.open .feature-card__toggle-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* ================================================================
+       ARCHITECTURE — DARK MODE SECTION
+       ================================================================ */
+
+    .architecture {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .architecture__header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .architecture__eyebrow {
+      color: var(--dark-muted);
+      margin-bottom: 16px;
+    }
+
+    .architecture__title {
+      font-size: clamp(28px, 4vw, 44px);
+      color: var(--dark-text);
+      margin-bottom: 16px;
+    }
+
+    .architecture__diagram {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .arch-layer {
+      border: var(--border-thick) solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 24px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .arch-layer:hover {
+      border-color: var(--coral);
+    }
+
+    .arch-layer__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      background: var(--dark-surface);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .arch-layer__name {
+      font-weight: 700;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .arch-layer__badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .arch-layer__badge--cli { background: var(--coral); color: var(--white); }
+    .arch-layer__badge--compose { background: var(--gold); color: var(--ink); }
+    .arch-layer__badge--gateway { background: var(--sage); color: var(--white); }
+
+    .arch-layer__chevron {
+      transition: transform 0.3s;
+      font-size: 14px;
+      color: var(--dark-muted);
+    }
+
+    .arch-layer.open .arch-layer__chevron {
+      transform: rotate(180deg);
+    }
+
+    .arch-layer__body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.45s ease;
+    }
+
+    .arch-layer.open .arch-layer__body {
+      max-height: 500px;
+    }
+
+    .arch-layer__content {
+      padding: 24px 28px;
+      border-top: 1px solid var(--dark-border);
+      font-size: 14px;
+      color: var(--dark-muted);
+      line-height: 1.7;
+    }
+
+    .arch-layer__content code {
+      background: var(--dark-bg);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--coral-soft);
+    }
+
+    /* ================================================================
+       WORKFLOW — LIGHT MODE
+       ================================================================ */
+
+    .workflow {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .workflow__header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .workflow__eyebrow {
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+    }
+
+    .workflow__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .workflow__steps {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .workflow__step {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 24px;
+      padding-bottom: 48px;
+      position: relative;
+    }
+
+    .workflow__step:last-child {
+      padding-bottom: 0;
+    }
+
+    .workflow__step-line {
+      position: absolute;
+      left: 29px;
+      top: 60px;
+      bottom: 0;
+      width: var(--border-thick);
+      background: var(--cream);
+    }
+
+    .workflow__step:last-child .workflow__step-line {
+      display: none;
+    }
+
+    .workflow__step-number {
+      width: 60px;
+      height: 60px;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 400;
+      background: var(--white);
+      position: relative;
+      z-index: 1;
+    }
+
+    .workflow__step-content {
+      padding-top: 8px;
+    }
+
+    .workflow__step-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .workflow__step-desc {
+      font-size: 15px;
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+    }
+
+    /* ================================================================
+       COMMAND REFERENCE — DARK MODE
+       ================================================================ */
+
+    .commands {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .commands__header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 48px;
+    }
+
+    .commands__eyebrow {
+      color: var(--dark-muted);
+      margin-bottom: 16px;
+    }
+
+    .commands__title {
+      font-size: clamp(28px, 4vw, 44px);
+      color: var(--dark-text);
+    }
+
+    .commands__tabs {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .commands__tab {
+      padding: 10px 20px;
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--dark-muted);
+      background: transparent;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .commands__tab:hover {
+      border-color: var(--dark-muted);
+      color: var(--dark-text);
+    }
+
+    .commands__tab.active {
+      border-color: var(--coral);
+      color: var(--coral);
+      background: rgba(232, 99, 74, 0.08);
+    }
+
+    .commands__panel {
+      display: none;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .commands__panel.active {
+      display: block;
+    }
+
+    .commands__entry {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--dark-border);
+      align-items: baseline;
+    }
+
+    .commands__entry:last-child {
+      border-bottom: none;
+    }
+
+    .commands__cmd {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--coral-soft);
+    }
+
+    .commands__desc {
+      font-size: 14px;
+      color: var(--dark-muted);
+    }
+
+    /* ================================================================
+       GROUPS & ROLES — LIGHT (CREAM)
+       ================================================================ */
+
+    .groups {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .groups__header {
+      max-width: 480px;
+      margin-bottom: 64px;
+    }
+
+    .groups__eyebrow {
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+    }
+
+    .groups__title {
+      font-size: clamp(28px, 4vw, 40px);
+      margin-bottom: 16px;
+    }
+
+    .groups__subtitle {
+      color: var(--mid-gray);
+      font-size: 17px;
+    }
+
+    .groups__visual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+
+    .group-box {
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .group-box__header {
+      padding: 16px 24px;
+      background: var(--ink);
+      color: var(--white);
+      font-weight: 700;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .group-box__body {
+      padding: 24px;
+    }
+
+    .group-box__instance {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 2px solid var(--cream);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .group-box__instance:hover {
+      border-color: var(--coral);
+    }
+
+    .group-box__instance:last-child {
+      margin-bottom: 0;
+    }
+
+    .group-box__role {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+
+    .group-box__role--manager {
+      background: var(--coral);
+      color: var(--white);
+    }
+
+    .group-box__role--worker {
+      background: var(--sage);
+      color: var(--white);
+    }
+
+    .group-box__dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--sage);
+    }
+
+    .group-box__dot--idle {
+      background: var(--warm-gray);
+    }
+
+    /* ================================================================
+       STORAGE + INFRA — DARK MODE
+       ================================================================ */
+
+    .storage {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .storage__header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .storage__eyebrow {
+      color: var(--dark-muted);
+      margin-bottom: 16px;
+    }
+
+    .storage__title {
+      font-size: clamp(28px, 4vw, 44px);
+      color: var(--dark-text);
+      margin-bottom: 16px;
+    }
+
+    .storage__subtitle {
+      color: var(--dark-muted);
+      font-size: 17px;
+    }
+
+    .storage__features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .storage-feature {
+      padding: 32px;
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      transition: border-color 0.3s;
+    }
+
+    .storage-feature:hover {
+      border-color: var(--gold);
+    }
+
+    .storage-feature__icon {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+
+    .storage-feature__title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin-bottom: 8px;
+    }
+
+    .storage-feature__desc {
+      font-size: 14px;
+      color: var(--dark-muted);
+      line-height: 1.6;
+    }
+
+    /* ================================================================
+       DASHBOARD PREVIEW — LIGHT MODE
+       ================================================================ */
+
+    .dashboard-preview {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .dashboard-preview__inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(40px, 6vw, 80px);
+      align-items: center;
+    }
+
+    .dashboard-preview__content {
+      max-width: 460px;
+    }
+
+    .dashboard-preview__eyebrow {
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+    }
+
+    .dashboard-preview__title {
+      font-size: clamp(24px, 3vw, 36px);
+      margin-bottom: 16px;
+    }
+
+    .dashboard-preview__desc {
+      color: var(--mid-gray);
+      font-size: 16px;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .dashboard-preview__features {
+      list-style: none;
+    }
+
+    .dashboard-preview__features li {
+      padding: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      color: var(--charcoal);
+    }
+
+    .dashboard-preview__features li::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--coral);
+      flex-shrink: 0;
+    }
+
+    /* ================================================================
+       TESTIMONIAL / QUOTE — DARK MODE
+       ================================================================ */
+
+    .quote-section {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .quote-section__inner {
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .quote-section__mark {
+      font-family: var(--font-display);
+      font-size: 80px;
+      color: var(--coral);
+      line-height: 0.5;
+      margin-bottom: 24px;
+    }
+
+    .quote-section__text {
+      font-family: var(--font-display);
+      font-size: clamp(22px, 3vw, 32px);
+      line-height: 1.5;
+      color: var(--dark-text);
+      font-style: italic;
+      margin-bottom: 28px;
+    }
+
+    .quote-section__attribution {
+      color: var(--dark-muted);
+      font-size: 15px;
+    }
+
+    .quote-section__attribution strong {
+      color: var(--dark-text);
+    }
+
+    /* ================================================================
+       CTA — LIGHT MODE
+       ================================================================ */
+
+    .cta-section {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .cta-section__inner {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .cta-section__title {
+      font-size: clamp(28px, 4vw, 48px);
+      margin-bottom: 20px;
+    }
+
+    .cta-section__desc {
+      font-size: 18px;
+      color: var(--mid-gray);
+      margin-bottom: 40px;
+    }
+
+    .cta-section__install {
+      display: inline-block;
+      padding: 20px 40px;
+      background: var(--off-white);
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-lg);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--ink);
+      margin-bottom: 24px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      position: relative;
+    }
+
+    .cta-section__install:hover {
+      background: var(--cream);
+      transform: translateY(-2px);
+    }
+
+    .cta-section__install-hint {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background: var(--coral);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .cta-section__install:hover .cta-section__install-hint {
+      opacity: 1;
+    }
+
+    .cta-section__links {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 32px;
+    }
+
+    .cta-section__link {
+      font-size: 15px;
+      color: var(--mid-gray);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .cta-section__link:hover {
+      color: var(--ink);
+    }
+
+    /* ================================================================
+       FOOTER — DARK MODE
+       ================================================================ */
+
+    .footer {
+      background: var(--dark-bg);
+      color: var(--dark-muted);
+      border-top: var(--border-thick) solid var(--dark-border);
+      padding: 56px 0 40px;
+    }
+
+    .footer__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer__logo {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--dark-text);
+    }
+
+    .footer__links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .footer__link {
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    .footer__link:hover {
+      color: var(--dark-text);
+    }
+
+    .footer__copy {
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--dark-border);
+    }
+
+    /* ================================================================
+       IMAGE PLACEHOLDERS — for designer handoff
+       ================================================================ */
+
+    .img-placeholder {
+      width: 100%;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      position: relative;
+      background: var(--cream);
+      border: var(--border-thick) solid var(--ink);
+    }
+
+    .img-placeholder::before {
+      content: '';
+      display: block;
+      padding-top: 62%;
+    }
+
+    .img-placeholder__inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .img-placeholder__label {
+      font-size: 13px;
+      color: var(--mid-gray);
+      text-align: center;
+      line-height: 1.5;
+      font-family: var(--font-mono);
+    }
+
+    /* ================================================================
+       RESPONSIVE
+       ================================================================ */
+
+    @media (max-width: 900px) {
+      .grid-2, .problem__grid, .dashboard-preview__inner, .groups__visual {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-3, .grid-4, .storage__features {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .problem__side--left {
+        border-right: none;
+        border-bottom: var(--border-thick) solid var(--dark-border);
+      }
+
+      .commands__entry {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+
+      .grid-3, .grid-4, .storage__features {
+        grid-template-columns: 1fr;
+      }
+
+      .nav__links { display: none; }
+      .nav__mobile-toggle { display: flex; }
+
+      .nav__links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 68px;
+        left: 0;
+        right: 0;
+        background: var(--white);
+        border-bottom: var(--border-thick) solid var(--ink);
+        padding: 20px clamp(20px, 5vw, 48px);
+        gap: 16px;
+      }
+
+      .hero__actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .btn { text-align: center; justify-content: center; }
+
+      .proof-bar__divider { display: none; }
+      .proof-bar__inner { justify-content: center; }
+
+      .commands__tabs {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .cta-section__links {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .footer__inner {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .footer__links {
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+      }
+    }
+
+    /* ================================================================
+       ANIMATIONS — intersection observer reveals
+       ================================================================ */
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+  </style>
+</head>
+<body>
+
+  <!-- ================================================================
+       NAVIGATION
+       ================================================================ -->
+  <nav class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="#" class="nav__logo">
+        <span class="nav__logo-icon">🦞</span>
+        clawctl
+      </a>
+
+      <button class="nav__mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <ul class="nav__links" id="navLinks">
+        <li><a href="#features" class="nav__link">Features</a></li>
+        <li><a href="#architecture" class="nav__link">Architecture</a></li>
+        <li><a href="#workflow" class="nav__link">Workflow</a></li>
+        <li><a href="#commands" class="nav__link">Commands</a></li>
+        <li><a href="#groups" class="nav__link">Groups</a></li>
+        <li><a href="#cta" class="nav__cta">Get Started &rarr;</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ================================================================
+       HERO — LIGHT MODE
+       ================================================================ -->
+  <section class="hero section" id="hero">
+    <div class="container">
+      <div class="hero__eyebrow">
+        <span class="hero__eyebrow-dot"></span>
+        Open Source Fleet Orchestration
+      </div>
+
+      <h1 class="hero__title t-display">
+        Your agents, your server,<br><em>your rules.</em>
+      </h1>
+
+      <p class="hero__subtitle">
+        Run, group, and orchestrate autonomous AI agent fleets on your own infrastructure. One binary. Zero dependencies. Total control over every instance.
+      </p>
+
+      <div class="hero__actions">
+        <a href="#cta" class="btn btn--primary">Install clawctl &rarr;</a>
+        <a href="#workflow" class="btn btn--secondary">See how it works</a>
+      </div>
+
+      <div class="hero__terminal">
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__title">~/server — bash</span>
+          </div>
+          <div class="terminal__body" id="heroTerminal">
+            <div><span class="terminal__prompt">$ </span><span class="terminal__cmd" id="heroCmd"></span><span class="terminal__cursor" id="heroCursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       SOCIAL PROOF BAR — LIGHT
+       ================================================================ -->
+  <div class="proof-bar">
+    <div class="container proof-bar__inner">
+      <div class="proof-bar__stat reveal">
+        <div class="proof-bar__number">8</div>
+        <div class="proof-bar__label">Max concurrent agents per node</div>
+      </div>
+      <div class="proof-bar__divider"></div>
+      <div class="proof-bar__stat reveal reveal-delay-1">
+        <div class="proof-bar__number">30+</div>
+        <div class="proof-bar__label">Messaging channels supported</div>
+      </div>
+      <div class="proof-bar__divider"></div>
+      <div class="proof-bar__stat reveal reveal-delay-2">
+        <div class="proof-bar__number">0</div>
+        <div class="proof-bar__label">External dependencies</div>
+      </div>
+      <div class="proof-bar__divider"></div>
+      <div class="proof-bar__stat reveal reveal-delay-3">
+        <div class="proof-bar__number">~8MB</div>
+        <div class="proof-bar__label">Static Go binary</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       PROBLEM / SOLUTION — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark problem" id="problem">
+    <div class="problem__grid">
+      <div class="problem__side problem__side--left reveal">
+        <span class="problem__tag">The Problem</span>
+        <h2 class="problem__heading t-heading">Running multiple AI agents on one server shouldn't require a PhD in DevOps.</h2>
+        <ul class="problem__list">
+          <li>
+            <span class="problem__icon problem__icon--x">&#10005;</span>
+            Port conflicts and credential leaks between instances
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--x">&#10005;</span>
+            Manual Docker compose wrangling for every new agent
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--x">&#10005;</span>
+            No visibility into health, RAM, or uptime across the fleet
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--x">&#10005;</span>
+            Workspace sharing and collaboration is an afterthought
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--x">&#10005;</span>
+            Backup means copying directories and hoping for the best
+          </li>
+        </ul>
+      </div>
+      <div class="problem__side reveal reveal-delay-2">
+        <span class="problem__tag problem__tag--solution">The Solution</span>
+        <h2 class="problem__heading t-heading">clawctl makes multi-agent orchestration feel like managing one.</h2>
+        <ul class="problem__list">
+          <li>
+            <span class="problem__icon problem__icon--check">&#10003;</span>
+            Automatic port allocation and complete namespace isolation
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--check">&#10003;</span>
+            One command to create, start, stop, or remove any instance
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--check">&#10003;</span>
+            Live dashboard with health probes, RAM, and uptime per agent
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--check">&#10003;</span>
+            Group instances with shared skills, workspace, and hooks
+          </li>
+          <li>
+            <span class="problem__icon problem__icon--check">&#10003;</span>
+            S3 backup, FUSE mounting, and automated cron sync built in
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       FEATURES GRID — LIGHT MODE (CREAM)
+       ================================================================ -->
+  <section class="section section--cream features" id="features">
+    <div class="container">
+      <div class="features__header reveal">
+        <div class="features__eyebrow t-label">Capabilities</div>
+        <h2 class="features__title t-display">Everything you need to run an agent fleet.</h2>
+        <p class="features__subtitle">From single-instance management to multi-agent team orchestration with durable storage and observability.</p>
+      </div>
+
+      <div class="grid-3">
+        <!-- Feature 1 -->
+        <div class="feature-card reveal">
+          <span class="feature-card__number">01</span>
+          <div class="feature-card__icon">⚡</div>
+          <h3 class="feature-card__title">Instant Provisioning</h3>
+          <p class="feature-card__desc">Create a fully isolated agent instance in under 5 seconds. Ports, tokens, config, workspace — all handled.</p>
+          <button class="feature-card__toggle" data-target="detail-1">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-1">
+            <div class="feature-card__detail-inner">
+              Each instance gets its own <code>openclaw.json</code>, credentials directory, workspace, and Docker Compose project. Port allocation uses a deterministic registry: base 18789 + (index × 100), with automatic gap reuse when instances are removed.
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="feature-card reveal reveal-delay-1">
+          <span class="feature-card__number">02</span>
+          <div class="feature-card__icon">🛡️</div>
+          <h3 class="feature-card__title">Complete Isolation</h3>
+          <p class="feature-card__desc">Credentials never cross instance boundaries. Each agent runs in its own Docker namespace with dedicated volumes.</p>
+          <button class="feature-card__toggle" data-target="detail-2">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-2">
+            <div class="feature-card__detail-inner">
+              Isolation is achieved through Docker Compose project naming, per-instance env files, and separate volume mounts. Shared resources (skills, workspace, hooks) are opt-in and use Docker bind mounts with configurable read-only/read-write access.
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="feature-card reveal reveal-delay-2">
+          <span class="feature-card__number">03</span>
+          <div class="feature-card__icon">📊</div>
+          <h3 class="feature-card__title">Live Dashboard</h3>
+          <p class="feature-card__desc">Real-time fleet overview with health probes, RAM usage, uptime, and failing component detection.</p>
+          <button class="feature-card__toggle" data-target="detail-3">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-3">
+            <div class="feature-card__detail-inner">
+              The dashboard refreshes at configurable intervals, probing both <code>/healthz</code> (liveness) and <code>/readyz</code> (readiness) endpoints. Verdicts: healthy, degraded, stopped, or down — with specific failing component names surfaced from the readiness response.
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="feature-card reveal">
+          <span class="feature-card__number">04</span>
+          <div class="feature-card__icon">👥</div>
+          <h3 class="feature-card__title">Group Orchestration</h3>
+          <p class="feature-card__desc">Organize agents into teams with shared resources, config inheritance, and manager/worker roles.</p>
+          <button class="feature-card__toggle" data-target="detail-4">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-4">
+            <div class="feature-card__detail-inner">
+              Groups provide a namespace: <code>clawctl create backend/sarah</code>. Config inherits through 4 layers: global defaults → group defaults → template → instance skeleton. Grouped instances share resources by default — opt out with <code>--no-shared-workspace</code>.
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="feature-card reveal reveal-delay-1">
+          <span class="feature-card__number">05</span>
+          <div class="feature-card__icon">☁️</div>
+          <h3 class="feature-card__title">S3 Durability</h3>
+          <p class="feature-card__desc">Backup to S3 with versioning, automated cron sync, FUSE mounting, and workspace migration.</p>
+          <button class="feature-card__toggle" data-target="detail-5">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-5">
+            <div class="feature-card__detail-inner">
+              Storage setup creates the S3 bucket, enables versioning, blocks public access, and configures rclone — all in one command. Sync excludes credentials and sessions. FUSE mount via mountpoint-s3 enables direct filesystem access to S3-backed workspaces.
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="feature-card reveal reveal-delay-2">
+          <span class="feature-card__number">06</span>
+          <div class="feature-card__icon">🔒</div>
+          <h3 class="feature-card__title">Reverse Proxy + HTTPS</h3>
+          <p class="feature-card__desc">Expose agents through Caddy with automatic Let's Encrypt certificates. Path or subdomain routing.</p>
+          <button class="feature-card__toggle" data-target="detail-6">
+            Learn more <span class="feature-card__toggle-arrow">▼</span>
+          </button>
+          <div class="feature-card__detail" id="detail-6">
+            <div class="feature-card__detail-inner">
+              Two routing modes: path-based (<code>domain.com/sarah/</code>) for simple setups, or subdomain (<code>sarah.domain.com</code>) for clean URLs. Caddy handles certificate provisioning and renewal automatically. One command sets up and configures everything.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       ARCHITECTURE — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark architecture" id="architecture">
+    <div class="container">
+      <div class="architecture__header reveal">
+        <div class="architecture__eyebrow t-label">Architecture</div>
+        <h2 class="architecture__title t-display">Three layers. Zero magic.</h2>
+      </div>
+
+      <div class="architecture__diagram">
+        <!-- Layer 1 -->
+        <div class="arch-layer reveal" data-layer>
+          <div class="arch-layer__header">
+            <span class="arch-layer__name">
+              <span class="arch-layer__badge arch-layer__badge--cli">CLI</span>
+              clawctl binary
+            </span>
+            <span class="arch-layer__chevron">▼</span>
+          </div>
+          <div class="arch-layer__body">
+            <div class="arch-layer__content">
+              <p>Single static Go binary (~8MB) with zero runtime dependencies. Parses commands, manages the port registry, generates compose overrides, merges configs, and orchestrates the lifecycle of every instance. All state lives in <code>~/.openclaw/</code> as flat files — inspectable, <code>grep</code>-able, and version-controllable.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer 2 -->
+        <div class="arch-layer reveal reveal-delay-1" data-layer>
+          <div class="arch-layer__header">
+            <span class="arch-layer__name">
+              <span class="arch-layer__badge arch-layer__badge--compose">COMPOSE</span>
+              Docker Compose substrate
+            </span>
+            <span class="arch-layer__chevron">▼</span>
+          </div>
+          <div class="arch-layer__body">
+            <div class="arch-layer__content">
+              <p>A shared <code>docker-compose.yml</code> template defines the gateway and CLI services. Per-instance <code>instance.env</code> files inject ports, tokens, and paths. Generated <code>docker-compose.override.yml</code> files add shared resource mounts, role-specific volumes, and environment overrides — never hand-edited.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer 3 -->
+        <div class="arch-layer reveal reveal-delay-2" data-layer>
+          <div class="arch-layer__header">
+            <span class="arch-layer__name">
+              <span class="arch-layer__badge arch-layer__badge--gateway">GATEWAY</span>
+              OpenClaw gateway process
+            </span>
+            <span class="arch-layer__chevron">▼</span>
+          </div>
+          <div class="arch-layer__body">
+            <div class="arch-layer__content">
+              <p>Each instance runs a single long-lived OpenClaw gateway process inside its container. The gateway owns session state, channel integrations (WhatsApp, Telegram, Slack, Discord, and 30+ more), agent runtime, and the embedded workspace. It exposes <code>/healthz</code> and <code>/readyz</code> endpoints for clawctl to probe.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       WORKFLOW — LIGHT MODE
+       ================================================================ -->
+  <section class="section workflow" id="workflow">
+    <div class="container">
+      <div class="workflow__header reveal">
+        <div class="workflow__eyebrow t-label">Getting Started</div>
+        <h2 class="workflow__title t-display">From zero to a running agent fleet in four steps.</h2>
+      </div>
+
+      <div class="workflow__steps">
+        <!-- Step 1 -->
+        <div class="workflow__step reveal">
+          <div>
+            <div class="workflow__step-number">1</div>
+            <div class="workflow__step-line"></div>
+          </div>
+          <div class="workflow__step-content">
+            <h3 class="workflow__step-title">Create an instance</h3>
+            <p class="workflow__step-desc">Name it, and clawctl handles the rest — ports, tokens, config, directory structure.</p>
+            <div class="terminal terminal--light">
+              <div class="terminal__bar">
+                <span class="terminal__dot terminal__dot--red"></span>
+                <span class="terminal__dot terminal__dot--yellow"></span>
+                <span class="terminal__dot terminal__dot--green"></span>
+                <span class="terminal__title">terminal</span>
+              </div>
+              <div class="terminal__body">
+                <div><span class="terminal__prompt">$ </span>clawctl create sarah</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Creating instance 'sarah'...</div>
+                <div class="terminal__output">&nbsp;&nbsp;Index:&nbsp;&nbsp;&nbsp;&nbsp; 0</div>
+                <div class="terminal__output">&nbsp;&nbsp;Gateway:&nbsp;&nbsp; :18789</div>
+                <div class="terminal__output">&nbsp;&nbsp;Directory: ~/.openclaw/sarah</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Instance 'sarah' created.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="workflow__step reveal">
+          <div>
+            <div class="workflow__step-number">2</div>
+            <div class="workflow__step-line"></div>
+          </div>
+          <div class="workflow__step-content">
+            <h3 class="workflow__step-title">Add authentication</h3>
+            <p class="workflow__step-desc">Wire up an AI provider — OAuth for Codex or a raw API key for OpenAI, Anthropic, or Gemini.</p>
+            <div class="terminal terminal--light">
+              <div class="terminal__bar">
+                <span class="terminal__dot terminal__dot--red"></span>
+                <span class="terminal__dot terminal__dot--yellow"></span>
+                <span class="terminal__dot terminal__dot--green"></span>
+                <span class="terminal__title">terminal</span>
+              </div>
+              <div class="terminal__body">
+                <div><span class="terminal__prompt">$ </span>clawctl auth sarah apikey anthropic sk-ant-...</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Adding anthropic API key to 'sarah'...</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Restarting gateway...</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Auth complete for 'sarah'.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="workflow__step reveal">
+          <div>
+            <div class="workflow__step-number">3</div>
+            <div class="workflow__step-line"></div>
+          </div>
+          <div class="workflow__step-content">
+            <h3 class="workflow__step-title">Start the instance</h3>
+            <p class="workflow__step-desc">The gateway boots, clawctl waits for the health check, and reports readiness.</p>
+            <div class="terminal terminal--light">
+              <div class="terminal__bar">
+                <span class="terminal__dot terminal__dot--red"></span>
+                <span class="terminal__dot terminal__dot--yellow"></span>
+                <span class="terminal__dot terminal__dot--green"></span>
+                <span class="terminal__title">terminal</span>
+              </div>
+              <div class="terminal__body">
+                <div><span class="terminal__prompt">$ </span>clawctl start sarah</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Starting instance 'sarah'...</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Waiting for health...</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Instance 'sarah' is healthy on :18789</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="workflow__step reveal">
+          <div>
+            <div class="workflow__step-number">4</div>
+          </div>
+          <div class="workflow__step-content">
+            <h3 class="workflow__step-title">Scale to a fleet</h3>
+            <p class="workflow__step-desc">Create more instances, organize into groups, monitor from the dashboard.</p>
+            <div class="terminal terminal--light">
+              <div class="terminal__bar">
+                <span class="terminal__dot terminal__dot--red"></span>
+                <span class="terminal__dot terminal__dot--yellow"></span>
+                <span class="terminal__dot terminal__dot--green"></span>
+                <span class="terminal__title">terminal</span>
+              </div>
+              <div class="terminal__body">
+                <div><span class="terminal__prompt">$ </span>clawctl group create backend</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Group 'backend' created.</div>
+                <div><span class="terminal__prompt">$ </span>clawctl create backend/bob --from=sarah</div>
+                <div class="terminal__output"><span class="terminal__success">==> </span>Instance 'backend/bob' created.</div>
+                <div class="terminal__output">&nbsp;&nbsp;(config copied from sarah)</div>
+                <div><span class="terminal__prompt">$ </span>clawctl dashboard</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       COMMAND REFERENCE — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark commands" id="commands">
+    <div class="container">
+      <div class="commands__header reveal">
+        <div class="commands__eyebrow t-label">Reference</div>
+        <h2 class="commands__title t-display">Every command at a glance.</h2>
+      </div>
+
+      <div class="commands__tabs" id="commandTabs">
+        <button class="commands__tab active" data-panel="cmd-lifecycle">Lifecycle</button>
+        <button class="commands__tab" data-panel="cmd-info">Info</button>
+        <button class="commands__tab" data-panel="cmd-groups">Groups</button>
+        <button class="commands__tab" data-panel="cmd-storage">Storage</button>
+        <button class="commands__tab" data-panel="cmd-ops">Operations</button>
+      </div>
+
+      <!-- Lifecycle -->
+      <div class="commands__panel active" id="cmd-lifecycle">
+        <div class="commands__entry"><span class="commands__cmd">create &lt;name&gt;</span><span class="commands__desc">Create a new isolated instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">create &lt;group&gt;/&lt;name&gt;</span><span class="commands__desc">Create instance inside a group</span></div>
+        <div class="commands__entry"><span class="commands__cmd">create &lt;name&gt; --from=&lt;src&gt;</span><span class="commands__desc">Clone config from existing instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">start &lt;name&gt;</span><span class="commands__desc">Start instance and wait for health</span></div>
+        <div class="commands__entry"><span class="commands__cmd">stop &lt;name&gt;</span><span class="commands__desc">Gracefully stop an instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">restart &lt;name&gt;</span><span class="commands__desc">Restart the gateway container</span></div>
+        <div class="commands__entry"><span class="commands__cmd">remove &lt;name&gt; [--purge]</span><span class="commands__desc">Remove instance, optionally delete data</span></div>
+        <div class="commands__entry"><span class="commands__cmd">start-all</span><span class="commands__desc">Start every registered instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">stop-all</span><span class="commands__desc">Stop every registered instance</span></div>
+      </div>
+
+      <!-- Info -->
+      <div class="commands__panel" id="cmd-info">
+        <div class="commands__entry"><span class="commands__cmd">list</span><span class="commands__desc">Show all instances with port, status, RAM, uptime</span></div>
+        <div class="commands__entry"><span class="commands__cmd">status &lt;name&gt;</span><span class="commands__desc">Detailed instance info and container state</span></div>
+        <div class="commands__entry"><span class="commands__cmd">health [name...]</span><span class="commands__desc">Deep probe: liveness + readiness + failing components</span></div>
+        <div class="commands__entry"><span class="commands__cmd">stats</span><span class="commands__desc">Docker resource usage across all instances</span></div>
+        <div class="commands__entry"><span class="commands__cmd">dashboard [--interval=5s]</span><span class="commands__desc">Live-refreshing fleet overview</span></div>
+        <div class="commands__entry"><span class="commands__cmd">activity [--since=2h]</span><span class="commands__desc">Recent file changes and log errors</span></div>
+      </div>
+
+      <!-- Groups -->
+      <div class="commands__panel" id="cmd-groups">
+        <div class="commands__entry"><span class="commands__cmd">group create &lt;name&gt;</span><span class="commands__desc">Create a new group namespace</span></div>
+        <div class="commands__entry"><span class="commands__cmd">group list</span><span class="commands__desc">List all groups with member counts</span></div>
+        <div class="commands__entry"><span class="commands__cmd">group add &lt;g&gt; &lt;inst&gt;</span><span class="commands__desc">Move existing instance into group</span></div>
+        <div class="commands__entry"><span class="commands__cmd">group remove &lt;name&gt;</span><span class="commands__desc">Remove group (instances must be removed first)</span></div>
+        <div class="commands__entry"><span class="commands__cmd">group shared &lt;name&gt; --all</span><span class="commands__desc">Enable group-level shared resources</span></div>
+        <div class="commands__entry"><span class="commands__cmd">share &lt;name&gt; --skills</span><span class="commands__desc">Enable specific shared resource for instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">unshare &lt;name&gt; --workspace</span><span class="commands__desc">Disable specific shared resource</span></div>
+      </div>
+
+      <!-- Storage -->
+      <div class="commands__panel" id="cmd-storage">
+        <div class="commands__entry"><span class="commands__cmd">storage setup --bucket=&lt;n&gt;</span><span class="commands__desc">Create S3 bucket + versioning + rclone</span></div>
+        <div class="commands__entry"><span class="commands__cmd">storage sync [--dry-run]</span><span class="commands__desc">Sync all instances to S3 (excludes credentials)</span></div>
+        <div class="commands__entry"><span class="commands__cmd">storage cron --enable</span><span class="commands__desc">Automatic hourly sync via crontab</span></div>
+        <div class="commands__entry"><span class="commands__cmd">storage mount</span><span class="commands__desc">FUSE-mount S3 bucket locally</span></div>
+        <div class="commands__entry"><span class="commands__cmd">storage status</span><span class="commands__desc">Show config, tool availability, mount and cron state</span></div>
+        <div class="commands__entry"><span class="commands__cmd">migrate &lt;name&gt; --to s3</span><span class="commands__desc">Move workspace to S3-backed FUSE mount</span></div>
+        <div class="commands__entry"><span class="commands__cmd">backup &lt;name&gt;</span><span class="commands__desc">Tarball instance to a timestamped archive</span></div>
+        <div class="commands__entry"><span class="commands__cmd">restore &lt;name&gt; &lt;file&gt;</span><span class="commands__desc">Restore instance from backup with port re-registration</span></div>
+      </div>
+
+      <!-- Ops -->
+      <div class="commands__panel" id="cmd-ops">
+        <div class="commands__entry"><span class="commands__cmd">logs &lt;name&gt; [-f]</span><span class="commands__desc">View or follow container logs</span></div>
+        <div class="commands__entry"><span class="commands__cmd">exec &lt;name&gt; &lt;cmd...&gt;</span><span class="commands__desc">Run CLI command inside instance container</span></div>
+        <div class="commands__entry"><span class="commands__cmd">tunnel [name...]</span><span class="commands__desc">Print SSH tunnel command for listed instances</span></div>
+        <div class="commands__entry"><span class="commands__cmd">auth &lt;name&gt; codex</span><span class="commands__desc">OAuth flow for OpenAI Codex</span></div>
+        <div class="commands__entry"><span class="commands__cmd">auth &lt;name&gt; apikey &lt;p&gt; &lt;k&gt;</span><span class="commands__desc">Register API key for any provider</span></div>
+        <div class="commands__entry"><span class="commands__cmd">channel &lt;name&gt; &lt;ch&gt;</span><span class="commands__desc">Add messaging channel to instance</span></div>
+        <div class="commands__entry"><span class="commands__cmd">proxy setup --domain=&lt;d&gt;</span><span class="commands__desc">Configure Caddy reverse proxy + HTTPS</span></div>
+        <div class="commands__entry"><span class="commands__cmd">proxy status</span><span class="commands__desc">Show Caddy install and service state</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       GROUPS & ROLES — LIGHT MODE (CREAM)
+       ================================================================ -->
+  <section class="section section--cream groups" id="groups">
+    <div class="container">
+      <div class="groups__header reveal">
+        <div class="groups__eyebrow t-label">Team Topology</div>
+        <h2 class="groups__title t-display">Agents that work together.</h2>
+        <p class="groups__subtitle">Group instances into teams with shared workspaces, coordinated skills, and manager/worker roles for autonomous task delegation.</p>
+      </div>
+
+      <div class="groups__visual">
+        <!-- Group 1: Backend team -->
+        <div class="group-box reveal">
+          <div class="group-box__header">
+            <span>📁</span> backend/
+          </div>
+          <div class="group-box__body">
+            <div class="group-box__instance">
+              <span class="group-box__dot"></span>
+              <span class="t-mono">sarah</span>
+              <span class="group-box__role group-box__role--manager">manager</span>
+            </div>
+            <div class="group-box__instance">
+              <span class="group-box__dot"></span>
+              <span class="t-mono">bob</span>
+              <span class="group-box__role group-box__role--worker">worker</span>
+            </div>
+            <div class="group-box__instance">
+              <span class="group-box__dot"></span>
+              <span class="t-mono">eve</span>
+              <span class="group-box__role group-box__role--worker">worker</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group 2: Ops team -->
+        <div class="group-box reveal reveal-delay-1">
+          <div class="group-box__header">
+            <span>📁</span> ops/
+          </div>
+          <div class="group-box__body">
+            <div class="group-box__instance">
+              <span class="group-box__dot"></span>
+              <span class="t-mono">monitor</span>
+              <span class="group-box__role group-box__role--manager">manager</span>
+            </div>
+            <div class="group-box__instance">
+              <span class="group-box__dot group-box__dot--idle"></span>
+              <span class="t-mono">alerter</span>
+              <span class="group-box__role group-box__role--worker">worker</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filesystem diagram -->
+      <div class="reveal" style="margin-top: 48px;">
+        <div class="terminal terminal--light" style="max-width: 540px; margin: 0 auto;">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__title">~/.openclaw/</span>
+          </div>
+          <div class="terminal__body" style="font-size: 13px; line-height: 2;">
+            <div><span style="color: var(--mid-gray);">├── </span><span style="color: var(--coral);">.port-registry</span></div>
+            <div><span style="color: var(--mid-gray);">├── </span>shared/<span style="color: var(--mid-gray);"> ← global skills &amp; hooks</span></div>
+            <div><span style="color: var(--mid-gray);">├── </span><strong>backend/</strong></div>
+            <div><span style="color: var(--mid-gray);">│&nbsp;&nbsp; ├── </span><span style="color: var(--coral);">.group.json</span></div>
+            <div><span style="color: var(--mid-gray);">│&nbsp;&nbsp; ├── </span>shared/<span style="color: var(--mid-gray);"> ← team workspace &amp; tasks</span></div>
+            <div><span style="color: var(--mid-gray);">│&nbsp;&nbsp; ├── </span>sarah/<span style="color: var(--mid-gray);"> ← manager instance</span></div>
+            <div><span style="color: var(--mid-gray);">│&nbsp;&nbsp; ├── </span>bob/<span style="color: var(--mid-gray);">&nbsp;&nbsp; ← worker instance</span></div>
+            <div><span style="color: var(--mid-gray);">│&nbsp;&nbsp; └── </span>eve/<span style="color: var(--mid-gray);">&nbsp;&nbsp; ← worker instance</span></div>
+            <div><span style="color: var(--mid-gray);">└── </span><strong>ops/</strong></div>
+            <div><span style="color: var(--mid-gray);">&nbsp;&nbsp;&nbsp; ├── </span>monitor/</div>
+            <div><span style="color: var(--mid-gray);">&nbsp;&nbsp;&nbsp; └── </span>alerter/</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       STORAGE & INFRA — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark storage" id="storage">
+    <div class="container">
+      <div class="storage__header reveal">
+        <div class="storage__eyebrow t-label">Durability</div>
+        <h2 class="storage__title t-display">Your agents' work, backed up and durable.</h2>
+        <p class="storage__subtitle">S3 integration built in — not bolted on. From manual backup to fully automated cloud-synced workspaces.</p>
+      </div>
+
+      <div class="storage__features">
+        <div class="storage-feature reveal">
+          <div class="storage-feature__icon">📦</div>
+          <h3 class="storage-feature__title">Tarball Backup</h3>
+          <p class="storage-feature__desc">Instant tarball backups with timestamps. Restore to any name with automatic port re-registration. Simple, portable, reliable.</p>
+        </div>
+
+        <div class="storage-feature reveal reveal-delay-1">
+          <div class="storage-feature__icon">🔄</div>
+          <h3 class="storage-feature__title">rclone Sync</h3>
+          <p class="storage-feature__desc">Sync workspaces to S3 with smart exclusions — credentials and sessions never leave the server. Supports dry-run for safe previews.</p>
+        </div>
+
+        <div class="storage-feature reveal reveal-delay-2">
+          <div class="storage-feature__icon">📂</div>
+          <h3 class="storage-feature__title">FUSE Mount</h3>
+          <p class="storage-feature__desc">Mount S3 directly as a local filesystem via mountpoint-s3. Migrate instance workspaces to S3-backed storage with zero downtime to configuration.</p>
+        </div>
+
+        <div class="storage-feature reveal">
+          <div class="storage-feature__icon">⏰</div>
+          <h3 class="storage-feature__title">Cron Automation</h3>
+          <p class="storage-feature__desc">Enable automatic sync on an hourly, daily, or custom schedule. One command to enable, one to disable. Logs to /var/log for auditability.</p>
+        </div>
+
+        <div class="storage-feature reveal reveal-delay-1">
+          <div class="storage-feature__icon">🛡️</div>
+          <h3 class="storage-feature__title">Versioned Buckets</h3>
+          <p class="storage-feature__desc">Storage setup enables S3 versioning and blocks public access by default. Your agents' work is recoverable even after accidental overwrites.</p>
+        </div>
+
+        <div class="storage-feature reveal reveal-delay-2">
+          <div class="storage-feature__icon">🔀</div>
+          <h3 class="storage-feature__title">Live Migration</h3>
+          <p class="storage-feature__desc">Move a running instance's workspace from local disk to S3. clawctl stops, copies, re-points, and restarts — cleanly and atomically.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       DASHBOARD PREVIEW — LIGHT MODE
+       ================================================================ -->
+  <section class="section dashboard-preview" id="dashboard">
+    <div class="container">
+      <div class="dashboard-preview__inner">
+        <div class="dashboard-preview__content reveal">
+          <div class="dashboard-preview__eyebrow t-label">Observability</div>
+          <h2 class="dashboard-preview__title t-display">See everything. At a glance.</h2>
+          <p class="dashboard-preview__desc">The live dashboard refreshes automatically, probing every instance for health, RAM usage, uptime, and failing components. No external monitoring required.</p>
+          <ul class="dashboard-preview__features">
+            <li>Health probes via /healthz and /readyz endpoints</li>
+            <li>Per-instance RAM and CPU via Docker stats</li>
+            <li>Activity feed with file changes and log errors</li>
+            <li>Color-coded verdicts: healthy, degraded, stopped, down</li>
+            <li>Configurable refresh interval</li>
+          </ul>
+        </div>
+
+        <div class="reveal reveal-delay-2">
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--yellow"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__title">clawctl dashboard — 14:32:08</span>
+            </div>
+            <div class="terminal__body" style="font-size: 13px; line-height: 2;">
+              <div style="font-weight: bold; color: var(--dark-text);">NAME&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PORT&nbsp;&nbsp;&nbsp;&nbsp; HEALTH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; RAM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UPTIME</div>
+              <div style="color: var(--dark-muted);">─────────────── ──────── ──────────── ────────── ──────────</div>
+              <div>sarah&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :18789&nbsp;&nbsp; <span style="color: #7da67d;">healthy</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 342MiB&nbsp;&nbsp;&nbsp;&nbsp; 4 hours</div>
+              <div>backend/bob&nbsp;&nbsp;&nbsp;&nbsp; :18889&nbsp;&nbsp; <span style="color: #7da67d;">healthy</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 289MiB&nbsp;&nbsp;&nbsp;&nbsp; 2 hours</div>
+              <div>backend/eve&nbsp;&nbsp;&nbsp;&nbsp; :18989&nbsp;&nbsp; <span style="color: #c8a86e;">degraded</span>&nbsp;&nbsp;&nbsp;&nbsp; 401MiB&nbsp;&nbsp;&nbsp;&nbsp; 2 hours</div>
+              <div>ops/monitor&nbsp;&nbsp;&nbsp;&nbsp; :19089&nbsp;&nbsp; <span style="color: #7da67d;">healthy</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 198MiB&nbsp;&nbsp;&nbsp;&nbsp; 6 hours</div>
+              <div>ops/alerter&nbsp;&nbsp;&nbsp;&nbsp; :19189&nbsp;&nbsp; <span style="color: #e8634a;">stopped</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; —&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; —</div>
+              <div style="color: var(--dark-muted); margin-top: 12px; font-weight: bold;">[Ctrl+C to exit]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       QUOTE — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark quote-section">
+    <div class="container">
+      <div class="quote-section__inner reveal">
+        <div class="quote-section__mark">&ldquo;</div>
+        <p class="quote-section__text">
+          I went from manually managing Docker containers and praying nothing conflicted, to spinning up a five-agent team with shared skills in under a minute. clawctl is what I kept wishing existed.
+        </p>
+        <p class="quote-section__attribution">
+          <strong>The kind of thing our users tell us</strong> &mdash; Self-hosted AI operators
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CTA — LIGHT MODE
+       ================================================================ -->
+  <section class="section cta-section" id="cta">
+    <div class="container">
+      <div class="cta-section__inner reveal">
+        <h2 class="cta-section__title t-display">Ready to orchestrate?</h2>
+        <p class="cta-section__desc">One binary. Drop it in your PATH. Start building your agent fleet.</p>
+
+        <div class="cta-section__install" id="installCmd" title="Click to copy">
+          <span>go build -o clawctl . && sudo mv clawctl /usr/local/bin/</span>
+          <span class="cta-section__install-hint">click to copy</span>
+        </div>
+
+        <p style="color: var(--mid-gray); font-size: 14px; margin-top: 8px;">Requires Go 1.22+ and Docker with Compose v2</p>
+
+        <div class="cta-section__links">
+          <a href="#" class="cta-section__link">
+            <span>→</span> View on GitHub
+          </a>
+          <a href="#" class="cta-section__link">
+            <span>→</span> Read the docs
+          </a>
+          <a href="#" class="cta-section__link">
+            <span>→</span> Join the community
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       FOOTER — DARK MODE
+       ================================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__inner">
+        <span class="footer__logo">🦞 clawctl</span>
+        <ul class="footer__links">
+          <li><a href="#features" class="footer__link">Features</a></li>
+          <li><a href="#architecture" class="footer__link">Architecture</a></li>
+          <li><a href="#commands" class="footer__link">Commands</a></li>
+          <li><a href="#" class="footer__link">GitHub</a></li>
+          <li><a href="#" class="footer__link">OpenClaw</a></li>
+        </ul>
+        <div class="footer__copy">
+          &copy; 2026 OpenClaw Project. clawctl is open source software.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================================================================
+       IMAGE ASSET SPECIFICATIONS — Designer Handoff
+       ================================================================
+
+       The following image assets are specified for the designer to generate.
+       Each includes a correlation ID, emotion, style, sizing, and layered
+       visual description for reproduction.
+
+       Currently this page uses zero external images — all visuals are
+       achieved through CSS, terminal mockups, and structural elements.
+       The following assets would enhance the page if generated:
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: hero-bg-pattern                                         │
+       │ CORRELATION-ID: IMG-001-HERO-BG                                │
+       │ EMOTION: Calm authority, quiet sophistication                  │
+       │ STYLE: Geometric line art, monochrome with coral accent        │
+       │ SIZE: 1920x1080px @2x (3840x2160), SVG preferred              │
+       │                                                                │
+       │ LAYER 1 (base): Warm off-white (#f4f2ef) solid fill            │
+       │ LAYER 2 (grid): Thin (0.5px) warm-gray (#c8c3ba) horizontal   │
+       │   and vertical lines forming a 60px grid, opacity 30%          │
+       │ LAYER 3 (nodes): At select grid intersections, small (6px)     │
+       │   circles in ink (#1a1714), connected by 1.5px lines forming   │
+       │   an abstract network/constellation pattern — clustered in     │
+       │   the right third of the canvas, sparse elsewhere              │
+       │ LAYER 4 (accent): Three of the node circles filled with        │
+       │   coral (#e8634a) to create focal points, one with a subtle    │
+       │   16px radius glow (coral at 15% opacity)                      │
+       │ LAYER 5 (fade): Radial gradient from transparent at center     │
+       │   to off-white (#f4f2ef) at edges, ensuring text readability   │
+       │                                                                │
+       │ CONTRAST NOTES: Pattern should be subtle enough for text       │
+       │   overlay but visible enough to add depth. The coral nodes     │
+       │   should pop as warm accents against the monochrome field.     │
+       │ USAGE: CSS background-image on .hero section                   │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: architecture-diagram                                     │
+       │ CORRELATION-ID: IMG-002-ARCH-DIAGRAM                            │
+       │ EMOTION: Technical clarity, engineered precision               │
+       │ STYLE: Isometric technical illustration, dark theme            │
+       │ SIZE: 800x500px @2x (1600x1000), PNG with transparency        │
+       │                                                                │
+       │ LAYER 1 (base): Transparent background (for dark section)      │
+       │ LAYER 2 (containers): Three stacked isometric rectangles       │
+       │   representing the three architecture layers:                  │
+       │   - Top: Coral (#e8634a) outlined box labeled "clawctl CLI"    │
+       │     with a terminal icon, 3px stroke                           │
+       │   - Middle: Gold (#c8a86e) outlined box labeled "Docker        │
+       │     Compose" with a container/whale silhouette, 3px stroke     │
+       │   - Bottom: Sage (#7da67d) outlined box labeled "OpenClaw      │
+       │     Gateway" with a lobster claw silhouette, 3px stroke        │
+       │ LAYER 3 (connections): Vertical dashed lines (2px, white       │
+       │   at 40% opacity) connecting each layer, with small            │
+       │   arrowheads pointing downward                                 │
+       │ LAYER 4 (labels): Small monospaced labels in off-white         │
+       │   (#e8e4de) next to each connection: "commands", "env-files",  │
+       │   "healthz"                                                    │
+       │ LAYER 5 (instances): Inside the bottom box, 3-4 small         │
+       │   rounded rectangles representing agent instances, each with   │
+       │   a tiny green dot (status indicator)                          │
+       │                                                                │
+       │ CONTRAST NOTES: Each layer uses its own accent color against   │
+       │   the dark (#141210) background. Lines are crisp and thick     │
+       │   (3px) to match the site's "thick lines" design language.     │
+       │ USAGE: Placed in the architecture section above the            │
+       │   interactive layer accordion                                  │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: og-social-card                                           │
+       │ CORRELATION-ID: IMG-003-OG-CARD                                 │
+       │ EMOTION: Professional confidence, modern tooling               │
+       │ STYLE: Clean editorial, thick-bordered, monochrome + coral     │
+       │ SIZE: 1200x630px (standard OG image)                           │
+       │                                                                │
+       │ LAYER 1 (base): Off-white (#f4f2ef) solid fill                 │
+       │ LAYER 2 (border): 8px ink (#1a1714) border inset 24px from     │
+       │   all edges, creating a "framed" look                          │
+       │ LAYER 3 (logo): Top-left corner inside frame, 48px lobster     │
+       │   emoji on a coral (#e8634a) circle (64px diameter)            │
+       │ LAYER 4 (title): Large serif text "clawctl" in ink (#1a1714),  │
+       │   72px Georgia, centered vertically, left-aligned with 80px    │
+       │   left margin                                                  │
+       │ LAYER 5 (subtitle): Below title, 24px sans-serif in mid-gray   │
+       │   (#8a8580): "Multi-Agent Fleet Orchestration"                 │
+       │ LAYER 6 (terminal): Right side, a small terminal mockup        │
+       │   (320x180px) with dark background showing "clawctl list"      │
+       │   output with colored status dots, rotated -3 degrees for      │
+       │   visual interest, with a subtle drop shadow                   │
+       │                                                                │
+       │ CONTRAST NOTES: The coral circle and terminal mockup provide   │
+       │   color pops against the monochrome frame. Terminal should     │
+       │   feel like a "window into the product."                       │
+       │ USAGE: <meta property="og:image"> tag                          │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ================================================================ -->
+
+  <!-- ================================================================
+       JAVASCRIPT — All callbacks and event listeners
+       ================================================================ -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ── Navigation: scroll hide/show ──────────────────────────────
+      var nav = document.getElementById('nav');
+      var lastScrollY = 0;
+      var navHeight = 68;
+      var scrollThreshold = 10;
+
+      function handleNavScroll() {
+        var currentScrollY = window.scrollY;
+        if (currentScrollY > lastScrollY && currentScrollY > navHeight + scrollThreshold) {
+          nav.classList.add('nav--hidden');
+        } else if (currentScrollY < lastScrollY - scrollThreshold) {
+          nav.classList.remove('nav--hidden');
+        }
+        lastScrollY = currentScrollY;
+      }
+
+      var scrollTicking = false;
+      window.addEventListener('scroll', function() {
+        if (!scrollTicking) {
+          window.requestAnimationFrame(function() {
+            handleNavScroll();
+            scrollTicking = false;
+          });
+          scrollTicking = true;
+        }
+      }, { passive: true });
+
+      // ── Mobile navigation toggle ──────────────────────────────────
+      var mobileToggle = document.getElementById('mobileToggle');
+      var navLinks = document.getElementById('navLinks');
+
+      mobileToggle.addEventListener('click', function() {
+        mobileToggle.classList.toggle('active');
+        navLinks.classList.toggle('open');
+      });
+
+      // Close mobile nav when a link is clicked
+      var navLinkItems = navLinks.querySelectorAll('.nav__link, .nav__cta');
+      for (var i = 0; i < navLinkItems.length; i++) {
+        navLinkItems[i].addEventListener('click', function() {
+          mobileToggle.classList.remove('active');
+          navLinks.classList.remove('open');
+        });
+      }
+
+      // ── Smooth scroll for anchor links ────────────────────────────
+      var anchorLinks = document.querySelectorAll('a[href^="#"]');
+      for (var j = 0; j < anchorLinks.length; j++) {
+        anchorLinks[j].addEventListener('click', function(e) {
+          var href = this.getAttribute('href');
+          if (href === '#') return;
+          var target = document.querySelector(href);
+          if (target) {
+            e.preventDefault();
+            var offsetTop = target.getBoundingClientRect().top + window.scrollY - navHeight;
+            window.scrollTo({
+              top: offsetTop,
+              behavior: 'smooth'
+            });
+          }
+        });
+      }
+
+      // ── Hero terminal typing animation ────────────────────────────
+      var heroCommands = [
+        { cmd: 'clawctl create sarah', delay: 60 },
+        { cmd: 'clawctl auth sarah apikey anthropic sk-ant-...', delay: 50 },
+        { cmd: 'clawctl start sarah', delay: 60 },
+        { cmd: 'clawctl group create backend', delay: 55 },
+        { cmd: 'clawctl create backend/bob --from=sarah', delay: 45 },
+        { cmd: 'clawctl dashboard', delay: 70 },
+      ];
+
+      var heroCmdEl = document.getElementById('heroCmd');
+      var heroCursorEl = document.getElementById('heroCursor');
+      var heroTerminalBody = document.getElementById('heroTerminal');
+      var currentCommandIndex = 0;
+
+      function typeCommand(cmdObj, callback) {
+        var text = cmdObj.cmd;
+        var charIndex = 0;
+        heroCmdEl.textContent = '';
+
+        function typeChar() {
+          if (charIndex < text.length) {
+            heroCmdEl.textContent += text[charIndex];
+            charIndex++;
+            setTimeout(typeChar, cmdObj.delay + Math.random() * 30);
+          } else {
+            // Pause, then "execute"
+            setTimeout(function() {
+              // Add the completed line to terminal history
+              var line = document.createElement('div');
+              line.innerHTML = '<span class="terminal__prompt">$ </span><span class="terminal__cmd">' + text + '</span>';
+              heroTerminalBody.insertBefore(line, heroTerminalBody.lastElementChild);
+
+              // Add a subtle output line
+              var output = document.createElement('div');
+              output.className = 'terminal__output';
+              output.innerHTML = '<span class="terminal__success">==> </span>Done.';
+              heroTerminalBody.insertBefore(output, heroTerminalBody.lastElementChild);
+
+              // Clear the active line
+              heroCmdEl.textContent = '';
+
+              // Limit visible history to last 8 lines
+              var lines = heroTerminalBody.children;
+              while (lines.length > 9) {
+                heroTerminalBody.removeChild(lines[0]);
+              }
+
+              setTimeout(callback, 800);
+            }, 600);
+          }
+        }
+
+        typeChar();
+      }
+
+      function runNextCommand() {
+        if (currentCommandIndex >= heroCommands.length) {
+          currentCommandIndex = 0;
+          // Clear terminal history for loop
+          var lines = heroTerminalBody.children;
+          while (lines.length > 1) {
+            heroTerminalBody.removeChild(lines[0]);
+          }
+        }
+        typeCommand(heroCommands[currentCommandIndex], function() {
+          currentCommandIndex++;
+          setTimeout(runNextCommand, 400);
+        });
+      }
+
+      // Start typing after page load
+      setTimeout(runNextCommand, 1200);
+
+      // ── Feature card progressive disclosure ───────────────────────
+      var featureToggles = document.querySelectorAll('.feature-card__toggle');
+
+      for (var k = 0; k < featureToggles.length; k++) {
+        featureToggles[k].addEventListener('click', function() {
+          var targetId = this.getAttribute('data-target');
+          var detail = document.getElementById(targetId);
+
+          if (detail.classList.contains('open')) {
+            detail.classList.remove('open');
+            this.classList.remove('open');
+          } else {
+            detail.classList.add('open');
+            this.classList.add('open');
+          }
+        });
+      }
+
+      // ── Architecture layer accordion ──────────────────────────────
+      var archLayers = document.querySelectorAll('[data-layer]');
+
+      for (var l = 0; l < archLayers.length; l++) {
+        var header = archLayers[l].querySelector('.arch-layer__header');
+        header.addEventListener('click', function() {
+          var layer = this.parentElement;
+          var isOpen = layer.classList.contains('open');
+
+          // Close all layers
+          for (var m = 0; m < archLayers.length; m++) {
+            archLayers[m].classList.remove('open');
+          }
+
+          // Toggle clicked layer
+          if (!isOpen) {
+            layer.classList.add('open');
+          }
+        });
+      }
+
+      // Open first layer by default
+      if (archLayers.length > 0) {
+        archLayers[0].classList.add('open');
+      }
+
+      // ── Command reference tabs ────────────────────────────────────
+      var commandTabs = document.querySelectorAll('.commands__tab');
+      var commandPanels = document.querySelectorAll('.commands__panel');
+
+      for (var n = 0; n < commandTabs.length; n++) {
+        commandTabs[n].addEventListener('click', function() {
+          var panelId = this.getAttribute('data-panel');
+
+          // Deactivate all tabs and panels
+          for (var o = 0; o < commandTabs.length; o++) {
+            commandTabs[o].classList.remove('active');
+          }
+          for (var p = 0; p < commandPanels.length; p++) {
+            commandPanels[p].classList.remove('active');
+          }
+
+          // Activate clicked tab and its panel
+          this.classList.add('active');
+          var panel = document.getElementById(panelId);
+          if (panel) {
+            panel.classList.add('active');
+          }
+        });
+      }
+
+      // ── Copy-to-clipboard for install command ─────────────────────
+      var installCmd = document.getElementById('installCmd');
+
+      installCmd.addEventListener('click', function() {
+        var text = 'go build -o clawctl . && sudo mv clawctl /usr/local/bin/';
+        var hint = this.querySelector('.cta-section__install-hint');
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            hint.textContent = 'Copied!';
+            hint.style.opacity = '1';
+            setTimeout(function() {
+              hint.textContent = 'click to copy';
+              hint.style.opacity = '';
+            }, 2000);
+          }).catch(function() {
+            fallbackCopy(text, hint);
+          });
+        } else {
+          fallbackCopy(text, hint);
+        }
+      });
+
+      function fallbackCopy(text, hint) {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          hint.textContent = 'Copied!';
+          hint.style.opacity = '1';
+          setTimeout(function() {
+            hint.textContent = 'click to copy';
+            hint.style.opacity = '';
+          }, 2000);
+        } catch (e) {
+          hint.textContent = 'Select & copy manually';
+          hint.style.opacity = '1';
+        }
+        document.body.removeChild(textarea);
+      }
+
+      // ── Intersection Observer for scroll-reveal animations ────────
+      var revealElements = document.querySelectorAll('.reveal');
+
+      if ('IntersectionObserver' in window) {
+        var revealObserver = new IntersectionObserver(function(entries) {
+          for (var q = 0; q < entries.length; q++) {
+            if (entries[q].isIntersecting) {
+              entries[q].target.classList.add('visible');
+              revealObserver.unobserve(entries[q].target);
+            }
+          }
+        }, {
+          root: null,
+          rootMargin: '0px 0px -60px 0px',
+          threshold: 0.1
+        });
+
+        for (var r = 0; r < revealElements.length; r++) {
+          revealObserver.observe(revealElements[r]);
+        }
+      } else {
+        // Fallback: show everything immediately
+        for (var s = 0; s < revealElements.length; s++) {
+          revealElements[s].classList.add('visible');
+        }
+      }
+
+      // ── Keyboard navigation for command tabs ──────────────────────
+      var tabContainer = document.getElementById('commandTabs');
+
+      tabContainer.addEventListener('keydown', function(e) {
+        var tabs = Array.prototype.slice.call(tabContainer.querySelectorAll('.commands__tab'));
+        var currentIndex = tabs.indexOf(document.activeElement);
+
+        if (currentIndex === -1) return;
+
+        var newIndex = currentIndex;
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          newIndex = (currentIndex + 1) % tabs.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          newIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          tabs[currentIndex].click();
+          return;
+        }
+
+        tabs[newIndex].focus();
+      });
+
+      // Set tab roles for accessibility
+      for (var t = 0; t < commandTabs.length; t++) {
+        commandTabs[t].setAttribute('role', 'tab');
+        commandTabs[t].setAttribute('tabindex', t === 0 ? '0' : '-1');
+      }
+
+      // ── Active nav link highlighting on scroll ────────────────────
+      var sections = document.querySelectorAll('section[id]');
+      var navAnchors = document.querySelectorAll('.nav__link[href^="#"]');
+
+      function highlightActiveNav() {
+        var scrollPos = window.scrollY + navHeight + 100;
+        var activeId = '';
+
+        for (var u = 0; u < sections.length; u++) {
+          var section = sections[u];
+          if (section.offsetTop <= scrollPos) {
+            activeId = section.getAttribute('id');
+          }
+        }
+
+        for (var v = 0; v < navAnchors.length; v++) {
+          var href = navAnchors[v].getAttribute('href');
+          if (href === '#' + activeId) {
+            navAnchors[v].style.color = 'var(--coral)';
+          } else {
+            navAnchors[v].style.color = '';
+          }
+        }
+      }
+
+      var navScrollTicking = false;
+      window.addEventListener('scroll', function() {
+        if (!navScrollTicking) {
+          window.requestAnimationFrame(function() {
+            highlightActiveNav();
+            navScrollTicking = false;
+          });
+          navScrollTicking = true;
+        }
+      }, { passive: true });
+
+      // Initial highlight
+      highlightActiveNav();
+
+      // ── Reduce motion preference ──────────────────────────────────
+      var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      function handleReducedMotion() {
+        if (prefersReducedMotion.matches) {
+          // Disable typing animation
+          heroCmdEl.textContent = 'clawctl dashboard';
+          heroCursorEl.style.animation = 'none';
+          // Show all reveals immediately
+          for (var w = 0; w < revealElements.length; w++) {
+            revealElements[w].style.transition = 'none';
+            revealElements[w].classList.add('visible');
+          }
+        }
+      }
+
+      handleReducedMotion();
+      if (prefersReducedMotion.addEventListener) {
+        prefersReducedMotion.addEventListener('change', handleReducedMotion);
+      }
+
+    })();
+  </script>
+</body>
+</html>

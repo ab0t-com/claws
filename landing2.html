@@ -1,0 +1,2584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw — Your AI Team, Working While You Lead</title>
+  <meta name="description" content="Build a team of AI employees that handle research, writing, scheduling, client work, and operations — privately, on your terms. No code required.">
+  <meta name="theme-color" content="#faf9f7">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <style>
+    /* ================================================================
+       DESIGN SYSTEM — Warm Editorial, Professional Feminine
+       Thick structural lines, generous whitespace, intentional contrast
+       ================================================================ */
+
+    :root {
+      /* Light palette — warm paper tones */
+      --white: #faf9f7;
+      --linen: #f5f2ed;
+      --sand: #ece7df;
+      --stone: #c4bdb3;
+      --dusk: #8e857a;
+      --earth: #5c554c;
+      --ink: #1c1915;
+
+      /* Dark palette — deep espresso */
+      --night: #0f0d0a;
+      --dark-surface: #1a1714;
+      --dark-border: #2d2822;
+      --dark-text: #ede9e2;
+      --dark-muted: #9e968c;
+
+      /* Accent — warm rose for emotion and warmth */
+      --rose: #c4727a;
+      --rose-soft: #d9969c;
+      --rose-deep: #a85860;
+      --rose-glow: rgba(196, 114, 122, 0.12);
+
+      /* Secondary — ochre gold for warmth and value */
+      --ochre: #b8935a;
+      --ochre-soft: #d4b882;
+
+      /* Tertiary — deep teal for trust and professionalism */
+      --teal: #5a8f8a;
+      --teal-soft: #7fb5af;
+
+      /* Status */
+      --online: #6da876;
+      --busy: #c8a040;
+      --offline: var(--stone);
+
+      /* Layout */
+      --max-width: 1080px;
+      --section-pad: clamp(64px, 10vw, 128px);
+      --border-thick: 3px;
+      --radius: 8px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+
+      /* Type — editorial pairing */
+      --font-display: 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    /* ================================================================
+       RESET
+       ================================================================ */
+
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.72;
+      color: var(--ink);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+
+    button {
+      font-family: inherit; font-size: inherit;
+      cursor: pointer; border: none; background: none;
+    }
+
+    /* ================================================================
+       TYPOGRAPHY
+       ================================================================ */
+
+    .t-display {
+      font-family: var(--font-display);
+      font-weight: 400;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+
+    .t-heading {
+      font-family: var(--font-body);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.28;
+    }
+
+    .t-label {
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    /* ================================================================
+       LAYOUT
+       ================================================================ */
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 clamp(20px, 5vw, 48px);
+    }
+
+    .section { padding: var(--section-pad) 0; }
+    .section--dark { background: var(--night); color: var(--dark-text); }
+    .section--linen { background: var(--linen); }
+
+    /* ================================================================
+       NAVIGATION
+       ================================================================ */
+
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(250, 249, 247, 0.94);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: var(--border-thick) solid var(--ink);
+      transition: transform 0.3s ease;
+    }
+
+    .nav.hidden { transform: translateY(-100%); }
+
+    .nav__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .nav__logo {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav__logo-mark {
+      width: 28px; height: 28px;
+      background: var(--rose);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+    }
+
+    .nav__links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav__link {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--earth);
+      transition: color 0.2s;
+    }
+
+    .nav__link:hover { color: var(--ink); }
+
+    .nav__cta {
+      padding: 9px 22px;
+      background: var(--ink);
+      color: var(--white);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav__cta:hover {
+      background: var(--earth);
+      transform: translateY(-1px);
+    }
+
+    .nav__burger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px;
+    }
+
+    .nav__burger span {
+      display: block; width: 22px; height: 2.5px;
+      background: var(--ink); border-radius: 2px;
+      transition: all 0.3s;
+    }
+
+    .nav__burger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+    .nav__burger.open span:nth-child(2) { opacity: 0; }
+    .nav__burger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+    /* ================================================================
+       HERO — LIGHT
+       ================================================================ */
+
+    .hero {
+      padding-top: 140px;
+      padding-bottom: var(--section-pad);
+      text-align: center;
+    }
+
+    .hero__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 18px;
+      border: 2px solid var(--rose);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--rose);
+      margin-bottom: 36px;
+    }
+
+    .hero__badge-dot {
+      width: 7px; height: 7px;
+      background: var(--online);
+      border-radius: 50%;
+      animation: pulse-dot 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero__title {
+      font-size: clamp(36px, 6vw, 68px);
+      max-width: 820px;
+      margin: 0 auto 28px;
+    }
+
+    .hero__title em {
+      font-style: italic;
+      color: var(--rose);
+    }
+
+    .hero__subtitle {
+      font-size: clamp(17px, 2.2vw, 21px);
+      color: var(--dusk);
+      max-width: 560px;
+      margin: 0 auto 48px;
+      line-height: 1.65;
+    }
+
+    .hero__actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 72px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 32px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.2s ease;
+      border: var(--border-thick) solid transparent;
+    }
+
+    .btn--rose {
+      background: var(--rose);
+      color: white;
+      border-color: var(--rose);
+    }
+
+    .btn--rose:hover {
+      background: var(--rose-deep);
+      border-color: var(--rose-deep);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(196, 114, 122, 0.2);
+    }
+
+    .btn--outline {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .btn--outline:hover {
+      background: var(--ink);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    /* ================================================================
+       CONVERSATION DEMO — the hero "show don't tell"
+       ================================================================ */
+
+    .conversation-demo {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: left;
+    }
+
+    .conv {
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(28, 25, 21, 0.08), 0 4px 12px rgba(28, 25, 21, 0.04);
+    }
+
+    .conv__header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 24px;
+      background: var(--linen);
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+
+    .conv__avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      position: relative;
+    }
+
+    .conv__avatar--ai {
+      background: var(--rose);
+      color: white;
+    }
+
+    .conv__status-dot {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--online);
+      border: 2px solid var(--linen);
+    }
+
+    .conv__name {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .conv__role {
+      font-size: 12px;
+      color: var(--dusk);
+    }
+
+    .conv__body {
+      padding: 24px;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 280px;
+    }
+
+    .msg {
+      max-width: 85%;
+      padding: 12px 18px;
+      border-radius: 16px;
+      font-size: 15px;
+      line-height: 1.55;
+      animation: msg-in 0.4s ease-out both;
+    }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg--user {
+      align-self: flex-end;
+      background: var(--ink);
+      color: var(--white);
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg--ai {
+      align-self: flex-start;
+      background: var(--linen);
+      color: var(--ink);
+      border-bottom-left-radius: 4px;
+    }
+
+    .msg--system {
+      align-self: center;
+      background: none;
+      color: var(--dusk);
+      font-size: 13px;
+      padding: 4px 0;
+      font-style: italic;
+    }
+
+    .msg__typing {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .msg__typing span {
+      width: 6px; height: 6px;
+      background: var(--stone);
+      border-radius: 50%;
+      animation: typing-bounce 1.4s ease-in-out infinite;
+    }
+
+    .msg__typing span:nth-child(2) { animation-delay: 0.15s; }
+    .msg__typing span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-4px); }
+    }
+
+    .conv__input {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--sand);
+      background: var(--white);
+    }
+
+    .conv__input-field {
+      flex: 1;
+      border: 2px solid var(--sand);
+      border-radius: 100px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--ink);
+      background: var(--linen);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .conv__input-field:focus {
+      border-color: var(--rose);
+    }
+
+    .conv__input-field::placeholder {
+      color: var(--stone);
+    }
+
+    .conv__send {
+      width: 40px; height: 40px;
+      background: var(--rose);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 16px;
+      transition: background 0.2s, transform 0.15s;
+      flex-shrink: 0;
+    }
+
+    .conv__send:hover {
+      background: var(--rose-deep);
+      transform: scale(1.05);
+    }
+
+    /* ================================================================
+       SOCIAL PROOF — LIGHT
+       ================================================================ */
+
+    .proof {
+      padding: 36px 0;
+      border-top: var(--border-thick) solid var(--ink);
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+
+    .proof__inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(32px, 6vw, 72px);
+      flex-wrap: wrap;
+    }
+
+    .proof__item {
+      text-align: center;
+    }
+
+    .proof__number {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.1;
+    }
+
+    .proof__label {
+      font-size: 13px;
+      color: var(--dusk);
+      margin-top: 2px;
+    }
+
+    .proof__sep {
+      width: 2px;
+      height: 40px;
+      background: var(--sand);
+    }
+
+    /* ================================================================
+       "MEET YOUR TEAM" — DARK MODE
+       ================================================================ */
+
+    .meet {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .meet__header {
+      text-align: center;
+      max-width: 580px;
+      margin: 0 auto 72px;
+    }
+
+    .meet__eyebrow {
+      color: var(--dark-muted);
+      margin-bottom: 16px;
+    }
+
+    .meet__title {
+      font-size: clamp(28px, 4.5vw, 48px);
+      margin-bottom: 16px;
+    }
+
+    .meet__subtitle {
+      color: var(--dark-muted);
+      font-size: 17px;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .team-card {
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+      transition: border-color 0.3s, transform 0.25s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .team-card:hover {
+      border-color: var(--rose);
+      transform: translateY(-4px);
+    }
+
+    .team-card__avatar {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .team-card__status {
+      position: absolute;
+      bottom: 2px; right: 2px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--dark-surface);
+    }
+
+    .team-card__status--online { background: var(--online); }
+    .team-card__status--busy { background: var(--busy); }
+
+    .team-card__name {
+      font-size: 19px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .team-card__title {
+      font-size: 13px;
+      color: var(--rose-soft);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .team-card__desc {
+      font-size: 14px;
+      color: var(--dark-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .team-card__channels {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .team-card__channel {
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--dark-border);
+      color: var(--dark-muted);
+    }
+
+    .team-card__detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, opacity 0.3s ease;
+      opacity: 0;
+    }
+
+    .team-card.expanded .team-card__detail {
+      max-height: 400px;
+      opacity: 1;
+    }
+
+    .team-card__detail-inner {
+      padding-top: 20px;
+      margin-top: 20px;
+      border-top: 1px solid var(--dark-border);
+    }
+
+    .team-card__detail-inner p {
+      font-size: 14px;
+      color: var(--dark-muted);
+      line-height: 1.65;
+      margin-bottom: 12px;
+    }
+
+    .team-card__expand {
+      font-size: 12px;
+      color: var(--rose-soft);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: gap 0.2s;
+    }
+
+    .team-card__expand:hover { gap: 8px; }
+
+    .team-card__expand-arrow {
+      transition: transform 0.3s;
+      font-size: 10px;
+    }
+
+    .team-card.expanded .team-card__expand-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* ================================================================
+       HOW IT WORKS — LIGHT (LINEN)
+       ================================================================ */
+
+    .how {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .how__header {
+      text-align: center;
+      max-width: 540px;
+      margin: 0 auto 72px;
+    }
+
+    .how__eyebrow { color: var(--dusk); margin-bottom: 16px; }
+
+    .how__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .how__steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+
+    .how__step {
+      padding: 40px 32px;
+      border: var(--border-thick) solid var(--ink);
+      border-right: none;
+      text-align: center;
+      position: relative;
+    }
+
+    .how__step:last-child { border-right: var(--border-thick) solid var(--ink); }
+
+    .how__step-number {
+      width: 48px; height: 48px;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 22px;
+      margin: 0 auto 24px;
+      background: var(--white);
+    }
+
+    .how__step-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .how__step-desc {
+      font-size: 15px;
+      color: var(--dusk);
+      line-height: 1.6;
+    }
+
+    .how__step-image {
+      margin-top: 24px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 2px solid var(--sand);
+      background: var(--white);
+      min-height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ================================================================
+       SCENARIO STORIES — DARK MODE (Show, Don't Tell)
+       ================================================================ */
+
+    .scenarios {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .scenarios__header {
+      text-align: center;
+      max-width: 580px;
+      margin: 0 auto 64px;
+    }
+
+    .scenarios__eyebrow { color: var(--dark-muted); margin-bottom: 16px; }
+
+    .scenarios__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .scenario {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin-bottom: 2px;
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .scenario:hover { border-color: var(--rose); }
+
+    .scenario + .scenario { margin-top: 24px; }
+
+    .scenario__story {
+      padding: clamp(32px, 4vw, 48px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .scenario__who {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .scenario__who-avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      border: 2px solid var(--dark-border);
+    }
+
+    .scenario__who-info {
+      font-size: 13px;
+    }
+
+    .scenario__who-name {
+      font-weight: 700;
+      color: var(--dark-text);
+    }
+
+    .scenario__who-role {
+      color: var(--dark-muted);
+    }
+
+    .scenario__heading {
+      font-size: clamp(20px, 2.5vw, 26px);
+      margin-bottom: 14px;
+      line-height: 1.3;
+    }
+
+    .scenario__text {
+      font-size: 15px;
+      color: var(--dark-muted);
+      line-height: 1.65;
+    }
+
+    .scenario__conv {
+      background: var(--dark-surface);
+      padding: clamp(24px, 3vw, 36px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-left: 2px solid var(--dark-border);
+      justify-content: center;
+    }
+
+    .scenario__msg {
+      max-width: 88%;
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .scenario__msg--user {
+      align-self: flex-end;
+      background: var(--rose);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .scenario__msg--ai {
+      align-self: flex-start;
+      background: var(--dark-border);
+      color: var(--dark-text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .scenario__msg--notify {
+      align-self: center;
+      font-size: 12px;
+      color: var(--dark-muted);
+      font-style: italic;
+      padding: 4px 0;
+    }
+
+    .scenario__msg strong { color: var(--ochre-soft); }
+
+    /* ================================================================
+       CHANNELS — LIGHT MODE
+       ================================================================ */
+
+    .channels {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .channels__header {
+      text-align: center;
+      max-width: 560px;
+      margin: 0 auto 56px;
+    }
+
+    .channels__eyebrow { color: var(--dusk); margin-bottom: 16px; }
+
+    .channels__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .channels__subtitle {
+      color: var(--dusk);
+      font-size: 17px;
+    }
+
+    .channels__grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .channel-tile {
+      padding: 28px 20px;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .channel-tile:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(28, 25, 21, 0.08);
+    }
+
+    .channel-tile__icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .channel-tile__name {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .channel-tile__desc {
+      font-size: 12px;
+      color: var(--dusk);
+      margin-top: 4px;
+    }
+
+    /* ================================================================
+       PRIVACY + SECURITY — DARK MODE
+       ================================================================ */
+
+    .privacy {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .privacy__inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(40px, 6vw, 80px);
+      align-items: center;
+    }
+
+    .privacy__content { max-width: 460px; }
+
+    .privacy__eyebrow { color: var(--dark-muted); margin-bottom: 16px; }
+
+    .privacy__title {
+      font-size: clamp(24px, 3.5vw, 38px);
+      margin-bottom: 18px;
+    }
+
+    .privacy__desc {
+      color: var(--dark-muted);
+      font-size: 16px;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .privacy__list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .privacy__list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .privacy__list-icon {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--teal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--teal);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .privacy__visual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .privacy__card {
+      padding: 24px;
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      transition: border-color 0.3s;
+    }
+
+    .privacy__card:hover { border-color: var(--teal); }
+
+    .privacy__card-icon { font-size: 28px; margin-bottom: 12px; }
+
+    .privacy__card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin-bottom: 6px;
+    }
+
+    .privacy__card-desc {
+      font-size: 13px;
+      color: var(--dark-muted);
+      line-height: 1.5;
+    }
+
+    /* ================================================================
+       TEAM BUILDER — LIGHT (LINEN) — Interactive
+       ================================================================ */
+
+    .builder {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .builder__header {
+      text-align: center;
+      max-width: 540px;
+      margin: 0 auto 56px;
+    }
+
+    .builder__eyebrow { color: var(--dusk); margin-bottom: 16px; }
+
+    .builder__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .builder__subtitle {
+      color: var(--dusk);
+      font-size: 17px;
+    }
+
+    .builder__demo {
+      max-width: 680px;
+      margin: 0 auto;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+
+    .builder__toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 24px;
+      background: var(--ink);
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .builder__toolbar-dot {
+      width: 10px; height: 10px;
+      background: var(--rose);
+      border-radius: 50%;
+    }
+
+    .builder__canvas {
+      padding: 32px;
+      background: var(--white);
+      min-height: 360px;
+    }
+
+    .builder__roles {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .builder__role-btn {
+      padding: 8px 20px;
+      border: 2px solid var(--sand);
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--earth);
+      transition: all 0.2s;
+      cursor: pointer;
+      background: var(--white);
+    }
+
+    .builder__role-btn:hover {
+      border-color: var(--rose);
+      color: var(--rose);
+    }
+
+    .builder__role-btn.active {
+      border-color: var(--rose);
+      background: var(--rose);
+      color: white;
+    }
+
+    .builder__preview {
+      display: none;
+    }
+
+    .builder__preview.active {
+      display: block;
+      animation: fade-up 0.4s ease-out;
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .builder__agent {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 24px;
+      border: 2px solid var(--sand);
+      border-radius: var(--radius-lg);
+      background: var(--linen);
+    }
+
+    .builder__agent-avatar {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+
+    .builder__agent-name {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .builder__agent-role {
+      font-size: 13px;
+      color: var(--rose);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .builder__agent-does {
+      font-size: 14px;
+      color: var(--earth);
+      line-height: 1.6;
+    }
+
+    .builder__agent-does strong {
+      color: var(--ink);
+    }
+
+    .builder__agent-channels {
+      display: flex;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .builder__agent-ch {
+      padding: 3px 10px;
+      border: 1.5px solid var(--stone);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--earth);
+    }
+
+    /* ================================================================
+       TESTIMONIALS — DARK MODE
+       ================================================================ */
+
+    .testimonials {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .testimonials__header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .testimonials__title {
+      font-size: clamp(28px, 4vw, 44px);
+    }
+
+    .testimonials__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .testimonial {
+      padding: 36px;
+      border: 2px solid var(--dark-border);
+      border-radius: var(--radius-lg);
+      transition: border-color 0.3s;
+    }
+
+    .testimonial:hover { border-color: var(--ochre); }
+
+    .testimonial__quote {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-style: italic;
+      line-height: 1.6;
+      color: var(--dark-text);
+      margin-bottom: 24px;
+    }
+
+    .testimonial__author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .testimonial__avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      border: 2px solid var(--dark-border);
+    }
+
+    .testimonial__name {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--dark-text);
+    }
+
+    .testimonial__role {
+      font-size: 13px;
+      color: var(--dark-muted);
+    }
+
+    /* ================================================================
+       PRICING — LIGHT MODE
+       ================================================================ */
+
+    .pricing {
+      border-top: var(--border-thick) solid var(--ink);
+    }
+
+    .pricing__header {
+      text-align: center;
+      max-width: 500px;
+      margin: 0 auto 56px;
+    }
+
+    .pricing__eyebrow { color: var(--dusk); margin-bottom: 16px; }
+
+    .pricing__title {
+      font-size: clamp(28px, 4vw, 44px);
+      margin-bottom: 16px;
+    }
+
+    .pricing__subtitle {
+      color: var(--dusk);
+      font-size: 17px;
+    }
+
+    .pricing__card {
+      max-width: 480px;
+      margin: 0 auto;
+      border: var(--border-thick) solid var(--ink);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .pricing__card-header {
+      padding: 36px 32px 28px;
+      background: var(--ink);
+      color: var(--white);
+    }
+
+    .pricing__price {
+      font-family: var(--font-display);
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .pricing__price-sub {
+      font-size: 15px;
+      color: var(--stone);
+    }
+
+    .pricing__card-body {
+      padding: 32px;
+    }
+
+    .pricing__features {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 32px;
+    }
+
+    .pricing__features li {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--sand);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+    }
+
+    .pricing__features li:last-child { border-bottom: none; }
+
+    .pricing__check {
+      color: var(--teal);
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    /* ================================================================
+       CTA — DARK MODE
+       ================================================================ */
+
+    .cta {
+      border-top: var(--border-thick) solid var(--dark-border);
+    }
+
+    .cta__inner {
+      text-align: center;
+      max-width: 620px;
+      margin: 0 auto;
+    }
+
+    .cta__title {
+      font-size: clamp(28px, 4.5vw, 52px);
+      margin-bottom: 20px;
+    }
+
+    .cta__desc {
+      color: var(--dark-muted);
+      font-size: 18px;
+      margin-bottom: 44px;
+      line-height: 1.6;
+    }
+
+    .cta__actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn--white {
+      background: var(--white);
+      color: var(--ink);
+      border-color: var(--white);
+    }
+
+    .btn--white:hover {
+      background: var(--sand);
+      transform: translateY(-2px);
+    }
+
+    .btn--ghost {
+      background: transparent;
+      color: var(--dark-text);
+      border-color: var(--dark-border);
+    }
+
+    .btn--ghost:hover {
+      border-color: var(--dark-text);
+      transform: translateY(-2px);
+    }
+
+    /* ================================================================
+       FOOTER — DARK
+       ================================================================ */
+
+    .footer {
+      background: var(--night);
+      color: var(--dark-muted);
+      border-top: 1px solid var(--dark-border);
+      padding: 48px 0 36px;
+    }
+
+    .footer__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer__logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--dark-text);
+    }
+
+    .footer__links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .footer__link {
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    .footer__link:hover { color: var(--dark-text); }
+
+    .footer__copy {
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--dark-border);
+    }
+
+    /* ================================================================
+       RESPONSIVE
+       ================================================================ */
+
+    @media (max-width: 900px) {
+      .team-grid { grid-template-columns: 1fr 1fr; }
+      .scenario { grid-template-columns: 1fr; }
+      .scenario__conv { border-left: none; border-top: 2px solid var(--dark-border); }
+      .privacy__inner { grid-template-columns: 1fr; }
+      .testimonials__grid { grid-template-columns: 1fr; }
+      .how__steps { grid-template-columns: 1fr; }
+      .how__step { border-right: var(--border-thick) solid var(--ink); border-bottom: none; }
+      .how__step:last-child { border-bottom: var(--border-thick) solid var(--ink); }
+      .channels__grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .nav__links { display: none; }
+      .nav__burger { display: flex; }
+      .nav__links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 64px; left: 0; right: 0;
+        background: var(--white);
+        border-bottom: var(--border-thick) solid var(--ink);
+        padding: 20px clamp(20px, 5vw, 48px);
+        gap: 14px;
+      }
+      .team-grid { grid-template-columns: 1fr; }
+      .channels__grid { grid-template-columns: 1fr 1fr; }
+      .privacy__visual { grid-template-columns: 1fr; }
+      .hero__actions { flex-direction: column; align-items: stretch; }
+      .btn { justify-content: center; text-align: center; }
+      .cta__actions { flex-direction: column; align-items: stretch; }
+      .footer__inner { flex-direction: column; text-align: center; }
+      .footer__links { flex-direction: column; gap: 10px; align-items: center; }
+      .builder__roles { justify-content: center; }
+      .proof__sep { display: none; }
+    }
+
+    /* ================================================================
+       SCROLL REVEAL
+       ================================================================ */
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.vis {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-d1 { transition-delay: 0.1s; }
+    .reveal-d2 { transition-delay: 0.2s; }
+    .reveal-d3 { transition-delay: 0.3s; }
+  </style>
+</head>
+<body>
+
+  <!-- ================================================================
+       NAVIGATION
+       ================================================================ -->
+  <nav class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="#" class="nav__logo">
+        <span class="nav__logo-mark">✦</span>
+        OpenClaw
+      </a>
+      <button class="nav__burger" id="burger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav__links" id="navLinks">
+        <li><a href="#meet" class="nav__link">Your Team</a></li>
+        <li><a href="#scenarios" class="nav__link">How It Works</a></li>
+        <li><a href="#channels" class="nav__link">Channels</a></li>
+        <li><a href="#privacy" class="nav__link">Privacy</a></li>
+        <li><a href="#pricing" class="nav__link">Pricing</a></li>
+        <li><a href="#cta" class="nav__cta">Get Started</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ================================================================
+       HERO — LIGHT
+       ================================================================ -->
+  <section class="hero section" id="hero">
+    <div class="container">
+      <div class="hero__badge">
+        <span class="hero__badge-dot"></span>
+        Your AI team is ready
+      </div>
+
+      <h1 class="hero__title t-display">
+        Hire the team you need.<br><em>They never sleep.</em>
+      </h1>
+
+      <p class="hero__subtitle">
+        Create AI employees who handle your research, writing, client comms, scheduling, and operations — privately, securely, on your own terms.
+      </p>
+
+      <div class="hero__actions">
+        <a href="#cta" class="btn btn--rose">Build Your Team &rarr;</a>
+        <a href="#scenarios" class="btn btn--outline">See them in action</a>
+      </div>
+
+      <!-- Live conversation demo -->
+      <div class="conversation-demo">
+        <div class="conv">
+          <div class="conv__header">
+            <div class="conv__avatar conv__avatar--ai">
+              ✦
+              <span class="conv__status-dot"></span>
+            </div>
+            <div>
+              <div class="conv__name">Maya</div>
+              <div class="conv__role">Research & Strategy</div>
+            </div>
+          </div>
+          <div class="conv__body" id="convBody">
+            <!-- Messages injected by JS -->
+          </div>
+          <div class="conv__input">
+            <input type="text" class="conv__input-field" placeholder="Message Maya..." id="convInput">
+            <button class="conv__send" id="convSend" aria-label="Send">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PROOF BAR
+       ================================================================ -->
+  <div class="proof">
+    <div class="container proof__inner">
+      <div class="proof__item reveal">
+        <div class="proof__number">30+</div>
+        <div class="proof__label">Messaging channels</div>
+      </div>
+      <div class="proof__sep"></div>
+      <div class="proof__item reveal reveal-d1">
+        <div class="proof__number">100%</div>
+        <div class="proof__label">Private & self-hosted</div>
+      </div>
+      <div class="proof__sep"></div>
+      <div class="proof__item reveal reveal-d2">
+        <div class="proof__number">24/7</div>
+        <div class="proof__label">Always available</div>
+      </div>
+      <div class="proof__sep"></div>
+      <div class="proof__item reveal reveal-d3">
+        <div class="proof__number">∞</div>
+        <div class="proof__label">Conversations, no per-seat cost</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       MEET YOUR TEAM — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark meet" id="meet">
+    <div class="container">
+      <div class="meet__header reveal">
+        <div class="meet__eyebrow t-label">Your Team</div>
+        <h2 class="meet__title t-display">Meet the people who work for you.</h2>
+        <p class="meet__subtitle">Each AI employee has a name, a role, a personality, and dedicated channels. They remember context. They learn your preferences. They're always on.</p>
+      </div>
+
+      <div class="team-grid">
+        <!-- Maya -->
+        <div class="team-card reveal" data-card>
+          <div class="team-card__avatar" style="background: var(--rose-glow);">
+            👩‍💼
+            <span class="team-card__status team-card__status--online"></span>
+          </div>
+          <div class="team-card__name">Maya</div>
+          <div class="team-card__title">Research & Strategy Lead</div>
+          <p class="team-card__desc">Researches competitors, summarizes reports, drafts strategy memos. Sends you a morning brief every day at 8am.</p>
+          <div class="team-card__channels">
+            <span class="team-card__channel">Slack</span>
+            <span class="team-card__channel">Email</span>
+            <span class="team-card__channel">WhatsApp</span>
+          </div>
+          <div class="team-card__detail">
+            <div class="team-card__detail-inner">
+              <p>Maya monitors your industry feeds, pulls key insights, and writes concise briefs tuned to your decision-making style. She learns which competitors matter to you and surfaces what's changed — not everything.</p>
+              <p>Connected via Slack for quick asks, WhatsApp for urgent flags, and email for the daily brief you can forward to your board.</p>
+            </div>
+          </div>
+          <button class="team-card__expand" data-expand>
+            How she works <span class="team-card__expand-arrow">▼</span>
+          </button>
+        </div>
+
+        <!-- Priya -->
+        <div class="team-card reveal reveal-d1" data-card>
+          <div class="team-card__avatar" style="background: rgba(90, 143, 138, 0.12);">
+            👩‍💻
+            <span class="team-card__status team-card__status--online"></span>
+          </div>
+          <div class="team-card__name">Priya</div>
+          <div class="team-card__title">Client Communications</div>
+          <p class="team-card__desc">Drafts client emails, follows up on proposals, manages scheduling. Never lets a thread go cold.</p>
+          <div class="team-card__channels">
+            <span class="team-card__channel">Email</span>
+            <span class="team-card__channel">Telegram</span>
+            <span class="team-card__channel">Calendar</span>
+          </div>
+          <div class="team-card__detail">
+            <div class="team-card__detail-inner">
+              <p>Priya reads incoming client emails and drafts responses in your voice. She flags anything that needs your personal touch and handles the rest — follow-ups, scheduling, confirmations.</p>
+              <p>She tracks proposal deadlines and nudges clients who've gone quiet. You review and send — or let her handle it end-to-end for routine correspondence.</p>
+            </div>
+          </div>
+          <button class="team-card__expand" data-expand>
+            How she works <span class="team-card__expand-arrow">▼</span>
+          </button>
+        </div>
+
+        <!-- Kai -->
+        <div class="team-card reveal reveal-d2" data-card>
+          <div class="team-card__avatar" style="background: rgba(184, 147, 90, 0.12);">
+            🧑‍🎨
+            <span class="team-card__status team-card__status--busy"></span>
+          </div>
+          <div class="team-card__name">Kai</div>
+          <div class="team-card__title">Content & Creative</div>
+          <p class="team-card__desc">Writes blog posts, social copy, newsletters, and case studies. Maintains your brand voice across everything.</p>
+          <div class="team-card__channels">
+            <span class="team-card__channel">Slack</span>
+            <span class="team-card__channel">Discord</span>
+            <span class="team-card__channel">Notion</span>
+          </div>
+          <div class="team-card__detail">
+            <div class="team-card__detail-inner">
+              <p>Kai has your brand guidelines, tone of voice, and past content in their workspace. When you say "write a LinkedIn post about the new partnership," they don't start from zero — they write like you.</p>
+              <p>Drafts land in your shared workspace for review. Kai revises based on your feedback and learns your preferences over time.</p>
+            </div>
+          </div>
+          <button class="team-card__expand" data-expand>
+            How they work <span class="team-card__expand-arrow">▼</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       HOW IT WORKS — LIGHT (LINEN)
+       ================================================================ -->
+  <section class="section section--linen how" id="how">
+    <div class="container">
+      <div class="how__header reveal">
+        <div class="how__eyebrow t-label">Simple Setup</div>
+        <h2 class="how__title t-display">Three steps. Real team members.</h2>
+      </div>
+
+      <div class="how__steps">
+        <div class="how__step reveal">
+          <div class="how__step-number">1</div>
+          <h3 class="how__step-title">Define the role</h3>
+          <p class="how__step-desc">Name them, describe what they handle, set their personality and boundaries. Just like writing a job description.</p>
+          <div class="how__step-image">
+            <!-- Designer asset -->
+            <img
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='140' fill='none'%3E%3Crect width='240' height='140' rx='8' fill='%23f5f2ed'/%3E%3Crect x='20' y='20' width='200' height='24' rx='4' fill='%23ece7df'/%3E%3Crect x='20' y='52' width='160' height='16' rx='4' fill='%23ece7df'/%3E%3Crect x='20' y='76' width='180' height='16' rx='4' fill='%23ece7df'/%3E%3Crect x='20' y='104' width='80' height='24' rx='12' fill='%23c4727a'/%3E%3C/svg%3E"
+              alt="Role definition form showing fields for name, responsibilities, and a rose-colored 'Create' button"
+              data-alt="CORRELATION-ID: IMG-201-ROLE-FORM. EMOTION: Clarity, professional capability. STYLE: Clean form UI, warm tones, thick-bordered inputs on linen background. SIZE: 480x280px @2x. LAYER 1: Linen (#f5f2ed) rounded rectangle, 8px radius. LAYER 2: Three input field rows — top field wider (Name, bold placeholder), two shorter fields below (Role, Description) in sand (#ece7df) with 2px borders. LAYER 3: A small avatar circle on the left of the name field showing a face emoji placeholder. LAYER 4: Rose (#c4727a) pill button bottom-left reading 'Create Employee'. LAYER 5: Subtle warm shadow beneath the card, 4px blur. Contrast: the rose button pops against the neutral form. Fields suggest a job-description-like flow."
+              width="240" height="140"
+            >
+          </div>
+        </div>
+
+        <div class="how__step reveal reveal-d1">
+          <div class="how__step-number">2</div>
+          <h3 class="how__step-title">Connect their channels</h3>
+          <p class="how__step-desc">WhatsApp, Slack, Telegram, email — choose where they listen and respond. One tap to add, QR code to connect.</p>
+          <div class="how__step-image">
+            <img
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='140' fill='none'%3E%3Crect width='240' height='140' rx='8' fill='%23f5f2ed'/%3E%3Ccircle cx='50' cy='70' r='24' fill='%23ece7df' stroke='%231c1915' stroke-width='2'/%3E%3Ccircle cx='120' cy='70' r='24' fill='%23ece7df' stroke='%23c4727a' stroke-width='3'/%3E%3Ccircle cx='190' cy='70' r='24' fill='%23ece7df' stroke='%231c1915' stroke-width='2'/%3E%3Cline x1='74' y1='70' x2='96' y2='70' stroke='%23c4bdb3' stroke-width='2'/%3E%3Cline x1='144' y1='70' x2='166' y2='70' stroke='%23c4bdb3' stroke-width='2'/%3E%3C/svg%3E"
+              alt="Three channel icons connected by lines, center one highlighted with rose border"
+              data-alt="CORRELATION-ID: IMG-202-CHANNELS. EMOTION: Connected, multi-platform reach. STYLE: Clean icon circles with connection lines, warm palette. SIZE: 480x280px @2x. LAYER 1: Linen background. LAYER 2: Five circles in a gentle arc, each containing a messaging app icon (WhatsApp green phone, Slack hashtag, Telegram paper plane, Discord controller, Email envelope) drawn in simple line art. LAYER 3: Thin connecting lines between circles in stone (#c4bdb3). LAYER 4: The center circle (Slack) has a 3px rose (#c4727a) border indicating 'active/selected'. LAYER 5: Below the arc, small sans-serif labels naming each channel. Contrast: rose highlight on the selected channel draws the eye."
+              width="240" height="140"
+            >
+          </div>
+        </div>
+
+        <div class="how__step reveal reveal-d2">
+          <div class="how__step-number">3</div>
+          <h3 class="how__step-title">Start talking</h3>
+          <p class="how__step-desc">Message them like a real colleague. They remember your last conversation. They know what you care about.</p>
+          <div class="how__step-image">
+            <img
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='140' fill='none'%3E%3Crect width='240' height='140' rx='8' fill='%23f5f2ed'/%3E%3Crect x='90' y='20' width='130' height='28' rx='14' fill='%231c1915'/%3E%3Crect x='20' y='56' width='150' height='28' rx='14' fill='%23ece7df' stroke='%23c4bdb3' stroke-width='1'/%3E%3Crect x='70' y='92' width='150' height='28' rx='14' fill='%231c1915'/%3E%3C/svg%3E"
+              alt="Chat bubbles alternating between user messages and AI responses"
+              data-alt="CORRELATION-ID: IMG-203-CHAT. EMOTION: Natural conversation, human warmth. STYLE: Chat bubble mockup, alternating dark (user) and light (AI) messages. SIZE: 480x280px @2x. LAYER 1: Linen background with subtle 1px horizontal rules suggesting a chat interface. LAYER 2: Three message bubbles — top-right dark bubble (user: 'Can you prep the board deck?'), middle-left light bubble (AI: 'On it. I'll have a draft by 3pm.'), bottom-right dark bubble (user: 'Perfect, thanks Maya'). LAYER 3: Small avatar circle (rose, with ✦) next to the AI message. LAYER 4: Typing indicator dots below the last message. LAYER 5: Warm subtle shadow on the entire chat area. Contrast: dark user bubbles against light AI bubbles create clear visual conversation flow."
+              width="240" height="140"
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       REAL SCENARIOS — DARK MODE (Show, Don't Tell)
+       ================================================================ -->
+  <section class="section section--dark scenarios" id="scenarios">
+    <div class="container">
+      <div class="scenarios__header reveal">
+        <div class="scenarios__eyebrow t-label">Real Scenarios</div>
+        <h2 class="scenarios__title t-display">This is what it actually looks like.</h2>
+      </div>
+
+      <!-- Scenario 1: Monday morning -->
+      <div class="scenario reveal">
+        <div class="scenario__story">
+          <div class="scenario__who">
+            <div class="scenario__who-avatar">👩‍💼</div>
+            <div class="scenario__who-info">
+              <div class="scenario__who-name">Sarah, Creative Director</div>
+              <div class="scenario__who-role">Boutique design agency, 12 people</div>
+            </div>
+          </div>
+          <h3 class="scenario__heading t-heading">Monday 7:48am — before the office opens</h3>
+          <p class="scenario__text">Sarah's AI research lead has already read six industry newsletters, flagged two competitive moves, and drafted a brief she can share at the 9am standup. It arrived in WhatsApp over coffee.</p>
+        </div>
+        <div class="scenario__conv">
+          <div class="scenario__msg scenario__msg--ai">Good morning, Sarah. Three things before your standup:</div>
+          <div class="scenario__msg scenario__msg--ai"><strong>1.</strong> Competitor X launched a new service tier — I've summarized the positioning<br><strong>2.</strong> That RFP from MediaCo? Deadline is Wednesday, not Friday (they updated it)<br><strong>3.</strong> I drafted the Q2 trends brief — 4 slides, attached</div>
+          <div class="scenario__msg scenario__msg--user">The RFP deadline change — are we still on track?</div>
+          <div class="scenario__msg scenario__msg--ai">We're tight but doable. I've drafted the exec summary and pulled the case studies. Priya is following up with their procurement team on the format requirements. I can have a review-ready draft by tonight.</div>
+          <div class="scenario__msg scenario__msg--user">Do it. And tell Priya thanks.</div>
+        </div>
+      </div>
+
+      <!-- Scenario 2: Client follow-up -->
+      <div class="scenario reveal">
+        <div class="scenario__story">
+          <div class="scenario__who">
+            <div class="scenario__who-avatar">👩‍⚕️</div>
+            <div class="scenario__who-info">
+              <div class="scenario__who-name">Dr. Chen, Executive Coach</div>
+              <div class="scenario__who-role">Solo practitioner, 40 active clients</div>
+            </div>
+          </div>
+          <h3 class="scenario__heading t-heading">Between sessions — a client needs rescheduling</h3>
+          <p class="scenario__text">Between back-to-back coaching sessions, her AI scheduling assistant handles a client reschedule, checks availability, and confirms — all while Dr. Chen is focused on her current client.</p>
+        </div>
+        <div class="scenario__conv">
+          <div class="scenario__msg scenario__msg--notify">Incoming from Marcus Chen via Telegram</div>
+          <div class="scenario__msg scenario__msg--ai">Hi Marcus, Dr. Chen is in a session right now. I can help with scheduling — what do you need?</div>
+          <div class="scenario__msg scenario__msg--user" style="background: var(--ochre);">Can we move Thursday's session to next week? Something came up.</div>
+          <div class="scenario__msg scenario__msg--ai">Of course. I have availability next <strong>Tuesday at 10am</strong> or <strong>Wednesday at 2pm</strong>. Which works better for you?</div>
+          <div class="scenario__msg scenario__msg--user" style="background: var(--ochre);">Tuesday works.</div>
+          <div class="scenario__msg scenario__msg--ai">Done — Tuesday the 24th at 10am. I've sent a calendar invite. See you then, Marcus.</div>
+        </div>
+      </div>
+
+      <!-- Scenario 3: Content pipeline -->
+      <div class="scenario reveal">
+        <div class="scenario__story">
+          <div class="scenario__who">
+            <div class="scenario__who-avatar">👩‍🎨</div>
+            <div class="scenario__who-info">
+              <div class="scenario__who-name">Amara, Brand Consultant</div>
+              <div class="scenario__who-role">Freelance, serving 6 retainer clients</div>
+            </div>
+          </div>
+          <h3 class="scenario__heading t-heading">Thursday afternoon — content review pipeline</h3>
+          <p class="scenario__text">Amara's AI content lead drafted three LinkedIn posts, a newsletter intro, and a client case study. They're sitting in her shared workspace, formatted in her brand voice, waiting for her review.</p>
+        </div>
+        <div class="scenario__conv">
+          <div class="scenario__msg scenario__msg--ai">Content batch ready for your review:</div>
+          <div class="scenario__msg scenario__msg--ai">
+            <strong>LinkedIn (3 posts)</strong><br>
+            → Partnership announcement — warm, forward-looking tone<br>
+            → Industry take on the Deloitte report — your contrarian angle<br>
+            → Client win spotlight — approved by Priya with MediaCo<br><br>
+            <strong>Newsletter</strong><br>
+            → "What I learned from saying no" — personal essay, 600 words<br><br>
+            All drafts in /shared/workspace/content/march/
+          </div>
+          <div class="scenario__msg scenario__msg--user">The contrarian take — make it sharper. Less hedging.</div>
+          <div class="scenario__msg scenario__msg--ai">Revised. I removed the qualifiers and led with the data point instead. The new version is direct — check the diff in your workspace.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CHANNELS — LIGHT
+       ================================================================ -->
+  <section class="section channels" id="channels">
+    <div class="container">
+      <div class="channels__header reveal">
+        <div class="channels__eyebrow t-label">Channels</div>
+        <h2 class="channels__title t-display">They meet you where you already are.</h2>
+        <p class="channels__subtitle">Your AI employees connect to the messaging platforms you already use. No new apps to download. No new habits to build.</p>
+      </div>
+
+      <div class="channels__grid">
+        <div class="channel-tile reveal">
+          <div class="channel-tile__icon">💬</div>
+          <div class="channel-tile__name">WhatsApp</div>
+          <div class="channel-tile__desc">Personal & business</div>
+        </div>
+        <div class="channel-tile reveal reveal-d1">
+          <div class="channel-tile__icon">✈️</div>
+          <div class="channel-tile__name">Telegram</div>
+          <div class="channel-tile__desc">Quick messages</div>
+        </div>
+        <div class="channel-tile reveal reveal-d1">
+          <div class="channel-tile__icon">💼</div>
+          <div class="channel-tile__name">Slack</div>
+          <div class="channel-tile__desc">Team workspaces</div>
+        </div>
+        <div class="channel-tile reveal reveal-d2">
+          <div class="channel-tile__icon">🎮</div>
+          <div class="channel-tile__name">Discord</div>
+          <div class="channel-tile__desc">Communities</div>
+        </div>
+        <div class="channel-tile reveal reveal-d2">
+          <div class="channel-tile__icon">📧</div>
+          <div class="channel-tile__name">Email</div>
+          <div class="channel-tile__desc">Formal comms</div>
+        </div>
+        <div class="channel-tile reveal reveal-d3">
+          <div class="channel-tile__icon">🔒</div>
+          <div class="channel-tile__name">Signal</div>
+          <div class="channel-tile__desc">Encrypted</div>
+        </div>
+        <div class="channel-tile reveal reveal-d3">
+          <div class="channel-tile__icon">💻</div>
+          <div class="channel-tile__name">Teams</div>
+          <div class="channel-tile__desc">Enterprise</div>
+        </div>
+        <div class="channel-tile reveal">
+          <div class="channel-tile__icon">➕</div>
+          <div class="channel-tile__name">25+ More</div>
+          <div class="channel-tile__desc">Matrix, IRC, Line...</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PRIVACY — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark privacy" id="privacy">
+    <div class="container">
+      <div class="privacy__inner">
+        <div class="privacy__content reveal">
+          <div class="privacy__eyebrow t-label">Privacy & Security</div>
+          <h2 class="privacy__title t-display">Your data never leaves your server.</h2>
+          <p class="privacy__desc">OpenClaw runs on your infrastructure — not ours. Every conversation, every file, every credential stays where you control it. No cloud dependency. No data harvesting. No third-party access.</p>
+          <ul class="privacy__list">
+            <li>
+              <span class="privacy__list-icon">✓</span>
+              <span>All data stored locally — nothing phones home</span>
+            </li>
+            <li>
+              <span class="privacy__list-icon">✓</span>
+              <span>Credentials are isolated per employee — never shared between them</span>
+            </li>
+            <li>
+              <span class="privacy__list-icon">✓</span>
+              <span>DM access requires explicit pairing codes — no open doors</span>
+            </li>
+            <li>
+              <span class="privacy__list-icon">✓</span>
+              <span>Optional S3 backup with automatic credential exclusion</span>
+            </li>
+            <li>
+              <span class="privacy__list-icon">✓</span>
+              <span>HTTPS via automatic Let's Encrypt — zero configuration</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="privacy__visual reveal reveal-d2">
+          <div class="privacy__card">
+            <div class="privacy__card-icon">🏠</div>
+            <div class="privacy__card-title">Self-Hosted</div>
+            <div class="privacy__card-desc">Runs on your own server. VPS, home lab, or office hardware. You choose where your data lives.</div>
+          </div>
+          <div class="privacy__card">
+            <div class="privacy__card-icon">🔐</div>
+            <div class="privacy__card-title">Isolated</div>
+            <div class="privacy__card-desc">Each AI employee has separate credentials, sessions, and workspace. No cross-contamination.</div>
+          </div>
+          <div class="privacy__card">
+            <div class="privacy__card-icon">🛡️</div>
+            <div class="privacy__card-title">Encrypted</div>
+            <div class="privacy__card-desc">HTTPS by default. Token auth on every connection. Pairing codes for new contacts.</div>
+          </div>
+          <div class="privacy__card">
+            <div class="privacy__card-icon">💾</div>
+            <div class="privacy__card-title">Backed Up</div>
+            <div class="privacy__card-desc">S3 sync with smart exclusions. Credentials never leave the server. Versioned for recovery.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       TEAM BUILDER INTERACTIVE — LIGHT (LINEN)
+       ================================================================ -->
+  <section class="section section--linen builder" id="builder">
+    <div class="container">
+      <div class="builder__header reveal">
+        <div class="builder__eyebrow t-label">Build Your Team</div>
+        <h2 class="builder__title t-display">What role do you need to fill?</h2>
+        <p class="builder__subtitle">Select a role to see what your AI employee looks like and what they can do.</p>
+      </div>
+
+      <div class="builder__demo reveal">
+        <div class="builder__toolbar">
+          <span class="builder__toolbar-dot"></span>
+          Team Builder
+        </div>
+        <div class="builder__canvas">
+          <div class="builder__roles" id="builderRoles">
+            <button class="builder__role-btn active" data-role="researcher">Researcher</button>
+            <button class="builder__role-btn" data-role="writer">Writer</button>
+            <button class="builder__role-btn" data-role="scheduler">Scheduler</button>
+            <button class="builder__role-btn" data-role="analyst">Analyst</button>
+            <button class="builder__role-btn" data-role="assistant">EA / Assistant</button>
+          </div>
+
+          <!-- Researcher -->
+          <div class="builder__preview active" id="role-researcher">
+            <div class="builder__agent">
+              <div class="builder__agent-avatar" style="background: var(--rose-glow);">🔍</div>
+              <div>
+                <div class="builder__agent-name">Research Lead</div>
+                <div class="builder__agent-role">Market Intelligence & Competitive Analysis</div>
+                <p class="builder__agent-does">
+                  Monitors industry feeds, summarizes reports, tracks competitors, and delivers <strong>daily morning briefs</strong> tailored to your priorities. Answers ad-hoc research questions with sourced, structured responses.
+                </p>
+                <div class="builder__agent-channels">
+                  <span class="builder__agent-ch">Slack</span>
+                  <span class="builder__agent-ch">WhatsApp</span>
+                  <span class="builder__agent-ch">Email</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Writer -->
+          <div class="builder__preview" id="role-writer">
+            <div class="builder__agent">
+              <div class="builder__agent-avatar" style="background: rgba(184,147,90,0.12);">✍️</div>
+              <div>
+                <div class="builder__agent-name">Content Lead</div>
+                <div class="builder__agent-role">Writing, Editing & Brand Voice</div>
+                <p class="builder__agent-does">
+                  Drafts blog posts, social copy, newsletters, and case studies in <strong>your brand voice</strong>. Revises based on feedback. Maintains a shared workspace with organized content calendar and draft pipeline.
+                </p>
+                <div class="builder__agent-channels">
+                  <span class="builder__agent-ch">Slack</span>
+                  <span class="builder__agent-ch">Discord</span>
+                  <span class="builder__agent-ch">Workspace</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scheduler -->
+          <div class="builder__preview" id="role-scheduler">
+            <div class="builder__agent">
+              <div class="builder__agent-avatar" style="background: rgba(90,143,138,0.12);">📅</div>
+              <div>
+                <div class="builder__agent-name">Scheduling Coordinator</div>
+                <div class="builder__agent-role">Calendar Management & Client Booking</div>
+                <p class="builder__agent-does">
+                  Handles meeting requests, rescheduling, and availability checks. Responds to clients in <strong>real time</strong> via Telegram or WhatsApp. Sends calendar invites and daily schedule summaries.
+                </p>
+                <div class="builder__agent-channels">
+                  <span class="builder__agent-ch">Telegram</span>
+                  <span class="builder__agent-ch">WhatsApp</span>
+                  <span class="builder__agent-ch">Calendar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analyst -->
+          <div class="builder__preview" id="role-analyst">
+            <div class="builder__agent">
+              <div class="builder__agent-avatar" style="background: rgba(196,114,122,0.08);">📊</div>
+              <div>
+                <div class="builder__agent-name">Business Analyst</div>
+                <div class="builder__agent-role">Data Interpretation & Reporting</div>
+                <p class="builder__agent-does">
+                  Processes data exports, builds summary reports, identifies trends and anomalies. Delivers <strong>weekly performance snapshots</strong> and answers "what happened?" questions with structured analysis.
+                </p>
+                <div class="builder__agent-channels">
+                  <span class="builder__agent-ch">Slack</span>
+                  <span class="builder__agent-ch">Email</span>
+                  <span class="builder__agent-ch">Workspace</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- EA -->
+          <div class="builder__preview" id="role-assistant">
+            <div class="builder__agent">
+              <div class="builder__agent-avatar" style="background: rgba(109,168,118,0.12);">🤝</div>
+              <div>
+                <div class="builder__agent-name">Executive Assistant</div>
+                <div class="builder__agent-role">Inbox Triage, Follow-ups & Operations</div>
+                <p class="builder__agent-does">
+                  Triages your inbox, drafts responses, follows up on outstanding threads, and handles <strong>routine operational tasks</strong>. Knows which emails need your personal attention and which they can handle.
+                </p>
+                <div class="builder__agent-channels">
+                  <span class="builder__agent-ch">Email</span>
+                  <span class="builder__agent-ch">WhatsApp</span>
+                  <span class="builder__agent-ch">Slack</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       TESTIMONIALS — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark testimonials" id="testimonials">
+    <div class="container">
+      <div class="testimonials__header reveal">
+        <h2 class="testimonials__title t-display">What operators are saying.</h2>
+      </div>
+
+      <div class="testimonials__grid">
+        <div class="testimonial reveal">
+          <p class="testimonial__quote">"I replaced three SaaS subscriptions with two AI employees. Maya handles my research, Priya handles my inbox. They cost less and they actually know my business."</p>
+          <div class="testimonial__author">
+            <div class="testimonial__avatar">👩‍💼</div>
+            <div>
+              <div class="testimonial__name">Independent Consultant</div>
+              <div class="testimonial__role">Strategy & Operations</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testimonial reveal reveal-d1">
+          <p class="testimonial__quote">"The privacy angle sold me. My clients are law firms — I can't have their data touching someone else's cloud. OpenClaw runs on my own server and nothing leaves it."</p>
+          <div class="testimonial__author">
+            <div class="testimonial__avatar">👩‍⚖️</div>
+            <div>
+              <div class="testimonial__name">Legal Tech Advisor</div>
+              <div class="testimonial__role">Compliance & Privacy</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testimonial reveal reveal-d1">
+          <p class="testimonial__quote">"My content lead drafts in my voice. Not 'sounds like AI' — it sounds like me. Because it has my past writing and knows my style. That took one afternoon to set up."</p>
+          <div class="testimonial__author">
+            <div class="testimonial__avatar">👩‍🎨</div>
+            <div>
+              <div class="testimonial__name">Brand Consultant</div>
+              <div class="testimonial__role">Solo Practice</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testimonial reveal reveal-d2">
+          <p class="testimonial__quote">"I message Kai on Slack like a colleague. 'Write the case study for the Acme project.' Twenty minutes later, it's in my shared workspace, formatted and ready to review."</p>
+          <div class="testimonial__author">
+            <div class="testimonial__avatar">👩‍💻</div>
+            <div>
+              <div class="testimonial__name">Agency Founder</div>
+              <div class="testimonial__role">Digital Services, 8 people</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PRICING — LIGHT
+       ================================================================ -->
+  <section class="section pricing" id="pricing">
+    <div class="container">
+      <div class="pricing__header reveal">
+        <div class="pricing__eyebrow t-label">Pricing</div>
+        <h2 class="pricing__title t-display">No per-seat fees. Ever.</h2>
+        <p class="pricing__subtitle">OpenClaw is open source. You bring your own AI provider keys. No middleman markup, no usage caps, no surprise invoices.</p>
+      </div>
+
+      <div class="pricing__card reveal">
+        <div class="pricing__card-header">
+          <div class="pricing__price">$0</div>
+          <div class="pricing__price-sub">Open source, self-hosted, forever</div>
+        </div>
+        <div class="pricing__card-body">
+          <ul class="pricing__features">
+            <li><span class="pricing__check">✓</span> Unlimited AI employees</li>
+            <li><span class="pricing__check">✓</span> All 30+ messaging channels</li>
+            <li><span class="pricing__check">✓</span> Group orchestration & shared workspaces</li>
+            <li><span class="pricing__check">✓</span> S3 backup & cloud storage</li>
+            <li><span class="pricing__check">✓</span> HTTPS reverse proxy with auto-certificates</li>
+            <li><span class="pricing__check">✓</span> Live health dashboard & monitoring</li>
+            <li><span class="pricing__check">✓</span> Full API access & extensibility</li>
+            <li><span class="pricing__check">✓</span> No vendor lock-in — bring any AI provider</li>
+          </ul>
+          <a href="#cta" class="btn btn--rose" style="width: 100%; justify-content: center;">Get Started Free &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CTA — DARK MODE
+       ================================================================ -->
+  <section class="section section--dark cta" id="cta">
+    <div class="container">
+      <div class="cta__inner reveal">
+        <h2 class="cta__title t-display">Your team is waiting.</h2>
+        <p class="cta__desc">Start with one AI employee. Add more as you need them. They learn your business, remember your preferences, and work while you sleep.</p>
+        <div class="cta__actions">
+          <a href="#" class="btn btn--white">Install OpenClaw &rarr;</a>
+          <a href="#" class="btn btn--ghost">Read the Guide</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       FOOTER
+       ================================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__inner">
+        <span class="footer__logo">✦ OpenClaw</span>
+        <ul class="footer__links">
+          <li><a href="#meet" class="footer__link">Your Team</a></li>
+          <li><a href="#scenarios" class="footer__link">Scenarios</a></li>
+          <li><a href="#privacy" class="footer__link">Privacy</a></li>
+          <li><a href="#" class="footer__link">GitHub</a></li>
+          <li><a href="#" class="footer__link">Documentation</a></li>
+        </ul>
+        <div class="footer__copy">
+          &copy; 2026 OpenClaw Project. Open source software, made for people who value privacy.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================================================================
+       IMAGE ASSET SPECIFICATIONS — Designer Handoff
+       ================================================================
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: hero-conversation-bg                                     │
+       │ CORRELATION-ID: IMG-200-HERO-BG                                 │
+       │ EMOTION: Warmth, trust, professional intimacy                  │
+       │ STYLE: Abstract soft watercolor wash, warm monochrome          │
+       │ SIZE: 1920x1080px @2x (3840x2160), PNG                        │
+       │                                                                │
+       │ LAYER 1 (base): Off-white (#faf9f7) solid fill                 │
+       │ LAYER 2 (wash): Soft watercolor-style organic shapes in warm   │
+       │   tones — very pale rose (#f0d8da at 15% opacity) and sand     │
+       │   (#ece7df at 20% opacity), clustered in the upper-right       │
+       │   quadrant and lower-left corner, leaving center clear for     │
+       │   text readability                                             │
+       │ LAYER 3 (lines): Two or three very thin (0.5px) curved lines  │
+       │   in stone (#c4bdb3 at 30% opacity) flowing diagonally across │
+       │   the canvas — suggesting connection, communication flow       │
+       │ LAYER 4 (dots): Scattered small circles (4-6px) in varying    │
+       │   warm tones — rose (#c4727a at 20%), ochre (#b8935a at 15%), │
+       │   teal (#5a8f8a at 10%) — suggesting a constellation of       │
+       │   people/agents in a network. 8-12 dots total, asymmetric     │
+       │ LAYER 5 (fade): Gentle radial vignette from transparent at    │
+       │   center to off-white (#faf9f7) at edges, 80% radius          │
+       │                                                                │
+       │ CONTRAST: Extremely subtle — this sits behind headline text.   │
+       │   The dots should be the most visible element but still quiet. │
+       │   Think 'textured paper' more than 'illustration.'            │
+       │ USAGE: CSS background-image on .hero section                   │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: team-card-avatars (set of 3)                             │
+       │ CORRELATION-ID: IMG-204-AVATARS                                 │
+       │ EMOTION: Approachable, professional, warm                      │
+       │ STYLE: Illustrated portrait, soft editorial line art           │
+       │ SIZE: 112x112px @2x (224x224) each, PNG with transparency     │
+       │                                                                │
+       │ AVATAR 1 — "Maya" (Research Lead)                              │
+       │ LAYER 1: Transparent background                                │
+       │ LAYER 2: Soft circular rose (#c4727a at 8%) background fill    │
+       │ LAYER 3: Minimal line-art portrait of a professional woman    │
+       │   with pulled-back hair, small earrings, confident expression │
+       │   — drawn in ink (#1c1915) with 2px strokes, editorial style  │
+       │   (think New Yorker illustration meets Rifle Paper Co.)        │
+       │ LAYER 4: Subtle rose (#c4727a) accent on the earrings or a    │
+       │   small detail like a collar or pin                            │
+       │                                                                │
+       │ AVATAR 2 — "Priya" (Client Comms)                              │
+       │ Same structure as Avatar 1 but:                                │
+       │ - Teal (#5a8f8a at 8%) background                              │
+       │ - Portrait with long dark hair, warm smile, reading glasses   │
+       │ - Teal accent on the glasses frames                            │
+       │                                                                │
+       │ AVATAR 3 — "Kai" (Content Lead)                                │
+       │ Same structure as Avatar 1 but:                                │
+       │ - Ochre (#b8935a at 8%) background                             │
+       │ - Portrait with short textured hair, creative/relaxed vibe    │
+       │ - Ochre accent on a creative detail (pen, headband)            │
+       │                                                                │
+       │ CONTRAST: Accent colors should pop warmly against the dark     │
+       │   card backgrounds in the "Meet Your Team" section. The        │
+       │   line art style ensures they don't feel like stock photos.    │
+       │ USAGE: Replace emoji avatars in .team-card__avatar             │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ ASSET: og-social-card-consumer                                  │
+       │ CORRELATION-ID: IMG-205-OG-CARD                                 │
+       │ EMOTION: Warm invitation, professional empowerment             │
+       │ STYLE: Editorial warmth, thick-bordered, warm palette          │
+       │ SIZE: 1200x630px (standard OG image)                           │
+       │                                                                │
+       │ LAYER 1 (base): Off-white (#faf9f7) solid fill                 │
+       │ LAYER 2 (frame): 6px ink (#1c1915) border inset 20px from     │
+       │   all edges                                                    │
+       │ LAYER 3 (logo): Top-left inside frame, rose (#c4727a)         │
+       │   circle with white ✦ symbol, 48px diameter                    │
+       │ LAYER 4 (headline): Large Georgia text "Hire the team you      │
+       │   need." in ink (#1c1915), 48px, centered vertically,         │
+       │   left-aligned at 64px margin                                  │
+       │ LAYER 5 (subline): "They never sleep." in italic Georgia,      │
+       │   32px, rose (#c4727a), immediately below headline             │
+       │ LAYER 6 (chat): Right side, a small conversation mockup        │
+       │   (280x200px) showing 3 chat bubbles on a cream background,   │
+       │   tilted -2 degrees, with a subtle drop shadow (0 4px 16px    │
+       │   rgba(28,25,21,0.08))                                        │
+       │                                                                │
+       │ CONTRAST: The rose italic text and chat mockup add warmth      │
+       │   and product context against the monochrome frame.            │
+       │ USAGE: <meta property="og:image"> tag                          │
+       └─────────────────────────────────────────────────────────────────┘
+
+       ================================================================ -->
+
+  <!-- ================================================================
+       JAVASCRIPT
+       ================================================================ -->
+  <script>
+    (function() {
+      'use strict';
+
+      /* ── Nav scroll hide/show ──────────────────────────────────── */
+      var nav = document.getElementById('nav');
+      var lastY = 0;
+      var ticking = false;
+
+      window.addEventListener('scroll', function() {
+        if (!ticking) {
+          requestAnimationFrame(function() {
+            var y = window.scrollY;
+            if (y > lastY && y > 80) nav.classList.add('hidden');
+            else if (y < lastY - 8) nav.classList.remove('hidden');
+            lastY = y;
+            ticking = false;
+          });
+          ticking = true;
+        }
+      }, { passive: true });
+
+      /* ── Mobile menu ───────────────────────────────────────────── */
+      var burger = document.getElementById('burger');
+      var navLinks = document.getElementById('navLinks');
+
+      burger.addEventListener('click', function() {
+        burger.classList.toggle('open');
+        navLinks.classList.toggle('open');
+      });
+
+      var mobileLinks = navLinks.querySelectorAll('a');
+      for (var i = 0; i < mobileLinks.length; i++) {
+        mobileLinks[i].addEventListener('click', function() {
+          burger.classList.remove('open');
+          navLinks.classList.remove('open');
+        });
+      }
+
+      /* ── Smooth scroll ─────────────────────────────────────────── */
+      var anchors = document.querySelectorAll('a[href^="#"]');
+      for (var j = 0; j < anchors.length; j++) {
+        anchors[j].addEventListener('click', function(e) {
+          var href = this.getAttribute('href');
+          if (href === '#') return;
+          var target = document.querySelector(href);
+          if (target) {
+            e.preventDefault();
+            window.scrollTo({
+              top: target.getBoundingClientRect().top + window.scrollY - 72,
+              behavior: 'smooth'
+            });
+          }
+        });
+      }
+
+      /* ── Hero conversation demo ────────────────────────────────── */
+      var convBody = document.getElementById('convBody');
+      var convInput = document.getElementById('convInput');
+      var convSend = document.getElementById('convSend');
+
+      var demoConversation = [
+        { type: 'ai', text: "Good morning! I've finished reviewing the Q2 market data you asked about." },
+        { type: 'ai', text: "Three key findings: organic search is up 23%, your competitor launched a new pricing tier, and the Deloitte report cites your segment as 'high growth.'" },
+        { type: 'user', text: "Can you draft a summary I can send to the board?" },
+        { type: 'ai', text: "Done — 4 slides, executive format. I put it in your shared workspace under /reports/q2-summary.pdf. Want me to also draft the email to send with it?" },
+        { type: 'user', text: "Yes, keep it brief. They hate long emails." },
+        { type: 'ai', text: "Sent to your drafts. Three sentences, bullet points for the key numbers, PDF attached. Ready for your review." },
+      ];
+
+      var msgIndex = 0;
+      var hasUserInteracted = false;
+
+      function addMessage(msg) {
+        var div = document.createElement('div');
+        div.className = 'msg msg--' + msg.type;
+        div.textContent = msg.text;
+        convBody.appendChild(div);
+        convBody.scrollTop = convBody.scrollHeight;
+      }
+
+      function showTyping() {
+        var div = document.createElement('div');
+        div.className = 'msg msg--ai';
+        div.id = 'typing-indicator';
+        div.innerHTML = '<div class="msg__typing"><span></span><span></span><span></span></div>';
+        convBody.appendChild(div);
+        convBody.scrollTop = convBody.scrollHeight;
+        return div;
+      }
+
+      function removeTyping() {
+        var el = document.getElementById('typing-indicator');
+        if (el) el.remove();
+      }
+
+      function playNextMessage() {
+        if (msgIndex >= demoConversation.length || hasUserInteracted) return;
+
+        var msg = demoConversation[msgIndex];
+        msgIndex++;
+
+        if (msg.type === 'ai') {
+          var typingEl = showTyping();
+          setTimeout(function() {
+            removeTyping();
+            addMessage(msg);
+            setTimeout(playNextMessage, 1400 + Math.random() * 800);
+          }, 800 + msg.text.length * 12);
+        } else {
+          addMessage(msg);
+          setTimeout(playNextMessage, 1200);
+        }
+      }
+
+      // Start demo after delay
+      setTimeout(playNextMessage, 2000);
+
+      // User can type their own message
+      function handleUserSend() {
+        var text = convInput.value.trim();
+        if (!text) return;
+
+        hasUserInteracted = true;
+        removeTyping();
+        addMessage({ type: 'user', text: text });
+        convInput.value = '';
+
+        // AI responds contextually
+        var typingEl = showTyping();
+        var responses = [
+          "I'll get on that right away. Give me a few minutes and I'll have something for you to review.",
+          "Great question — let me pull the data and get back to you with a structured answer.",
+          "On it. I'll drop the result in your shared workspace when it's ready.",
+          "Understood. I'll prioritize this and follow up within the hour.",
+          "Sure thing. I'll draft something that matches your usual tone and format.",
+        ];
+        var response = responses[Math.floor(Math.random() * responses.length)];
+
+        setTimeout(function() {
+          removeTyping();
+          addMessage({ type: 'ai', text: response });
+        }, 1200 + Math.random() * 600);
+      }
+
+      convSend.addEventListener('click', handleUserSend);
+
+      convInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleUserSend();
+        }
+      });
+
+      /* ── Team card expand/collapse ─────────────────────────────── */
+      var teamCards = document.querySelectorAll('[data-card]');
+
+      for (var k = 0; k < teamCards.length; k++) {
+        var expandBtn = teamCards[k].querySelector('[data-expand]');
+        if (expandBtn) {
+          expandBtn.addEventListener('click', function() {
+            var card = this.closest('[data-card]');
+            card.classList.toggle('expanded');
+          });
+        }
+      }
+
+      /* ── Team builder role tabs ────────────────────────────────── */
+      var roleBtns = document.querySelectorAll('.builder__role-btn');
+      var previews = document.querySelectorAll('.builder__preview');
+
+      for (var l = 0; l < roleBtns.length; l++) {
+        roleBtns[l].addEventListener('click', function() {
+          var role = this.getAttribute('data-role');
+
+          // Deactivate all
+          for (var m = 0; m < roleBtns.length; m++) {
+            roleBtns[m].classList.remove('active');
+          }
+          for (var n = 0; n < previews.length; n++) {
+            previews[n].classList.remove('active');
+          }
+
+          // Activate selected
+          this.classList.add('active');
+          var panel = document.getElementById('role-' + role);
+          if (panel) panel.classList.add('active');
+        });
+      }
+
+      /* ── Intersection Observer for reveals ─────────────────────── */
+      var reveals = document.querySelectorAll('.reveal');
+
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+          for (var o = 0; o < entries.length; o++) {
+            if (entries[o].isIntersecting) {
+              entries[o].target.classList.add('vis');
+              observer.unobserve(entries[o].target);
+            }
+          }
+        }, { rootMargin: '0px 0px -50px 0px', threshold: 0.1 });
+
+        for (var p = 0; p < reveals.length; p++) {
+          observer.observe(reveals[p]);
+        }
+      } else {
+        for (var q = 0; q < reveals.length; q++) {
+          reveals[q].classList.add('vis');
+        }
+      }
+
+      /* ── Active nav highlighting ───────────────────────────────── */
+      var sections = document.querySelectorAll('section[id]');
+      var navAnchors = document.querySelectorAll('.nav__link[href^="#"]');
+
+      function updateActiveNav() {
+        var pos = window.scrollY + 100;
+        var activeId = '';
+        for (var r = 0; r < sections.length; r++) {
+          if (sections[r].offsetTop <= pos) {
+            activeId = sections[r].id;
+          }
+        }
+        for (var s = 0; s < navAnchors.length; s++) {
+          navAnchors[s].style.color = navAnchors[s].getAttribute('href') === '#' + activeId
+            ? 'var(--rose)' : '';
+        }
+      }
+
+      var navTick = false;
+      window.addEventListener('scroll', function() {
+        if (!navTick) {
+          requestAnimationFrame(function() {
+            updateActiveNav();
+            navTick = false;
+          });
+          navTick = true;
+        }
+      }, { passive: true });
+
+      updateActiveNav();
+
+      /* ── Reduced motion ────────────────────────────────────────── */
+      var motionPref = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      function handleMotion() {
+        if (motionPref.matches) {
+          hasUserInteracted = true; // stop auto-conversation
+          for (var t = 0; t < demoConversation.length; t++) {
+            addMessage(demoConversation[t]);
+          }
+          for (var u = 0; u < reveals.length; u++) {
+            reveals[u].style.transition = 'none';
+            reveals[u].classList.add('vis');
+          }
+        }
+      }
+
+      handleMotion();
+      if (motionPref.addEventListener) {
+        motionPref.addEventListener('change', handleMotion);
+      }
+
+    })();
+  </script>
+</body>
+</html>

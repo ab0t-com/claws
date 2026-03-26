@@ -1,0 +1,24 @@
+# Binaries
+clawctl
+clawctl-v1
+*.exe
+
+# Credentials / secrets
+credentials.txt
+*.env
+.env
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.tar.gz

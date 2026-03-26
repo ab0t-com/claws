@@ -1,0 +1,22 @@
+#!/bin/bash
+# Pre-push hook: full repo scan for secrets with gitleaks
+
+GITLEAKS="/home/ubuntu/.local/bin/gitleaks"
+
+if [ ! -x "$GITLEAKS" ]; then
+    echo "WARNING: gitleaks not found at $GITLEAKS — skipping secret scan"
+    exit 0
+fi
+
+echo "Running gitleaks pre-push scan (full repo)..."
+$GITLEAKS detect --config .gitleaks.toml --verbose
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "ERROR: gitleaks detected secrets in the repository."
+    echo "Remove the secrets before pushing."
+    echo "If this is a false positive, add to .gitleaks.toml allowlist."
+    exit 1
+fi
+
+echo "gitleaks: clean"
