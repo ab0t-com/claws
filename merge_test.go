@@ -95,6 +95,7 @@ func TestMergeConfigTemplate(t *testing.T) {
 				"allowFrom":      []any{"+1234"},
 				"groups":         map[string]any{"abc@g.us": map[string]any{}},
 				"groupAllowFrom": []any{"+1234"},
+				"actions":        map[string]any{"sendMessage": true, "reactions": true},
 			},
 		},
 	})
@@ -141,6 +142,9 @@ func TestMergeConfigTemplate(t *testing.T) {
 	}
 	if _, ok := ch["groupAllowFrom"]; ok {
 		t.Error("channels.whatsapp.groupAllowFrom should be stripped")
+	}
+	if _, ok := ch["actions"]; ok {
+		t.Error("channels.whatsapp.actions should be stripped from template")
 	}
 	if ch["enabled"] != true {
 		t.Error("channels.whatsapp.enabled should be preserved")

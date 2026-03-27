@@ -171,7 +171,7 @@ func recentLogErrors(paths Paths, name string, cutoff time.Time, maxEntries int)
 		"-f", paths.ComposeTemplate,
 		"--env-file", filepath.Join(instanceDirFromName(paths, name), "instance.env"),
 		"-p", projectNameFromName(name),
-		"logs", "--tail", "200", "--no-color", "--timestamps", "openclaw-gateway",
+		"logs", "--tail", "200", "--no-color", "--timestamps", gatewayService(paths, name),
 	)
 	out, err := cmd.Output()
 	if err != nil {

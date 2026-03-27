@@ -210,6 +210,229 @@ func TestIntegration_ApproveHelp(t *testing.T) {
 	}
 }
 
+func TestIntegration_ChannelAddSetsSafeDefaults(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake")
+
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg := cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+
+	actions, ok := tg["actions"].(map[string]any)
+	if !ok {
+		t.Fatal("actions should be set after channel add")
+	}
+	if actions["sendMessage"] != false {
+		t.Error("sendMessage should default to false")
+	}
+	if actions["reactions"] != true {
+		t.Error("reactions should default to true")
+	}
+	if tg["groupPolicy"] != "allowlist" {
+		t.Errorf("groupPolicy should be allowlist, got %v", tg["groupPolicy"])
+	}
+}
+
+func TestIntegration_ChannelAddAllowSend(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake", "--allow-send")
+
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg := cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+
+	actions := tg["actions"].(map[string]any)
+	if actions["sendMessage"] != true {
+		t.Error("sendMessage should be true with --allow-send")
+	}
+}
+
+func TestIntegration_ChannelAddDiscordSafeDefaults(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "discord", "--token=fake")
+
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	dc := cfg["channels"].(map[string]any)["discord"].(map[string]any)
+
+	actions := dc["actions"].(map[string]any)
+	if actions["messages"] != false {
+		t.Error("discord messages should default to false")
+	}
+	if actions["reactions"] != true {
+		t.Error("discord reactions should default to true")
+	}
+	if actions["moderation"] != false {
+		t.Error("discord moderation should default to false")
+	}
+}
+
+func TestIntegration_ChannelSecurity(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake")
+
+	out, err := clawctl(t, root, "channel", "security", "alpha")
+	if err != nil {
+		t.Fatalf("channel security failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "telegram") {
+		t.Error("should show telegram channel")
+	}
+	if !strings.Contains(out, "sendMessage") {
+		t.Error("should show sendMessage action")
+	}
+	if !strings.Contains(out, "pairing") {
+		t.Error("should show dm-policy")
+	}
+}
+
+func TestIntegration_ChannelSend(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake")
+
+	// Enable
+	out, err := clawctl(t, root, "channel", "send", "alpha", "telegram", "--enable")
+	if err != nil {
+		t.Fatalf("channel send --enable failed: %v\n%s", err, out)
+	}
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	actions := cfg["channels"].(map[string]any)["telegram"].(map[string]any)["actions"].(map[string]any)
+	if actions["sendMessage"] != true {
+		t.Error("sendMessage should be true after --enable")
+	}
+
+	// Disable
+	clawctl(t, root, "channel", "send", "alpha", "telegram", "--disable")
+	cfg = readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	actions = cfg["channels"].(map[string]any)["telegram"].(map[string]any)["actions"].(map[string]any)
+	if actions["sendMessage"] != false {
+		t.Error("sendMessage should be false after --disable")
+	}
+}
+
+func TestIntegration_ChannelAllowDeny(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake")
+
+	// Allow
+	out, err := clawctl(t, root, "channel", "allow", "alpha", "telegram", "+1234567890")
+	if err != nil {
+		t.Fatalf("channel allow failed: %v\n%s", err, out)
+	}
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg := cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+	af := tg["allowFrom"].([]any)
+	if len(af) != 1 || af[0] != "+1234567890" {
+		t.Errorf("allowFrom should have +1234567890, got %v", af)
+	}
+
+	// Allow another (and test dedup)
+	clawctl(t, root, "channel", "allow", "alpha", "telegram", "+9876543210", "+1234567890")
+	cfg = readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg = cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+	af = tg["allowFrom"].([]any)
+	if len(af) != 2 {
+		t.Errorf("allowFrom should have 2 entries (deduped), got %d", len(af))
+	}
+
+	// Deny
+	clawctl(t, root, "channel", "deny", "alpha", "telegram", "+1234567890")
+	cfg = readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg = cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+	af = tg["allowFrom"].([]any)
+	if len(af) != 1 {
+		t.Errorf("allowFrom should have 1 entry after deny, got %d", len(af))
+	}
+
+	// Deny non-existent
+	_, err = clawctl(t, root, "channel", "deny", "alpha", "telegram", "+0000000000")
+	if err == nil {
+		t.Error("denying non-existent contact should fail")
+	}
+}
+
+func TestIntegration_ChannelAddOutputMentionsSend(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+
+	out, _ := clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=123:fake")
+	if !strings.Contains(out, "Outbound messaging is OFF") {
+		t.Error("should mention outbound messaging is off")
+	}
+	if !strings.Contains(out, "channel send") {
+		t.Error("should tell user how to enable sending")
+	}
+}
+
+func TestIntegration_ChannelSendNonExistent(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+
+	_, err := clawctl(t, root, "channel", "send", "alpha", "telegram", "--enable")
+	if err == nil {
+		t.Error("should fail on non-existent channel")
+	}
+}
+
+func TestIntegration_ChannelAllowNonExistent(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+
+	_, err := clawctl(t, root, "channel", "allow", "alpha", "telegram", "+1234567890")
+	if err == nil {
+		t.Error("should fail on non-existent channel")
+	}
+}
+
+func TestIntegration_ChannelDenyNonExistent(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+
+	_, err := clawctl(t, root, "channel", "deny", "alpha", "telegram", "+1234567890")
+	if err == nil {
+		t.Error("should fail on non-existent channel")
+	}
+}
+
+func TestIntegration_ChannelSendDiscord(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "discord", "--token=fake")
+
+	// Discord uses "messages" not "sendMessage"
+	clawctl(t, root, "channel", "send", "alpha", "discord", "--enable")
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	actions := cfg["channels"].(map[string]any)["discord"].(map[string]any)["actions"].(map[string]any)
+	if actions["messages"] != true {
+		t.Error("discord should use 'messages' key, not 'sendMessage'")
+	}
+	// sendMessage should NOT exist for discord
+	if _, exists := actions["sendMessage"]; exists {
+		t.Error("discord should not have sendMessage key")
+	}
+}
+
+func TestIntegration_ChannelAddWhatsAppDefaultAllowlist(t *testing.T) {
+	// WhatsApp should default to dmPolicy=allowlist (not pairing)
+	// Can't fully test WhatsApp add (needs login flow), but verify the profile
+	profile := channelProfiles["whatsapp"]
+	if profile.DefaultDmPolicy != "allowlist" {
+		t.Errorf("whatsapp default dm policy should be allowlist, got %s", profile.DefaultDmPolicy)
+	}
+	profile = channelProfiles["signal"]
+	if profile.DefaultDmPolicy != "allowlist" {
+		t.Errorf("signal default dm policy should be allowlist, got %s", profile.DefaultDmPolicy)
+	}
+	// Telegram should still be pairing (empty = pairing)
+	profile = channelProfiles["telegram"]
+	if profile.DefaultDmPolicy != "" {
+		t.Errorf("telegram default dm policy should be empty (pairing), got %s", profile.DefaultDmPolicy)
+	}
+}
+
 func TestIntegration_LegacyChannelStillWorks(t *testing.T) {
 	root := t.TempDir()
 	clawctl(t, root, "create", "alpha")

@@ -187,7 +187,7 @@ func cmdTokenRotate(args []string) error {
 
 	ref, _ := ParseRef(name)
 	envFile := filepath.Join(ref.Dir(paths), "instance.env")
-	configPath := filepath.Join(ref.Dir(paths), "openclaw.json")
+	configPath := mustResolveRuntime(paths, name).ConfigPath(ref.Dir(paths))
 
 	oldToken := readEnvValue(envFile, "OPENCLAW_GATEWAY_TOKEN")
 	newToken := generateToken()
@@ -195,7 +195,7 @@ func cmdTokenRotate(args []string) error {
 	// Update instance.env
 	updateEnvValue(envFile, "OPENCLAW_GATEWAY_TOKEN", newToken)
 
-	// Update openclaw.json gateway.auth.token
+	// Update config gateway.auth.token
 	if cfg, err := readInstanceConfig(configPath); err == nil {
 		setNestedConfig(cfg, "gateway.auth.token", newToken)
 		writeInstanceConfig(configPath, cfg)

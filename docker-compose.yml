@@ -32,7 +32,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${OPENCLAW_MEMORY_LIMIT:-1G}
+          memory: ${OPENCLAW_MEMORY_LIMIT:-2G}
           cpus: "${OPENCLAW_CPU_LIMIT:-2.0}"
     command:
       [

@@ -2,7 +2,7 @@
 
 **Priority:** P2 — Medium
 **Created:** 2026-03-25
-**Status:** Open
+**Status:** Done
 
 ## Problem
 

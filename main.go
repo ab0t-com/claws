@@ -84,6 +84,8 @@ func main() {
 		err = cmdStartAll(args)
 	case "stop-all":
 		err = cmdStopAll(args)
+	case "runtime":
+		err = cmdRuntime(args)
 	case "access":
 		err = cmdAccess(args)
 	case "token":
@@ -150,8 +152,11 @@ func printHelp() {
 			"channel add <n> slack --bot-token=<t> --app-token=<t>",
 			"channel add <n> whatsapp       Add WhatsApp (QR login)",
 			"channel status <name>          Show configured channels",
+			"channel security <name> [<ch>] Show channel security posture",
+			"channel send <n> <ch> --enable Toggle outbound messaging",
+			"channel allow <n> <ch> <id>    Add approved contact",
+			"channel deny <n> <ch> <id>     Remove approved contact",
 			"channel remove <name> <ch>     Disable a channel",
-			"channel <name> <ch>            Interactive wizard (legacy)",
 			"approve <name> <ch> <code>     Approve DM pairing code",
 		}},
 		{"Backup", []string{
@@ -191,6 +196,17 @@ func printHelp() {
 			"proxy setup --domain=<d>   Set up Caddy reverse proxy",
 			"proxy status               Show proxy state",
 			"proxy reload               Reload Caddy config",
+		}},
+		{"Runtime", []string{
+			"runtime list                   List available runtimes",
+			"runtime show <name>            Show runtime config",
+			"runtime add <n> --from=openclaw --image=<i>  Quick fork",
+			"runtime init <name>            Scaffold custom runtime",
+			"runtime test <name>            Validate runtime works",
+			"runtime detect <image>         Auto-detect from image",
+			"runtime export <name>          Export definition to JSON",
+			"runtime import <file>          Import shared definition",
+			"runtime remove <name>          Remove custom runtime",
 		}},
 		{"Image & Upgrade", []string{
 			"image list                     List local images",

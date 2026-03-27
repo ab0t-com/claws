@@ -185,6 +185,39 @@ for container in $(docker ps --format '{{.Names}}' 2>/dev/null | grep openclaw);
     else
         pass "  No Docker access (isolated)"
     fi
+
+    # Check for crash loops (restarted recently with low uptime)
+    status=$(docker inspect "$container" --format '{{.State.Status}}' 2>/dev/null)
+    restarts=$(docker inspect "$container" --format '{{.RestartCount}}' 2>/dev/null)
+    if [ "$restarts" -gt 3 ] 2>/dev/null; then
+        fail "  Crash-looping ($restarts restarts) — check logs: docker logs $container"
+        hint "Common cause: out of memory. Check if memory limit is too low."
+        hint "Current limit: $(docker inspect "$container" --format '{{.HostConfig.Memory}}' | python3 -c 'import sys; m=int(sys.stdin.read()); print(f"{m//1048576}MB")' 2>/dev/null || echo 'unknown')"
+    elif [ "$restarts" -gt 0 ] 2>/dev/null; then
+        warn "  Restarted $restarts time(s) — may indicate instability"
+    else
+        pass "  Stable (0 restarts)"
+    fi
+
+    # Check OOM kills
+    oom=$(docker inspect "$container" --format '{{.State.OOMKilled}}' 2>/dev/null)
+    if [ "$oom" = "true" ]; then
+        fail "  Was killed by out-of-memory (OOM) — needs more memory"
+        hint "Increase the limit: set OPENCLAW_MEMORY_LIMIT=2G in instance.env"
+        hint "Then recreate: clawctl restart $friendly --hard"
+    fi
+
+    # Check memory usage vs limit
+    if [ "$mem" != "0" ] && [ -n "$mem" ] && command -v python3 &>/dev/null; then
+        usage=$(docker stats --no-stream --format '{{.MemPerc}}' "$container" 2>/dev/null | tr -d '%')
+        if [ -n "$usage" ]; then
+            usage_int=$(echo "$usage" | python3 -c "import sys; print(int(float(sys.stdin.read())))" 2>/dev/null)
+            if [ -n "$usage_int" ] && [ "$usage_int" -gt 80 ]; then
+                warn "  Using ${usage}% of memory limit — may OOM under load"
+                hint "Consider increasing OPENCLAW_MEMORY_LIMIT in instance.env"
+            fi
+        fi
+    fi
 done
 
 echo ""

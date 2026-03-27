@@ -25,7 +25,7 @@ func generateToken() string {
 
 func cmdCreate(args []string) error {
 	paths := resolvePaths()
-	var nameArg, fromInstance, role, managerName, bindMode string
+	var nameArg, fromInstance, role, managerName, bindMode, runtimeName string
 	shared := SharedFlags{}
 	noShared := false
 
@@ -41,6 +41,8 @@ func cmdCreate(args []string) error {
 			bindMode = a[7:]
 		case strings.HasPrefix(a, "--image="):
 			// handled below after policy check
+		case strings.HasPrefix(a, "--runtime="):
+			runtimeName = a[10:]
 		case a == "--shared-skills" || a == "--skills":
 			shared.Skills = true
 		case a == "--shared-workspace" || a == "--workspace":
@@ -66,8 +68,17 @@ func cmdCreate(args []string) error {
 	if bindMode != "loopback" && bindMode != "lan" && bindMode != "wan" {
 		return errorf("invalid bind mode '%s' — use 'loopback', 'lan', or 'wan'", bindMode)
 	}
+	// Resolve runtime
+	if runtimeName == "" {
+		runtimeName = "openclaw"
+	}
+	rt, ok := getRuntimeByName(paths, runtimeName)
+	if !ok {
+		return errorf("unknown runtime '%s' — see available: clawctl runtime list", runtimeName)
+	}
+
 	if nameArg == "" {
-		return errorf("usage: clawctl create <name|group/name> [--from=<instance>] [--role=manager|worker] [--shared-*]")
+		return errorf("usage: clawctl create <name|group/name> [--from=<instance>] [--role=manager|worker] [--runtime=openclaw] [--shared-*]")
 	}
 
 	// Parse name — could be "bob" or "backend/bob"
@@ -111,14 +122,14 @@ func cmdCreate(args []string) error {
 	if fromInstance != "" {
 		fromRef, _ := ParseRef(fromInstance)
 		fromDir := fromRef.Dir(paths)
-		if _, err := os.Stat(filepath.Join(fromDir, "openclaw.json")); err != nil {
+		if _, err := os.Stat(filepath.Join(fromDir, rt.ConfigFileName)); err != nil {
 			return errorf("template instance '%s' not found", fromInstance)
 		}
 	}
 
 	name := ref.FullName()
 
-	// Resolve image: --image= flag > env var > default
+	// Resolve image: --image= flag > env var > runtime default
 	image := ""
 	for _, a := range args {
 		if strings.HasPrefix(a, "--image=") {
@@ -129,7 +140,7 @@ func cmdCreate(args []string) error {
 		image = os.Getenv("OPENCLAW_IMAGE")
 	}
 	if image == "" {
-		image = "openclaw:local"
+		image = rt.DefaultImage
 	}
 
 	// Policy enforcement
@@ -207,19 +218,20 @@ OPENCLAW_GATEWAY_TOKEN=%s
 OPENCLAW_GATEWAY_BIND=%s
 OPENCLAW_HOST_BIND=%s
 OPENCLAW_IMAGE=%s
+CLAWCTL_RUNTIME=%s
 OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=
 CLAUDE_AI_SESSION_KEY=
 CLAUDE_WEB_SESSION_KEY=
 CLAUDE_WEB_COOKIE=
 `, name, time.Now().UTC().Format("2006-01-02 15:04:05 UTC"), index,
-		name, dir, dir, gatewayPort, bridgePort, token, bindMode, hostBind(bindMode), image)
+		name, dir, dir, gatewayPort, bridgePort, token, bindMode, hostBind(bindMode), image, runtimeName)
 
 	if err := os.WriteFile(envFile, []byte(envContent), credentialFileMode); err != nil {
 		cleanup(dir, paths, name)
 		return err
 	}
 
-	// Build openclaw.json via config merge
+	// Build config via config merge
 	skeleton := map[string]any{
 		"gateway": map[string]any{
 			"port": float64(gatewayPort),
@@ -246,7 +258,7 @@ CLAUDE_WEB_COOKIE=
 	var fromConfigPath string
 	if fromInstance != "" {
 		fromRef, _ := ParseRef(fromInstance)
-		fromConfigPath = filepath.Join(fromRef.Dir(paths), "openclaw.json")
+		fromConfigPath = filepath.Join(fromRef.Dir(paths), rt.ConfigFileName)
 	}
 
 	// Config inheritance: global defaults → group defaults → template → skeleton
@@ -260,9 +272,15 @@ CLAUDE_WEB_COOKIE=
 			groupDefaultsPath = gdp
 		}
 	}
-	outputPath := filepath.Join(dir, "openclaw.json")
+	outputPath := filepath.Join(dir, rt.ConfigFileName)
 
-	if err := mergeConfigLayers(defaultsPath, groupDefaultsPath, fromConfigPath, fromInstance, skeletonFile, outputPath); err != nil {
+	if !rt.SupportsConfig {
+		// Runtime doesn't use config merging — write skeleton directly
+		if err := os.WriteFile(outputPath, skeletonData, 0600); err != nil {
+			cleanup(dir, paths, name)
+			return err
+		}
+	} else if err := mergeConfigLayers(defaultsPath, groupDefaultsPath, fromConfigPath, fromInstance, skeletonFile, outputPath); err != nil {
 		cleanup(dir, paths, name)
 		return err
 	}
@@ -355,14 +373,15 @@ func cmdStart(args []string) error {
 	}
 
 	info(fmt.Sprintf("Starting instance '%s'...", name))
-	if err := dcRun(paths, name, "up", "-d", "openclaw-gateway"); err != nil {
+	if err := dcRun(paths, name, "up", "-d", gatewayService(paths, name)); err != nil {
 		return err
 	}
 
 	// Wait for health
 	dir := instanceDir(paths, name)
 	port := readEnvValue(filepath.Join(dir, "instance.env"), "OPENCLAW_GATEWAY_PORT")
-	url := fmt.Sprintf("http://127.0.0.1:%s/healthz", port)
+	rt := mustResolveRuntime(paths, name)
+	url := fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint)
 
 	fmt.Println()
 	info("Waiting for health...")
@@ -422,13 +441,13 @@ func cmdRestart(args []string) error {
 		// --hard: tear down and recreate the container (picks up compose template changes)
 		info(fmt.Sprintf("Hard-restarting instance '%s' (recreating container)...", name))
 		dcRun(paths, name, "down")
-		if err := dcRun(paths, name, "up", "-d", "openclaw-gateway"); err != nil {
+		if err := dcRun(paths, name, "up", "-d", gatewayService(paths, name)); err != nil {
 			return err
 		}
 	} else {
 		// Normal: just restart the process inside the existing container
 		info(fmt.Sprintf("Restarting instance '%s'...", name))
-		if err := dcRun(paths, name, "restart", "openclaw-gateway"); err != nil {
+		if err := dcRun(paths, name, "restart", gatewayService(paths, name)); err != nil {
 			return err
 		}
 	}
@@ -543,6 +562,7 @@ func cmdStatus(args []string) error {
 		return err
 	}
 
+	rt := mustResolveRuntime(paths, name)
 	dir := instanceDir(paths, name)
 	envFile := filepath.Join(dir, "instance.env")
 	port := readEnvValue(envFile, "OPENCLAW_GATEWAY_PORT")
@@ -567,7 +587,7 @@ func cmdStatus(args []string) error {
 			"directory": dir,
 			"port":      port,
 			"token":     tokenDisplay,
-			"config":    filepath.Join(dir, "openclaw.json"),
+			"config":    rt.ConfigPath(dir),
 			"workspace": filepath.Join(dir, "workspace"),
 		}
 		data, _ := json.MarshalIndent(obj, "", "  ")
@@ -584,12 +604,12 @@ func cmdStatus(args []string) error {
 	if len(token) > 16 {
 		fmt.Printf("  Token:      %s...%s\n", token[:8], token[len(token)-8:])
 	}
-	fmt.Printf("  Config:     %s/openclaw.json\n", dir)
+	fmt.Printf("  Config:     %s\n", rt.ConfigPath(dir))
 	fmt.Printf("  Workspace:  %s/workspace/\n", dir)
 	fmt.Println()
 
 	fmt.Printf("%sContainer:%s\n", bold, nc)
-	dcRun(paths, name, "ps", "openclaw-gateway")
+	dcRun(paths, name, "ps", gatewayService(paths, name))
 	return nil
 }
 
@@ -654,7 +674,7 @@ func cmdLogs(args []string) error {
 		return err
 	}
 	composeArgs := append([]string{"logs"}, args[1:]...)
-	composeArgs = append(composeArgs, "openclaw-gateway")
+	composeArgs = append(composeArgs, gatewayService(paths, name))
 	return dc(paths, name, composeArgs...).Run()
 }
 
@@ -671,7 +691,7 @@ func cmdExec(args []string) error {
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
-	composeArgs := append([]string{"run", "--rm", "openclaw-cli"}, args[1:]...)
+	composeArgs := append([]string{"run", "--rm", cliService(paths, name)}, args[1:]...)
 	return dc(paths, name, composeArgs...).Run()
 }
 
@@ -693,11 +713,11 @@ func cmdAuth(args []string) error {
 	switch method {
 	case "codex":
 		info(fmt.Sprintf("Starting OAuth flow for '%s'...", name))
-		if err := dcRun(paths, name, "run", "--rm", "openclaw-cli", "models", "auth", "login", "--provider", "openai-codex", "--set-default"); err != nil {
+		if err := dcRun(paths, name, "run", "--rm", cliService(paths, name), "models", "auth", "login", "--provider", "openai-codex", "--set-default"); err != nil {
 			return err
 		}
 		info("Restarting gateway...")
-		dcRun(paths, name, "restart", "openclaw-gateway")
+		dcRun(paths, name, "restart", gatewayService(paths, name))
 		info(fmt.Sprintf("Auth complete for '%s'.", name))
 
 	case "apikey":
@@ -706,11 +726,11 @@ func cmdAuth(args []string) error {
 		}
 		provider, key := args[2], args[3]
 		info(fmt.Sprintf("Adding %s API key to '%s'...", provider, name))
-		if err := dcRun(paths, name, "run", "--rm", "-T", "openclaw-cli", "onboard", "--mode", "headless", "--"+provider+"-api-key", key); err != nil {
+		if err := dcRun(paths, name, "run", "--rm", "-T", cliService(paths, name), "onboard", "--mode", "headless", "--"+provider+"-api-key", key); err != nil {
 			return err
 		}
 		info("Restarting gateway...")
-		dcRun(paths, name, "restart", "openclaw-gateway")
+		dcRun(paths, name, "restart", gatewayService(paths, name))
 		info(fmt.Sprintf("Auth complete for '%s'.", name))
 
 	default:
@@ -1097,8 +1117,10 @@ func probeInstance(paths Paths, name string) instanceHealth {
 		return h
 	}
 
-	// Liveness: /healthz
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/healthz", port))
+	rt := mustResolveRuntime(paths, name)
+
+	// Liveness
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint))
 	if err == nil && resp.StatusCode == 200 {
 		h.Live = true
 		resp.Body.Close()
@@ -1110,17 +1132,19 @@ func probeInstance(paths Paths, name string) instanceHealth {
 		return h
 	}
 
-	// Readiness: /readyz
-	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s/readyz", port))
-	if err == nil {
-		defer resp.Body.Close()
-		var body struct {
-			Ready   bool     `json:"ready"`
-			Failing []string `json:"failing"`
-		}
-		if json.NewDecoder(resp.Body).Decode(&body) == nil {
-			h.Ready = body.Ready
-			h.Failing = body.Failing
+	// Readiness
+	if rt.ReadyEndpoint != "" {
+		resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.ReadyEndpoint))
+		if err == nil {
+			defer resp.Body.Close()
+			var body struct {
+				Ready   bool     `json:"ready"`
+				Failing []string `json:"failing"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&body) == nil {
+				h.Ready = body.Ready
+				h.Failing = body.Failing
+			}
 		}
 	}
 

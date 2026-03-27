@@ -192,11 +192,11 @@ func upgradeInstance(paths Paths, name, targetImage string) error {
 	dcRun(paths, name, "down")
 
 	// Start with new image
-	if err := dcRun(paths, name, "up", "-d", "openclaw-gateway"); err != nil {
+	if err := dcRun(paths, name, "up", "-d", gatewayService(paths, name)); err != nil {
 		// Rollback
 		warn(fmt.Sprintf("start failed — rolling back to %s", previousImage))
 		updateEnvValue(envFile, "OPENCLAW_IMAGE", previousImage)
-		dcRun(paths, name, "up", "-d", "openclaw-gateway")
+		dcRun(paths, name, "up", "-d", gatewayService(paths, name))
 		return errorf("upgrade failed, rolled back to %s", previousImage)
 	}
 
@@ -204,7 +204,7 @@ func upgradeInstance(paths Paths, name, targetImage string) error {
 	port := readEnvValue(envFile, "OPENCLAW_GATEWAY_PORT")
 	healthy := false
 	for i := 0; i < 15; i++ {
-		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/healthz", port))
+		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", port, mustResolveRuntime(paths, name).HealthEndpoint))
 		if err == nil && resp.StatusCode == 200 {
 			resp.Body.Close()
 			healthy = true
@@ -221,7 +221,7 @@ func upgradeInstance(paths Paths, name, targetImage string) error {
 		warn(fmt.Sprintf("%s — health check failed after 30s — rolling back to %s", name, previousImage))
 		dcRun(paths, name, "down")
 		updateEnvValue(envFile, "OPENCLAW_IMAGE", previousImage)
-		dcRun(paths, name, "up", "-d", "openclaw-gateway")
+		dcRun(paths, name, "up", "-d", gatewayService(paths, name))
 		return errorf("health check failed, rolled back to %s", previousImage)
 	}
 

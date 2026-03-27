@@ -57,6 +57,7 @@ func mergeConfigLayers(defaultsPath, groupDefaultsPath, templatePath, templateFl
 							delete(chMap, "groups")
 							delete(chMap, "allowFrom")
 							delete(chMap, "groupAllowFrom")
+							delete(chMap, "actions")
 						}
 					}
 				}

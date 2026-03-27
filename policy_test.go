@@ -71,6 +71,12 @@ func TestPolicyEnforceDmPairing(t *testing.T) {
 	if err := p.enforceDmPolicy("pairing"); err != nil {
 		t.Errorf("pairing should be allowed: %v", err)
 	}
+	if err := p.enforceDmPolicy("allowlist"); err != nil {
+		t.Errorf("allowlist should be allowed (stricter than pairing): %v", err)
+	}
+	if err := p.enforceDmPolicy("disabled"); err != nil {
+		t.Errorf("disabled should be allowed (strictest): %v", err)
+	}
 	if err := p.enforceDmPolicy("open"); err == nil {
 		t.Error("open should be blocked when pairing required")
 	}
@@ -207,6 +213,91 @@ func TestIntegration_PolicyEnforceClean(t *testing.T) {
 	out, _ := clawctl(t, root, "policy", "enforce")
 	if !strings.Contains(out, "No violations") {
 		t.Errorf("clean instance should have no violations: %s", out)
+	}
+}
+
+func TestPolicyEnforceOutboundAllowlist(t *testing.T) {
+	p := Policy{RequireOutboundAllowlist: true}
+
+	// sendMessage enabled without allowFrom = violation
+	chMap := map[string]any{
+		"actions": map[string]any{"sendMessage": true},
+	}
+	if err := p.enforceOutboundAllowlist("whatsapp", chMap); err == nil {
+		t.Error("should fail: sendMessage enabled without allowFrom")
+	}
+
+	// sendMessage enabled with allowFrom = ok
+	chMap["allowFrom"] = []any{"+1234567890"}
+	if err := p.enforceOutboundAllowlist("whatsapp", chMap); err != nil {
+		t.Errorf("should pass with allowFrom: %v", err)
+	}
+
+	// sendMessage disabled = ok (no allowFrom needed)
+	chMap2 := map[string]any{
+		"actions": map[string]any{"sendMessage": false},
+	}
+	if err := p.enforceOutboundAllowlist("whatsapp", chMap2); err != nil {
+		t.Errorf("should pass when sendMessage is false: %v", err)
+	}
+
+	// No actions set = ok
+	chMap3 := map[string]any{}
+	if err := p.enforceOutboundAllowlist("whatsapp", chMap3); err != nil {
+		t.Errorf("should pass when no actions: %v", err)
+	}
+
+	// Policy disabled = ok
+	p2 := Policy{RequireOutboundAllowlist: false}
+	if err := p2.enforceOutboundAllowlist("whatsapp", chMap); err != nil {
+		t.Errorf("should pass when policy disabled: %v", err)
+	}
+}
+
+func TestPolicyEnforceOutboundDiscord(t *testing.T) {
+	p := Policy{RequireOutboundAllowlist: true}
+
+	// Discord uses "messages" not "sendMessage"
+	chMap := map[string]any{
+		"actions": map[string]any{"messages": true},
+	}
+	if err := p.enforceOutboundAllowlist("discord", chMap); err == nil {
+		t.Error("should fail: discord messages enabled without allowFrom")
+	}
+}
+
+func TestIntegration_PolicyInitOutbound(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "policy", "init")
+
+	data, _ := os.ReadFile(filepath.Join(root, "policy.json"))
+	var p Policy
+	json.Unmarshal(data, &p)
+	if !p.RequireOutboundAllowlist {
+		t.Error("default policy should require outbound allowlist")
+	}
+}
+
+func TestIntegration_PolicyEnforceOutbound(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "create", "alpha")
+	clawctl(t, root, "channel", "add", "alpha", "telegram", "--token=fake", "--allow-send")
+
+	// Init policy (requires outbound allowlist)
+	clawctl(t, root, "policy", "init")
+
+	// Enforce — should disable sendMessage since no allowFrom
+	out, _ := clawctl(t, root, "policy", "enforce")
+	if !strings.Contains(out, "sendMessage") && !strings.Contains(out, "disabled") {
+		t.Errorf("should disable sendMessage without allowFrom: %s", out)
+	}
+
+	// Verify
+	cfg := readJSON(t, filepath.Join(root, "alpha", "openclaw.json"))
+	tg := cfg["channels"].(map[string]any)["telegram"].(map[string]any)
+	actions := tg["actions"].(map[string]any)
+	if actions["sendMessage"] != false {
+		t.Error("sendMessage should be false after enforce")
 	}
 }
 

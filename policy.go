@@ -20,10 +20,11 @@ type Policy struct {
 	AllowDockerSocket bool `json:"allowDockerSocket,omitempty"`
 
 	// Agent
-	RequireSandbox      bool     `json:"requireSandbox,omitempty"`
-	AllowedToolProfiles []string `json:"allowedToolProfiles,omitempty"` // empty = any
-	RequireDmPairing    bool     `json:"requireDmPairing,omitempty"`
-	BlockedChannels     []string `json:"blockedChannels,omitempty"`
+	RequireSandbox           bool     `json:"requireSandbox,omitempty"`
+	AllowedToolProfiles      []string `json:"allowedToolProfiles,omitempty"` // empty = any
+	RequireDmPairing         bool     `json:"requireDmPairing,omitempty"`
+	RequireOutboundAllowlist bool     `json:"requireOutboundAllowlist,omitempty"` // sendMessage requires allowFrom
+	BlockedChannels          []string `json:"blockedChannels,omitempty"`
 
 	// Image
 	AllowedImages []string `json:"allowedImages,omitempty"` // glob patterns, empty = any
@@ -97,10 +98,32 @@ func (p Policy) enforceChannelPolicy(channel string) error {
 	return nil
 }
 
-// enforceDmPolicy checks if pairing is required.
+// enforceDmPolicy checks that DM policy is not "open" (pairing or stricter required).
 func (p Policy) enforceDmPolicy(dmPolicy string) error {
-	if p.RequireDmPairing && dmPolicy != "pairing" {
-		return fmt.Errorf("policy violation: dmPolicy must be 'pairing' (admin policy requires it)")
+	if p.RequireDmPairing && dmPolicy != "pairing" && dmPolicy != "allowlist" && dmPolicy != "disabled" {
+		return fmt.Errorf("policy violation: dmPolicy '%s' is too permissive (pairing or allowlist required)", dmPolicy)
+	}
+	return nil
+}
+
+// enforceOutboundAllowlist checks that sendMessage is not enabled without an allowFrom list.
+func (p Policy) enforceOutboundAllowlist(channel string, chMap map[string]any) error {
+	if !p.RequireOutboundAllowlist {
+		return nil
+	}
+	actions, ok := chMap["actions"].(map[string]any)
+	if !ok {
+		return nil // no explicit actions = using defaults (we can't enforce here)
+	}
+	sendKey := channelSendAction(channel)
+	sendEnabled, ok := actions[sendKey].(bool)
+	if !ok || !sendEnabled {
+		return nil
+	}
+	// sendMessage is enabled — check allowFrom
+	af, _ := chMap["allowFrom"].([]any)
+	if len(af) == 0 {
+		return fmt.Errorf("channel %s: outbound messaging enabled without allowFrom contacts", channel)
 	}
 	return nil
 }
@@ -177,15 +200,16 @@ func cmdPolicyInit(args []string) error {
 
 	// Secure defaults
 	p := Policy{
-		AllowedBindModes: []string{"loopback"},
-		MaxInstances:     8,
-		MemoryLimitMB:    1024,
-		CPULimit:         2.0,
-		AllowDockerSocket: false,
-		RequireSandbox:    false, // start permissive, admin can tighten
-		RequireDmPairing:  true,
-		AllowedImages:     []string{"openclaw:*"},
-		AuditLog:          true,
+		AllowedBindModes:         []string{"loopback"},
+		MaxInstances:             8,
+		MemoryLimitMB:            2048,
+		CPULimit:                 2.0,
+		AllowDockerSocket:        false,
+		RequireSandbox:           false, // start permissive, admin can tighten
+		RequireDmPairing:         true,
+		RequireOutboundAllowlist: true,
+		AllowedImages:            []string{"openclaw:*"},
+		AuditLog:                 true,
 	}
 
 	if err := writePolicy(paths, p); err != nil {
@@ -245,12 +269,16 @@ func cmdPolicyValidate(args []string) error {
 		}
 
 		// Check channel DM policies
-		configPath := filepath.Join(dir, "openclaw.json")
+		configPath := mustResolveRuntime(paths, e.Name).ConfigPath(dir)
 		if cfg, err := readInstanceConfig(configPath); err == nil {
 			if channels, ok := cfg["channels"].(map[string]any); ok {
 				for ch, v := range channels {
 					chMap, ok := v.(map[string]any)
-					if !ok || !chMap["enabled"].(bool) {
+					if !ok {
+						continue
+					}
+					enabled, _ := chMap["enabled"].(bool)
+					if !enabled {
 						continue
 					}
 					if err := p.enforceChannelPolicy(ch); err != nil {
@@ -260,6 +288,9 @@ func cmdPolicyValidate(args []string) error {
 						if err := p.enforceDmPolicy(dm); err != nil {
 							issues = append(issues, fmt.Sprintf("channel %s: dmPolicy=%s (pairing required)", ch, dm))
 						}
+					}
+					if err := p.enforceOutboundAllowlist(ch, chMap); err != nil {
+						issues = append(issues, err.Error())
 					}
 				}
 			}
@@ -342,7 +373,7 @@ func cmdPolicyEnforce(args []string) error {
 		}
 
 		// Fix channel DM policies
-		configPath := filepath.Join(dir, "openclaw.json")
+		configPath := mustResolveRuntime(paths, e.Name).ConfigPath(dir)
 		cfg, err := readInstanceConfig(configPath)
 		if err != nil {
 			continue
@@ -382,6 +413,19 @@ func cmdPolicyEnforce(args []string) error {
 				cfgChanged = true
 				needsRestart[e.Name] = true
 			}
+
+			// Fix outbound without allowlist
+			if err := p.enforceOutboundAllowlist(ch, chMap); err != nil {
+				sendKey := channelSendAction(ch)
+				actions, ok := chMap["actions"].(map[string]any)
+				if ok {
+					actions[sendKey] = false
+					info(fmt.Sprintf("%s: %s %s disabled (no allowFrom contacts)", e.Name, ch, sendKey))
+					fixed++
+					cfgChanged = true
+					needsRestart[e.Name] = true
+				}
+			}
 		}
 
 		if cfgChanged {
@@ -417,7 +461,7 @@ func cmdPolicyEnforce(args []string) error {
 			for name := range needsRestart {
 				info(fmt.Sprintf("Hard-restarting %s (recreating container)...", name))
 				dcRun(paths, name, "down")
-				dcRun(paths, name, "up", "-d", "openclaw-gateway")
+				dcRun(paths, name, "up", "-d", gatewayService(paths, name))
 			}
 			info("All affected instances restarted with updated config.")
 		} else {

@@ -112,19 +112,18 @@ Uses the Baileys library (Web API). Requires QR code scanning from a phone.
 ### Setup
 
 ```bash
-# Configure access policy first
-clawctl exec alice config set channels.whatsapp.enabled true --json
-clawctl exec alice config set channels.whatsapp.dmPolicy '"pairing"' --json
+# Add WhatsApp (starts QR login, sets safe defaults)
+clawctl channel add alice whatsapp
+
+# Add your phone number to the allowlist
+clawctl channel allow alice whatsapp +15551234567
+
+# Restart to apply
 clawctl restart alice
-
-# Link via QR (interactive — needs terminal)
-clawctl exec alice channels login --channel whatsapp
-# A QR code appears in the terminal — scan it with WhatsApp:
-#   WhatsApp → Settings → Linked Devices → Link a Device
-
-# Message the WhatsApp number, approve pairing
-clawctl exec alice pairing approve whatsapp <CODE>
 ```
+
+Safe defaults applied: `dmPolicy: allowlist`, `sendMessage: false`, `groupPolicy: allowlist`.
+Only numbers in `allowFrom` will get any response.
 
 ### Config Reference
 
@@ -133,10 +132,15 @@ clawctl exec alice pairing approve whatsapp <CODE>
   "channels": {
     "whatsapp": {
       "enabled": true,
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",              // only allowFrom numbers get responses
       "allowFrom": ["+15551234567"],        // phone numbers that can DM
       "groupPolicy": "allowlist",           // "open" | "allowlist" | "disabled"
-      "groupAllowFrom": ["+15551234567"]    // who can add bot to groups
+      "groupAllowFrom": ["+15551234567"],   // who can trigger bot in groups
+      "actions": {
+        "sendMessage": false,               // OFF by default (agent can't initiate)
+        "reactions": true,
+        "polls": false
+      }
     }
   }
 }
@@ -350,9 +354,43 @@ clawctl group shared team --all
 
 ---
 
-## Security: DM Pairing
+## Security
 
-By default, every channel uses **DM pairing** — unknown senders can't get responses until approved.
+### Safe Defaults
+
+When you add a channel with `clawctl channel add`, safe defaults are applied automatically:
+
+- **Outbound messaging is OFF** — the agent can respond to messages but cannot initiate contact with new people
+- **Reactions and read-only lookups are ON** — harmless, useful for UX
+- **Group policy is set to `allowlist`** — agent only responds in explicitly allowed groups
+- **WhatsApp and Signal default to `dmPolicy: allowlist`** — only pre-approved phone numbers get any response
+- **Telegram, Discord, Slack default to `dmPolicy: pairing`** — unknown senders get a one-time approval code
+
+Use `--allow-send` when adding a channel to enable outbound messaging if you need it.
+
+### Managing Channel Security
+
+```bash
+# View full security posture (policies, actions, contacts)
+clawctl channel security alice
+clawctl channel security alice whatsapp
+
+# Enable/disable outbound messaging
+clawctl channel send alice whatsapp --enable
+clawctl channel send alice whatsapp --disable
+
+# Manage approved contacts
+clawctl channel allow alice whatsapp +15551234567
+clawctl channel allow alice whatsapp +15559876543 +15551112222
+clawctl channel deny alice whatsapp +15551234567
+
+# After changes, restart to apply
+clawctl restart alice
+```
+
+### DM Pairing
+
+For channels using `dmPolicy: pairing`, unknown senders get a one-time approval code:
 
 ```bash
 # Check pending pairing requests
@@ -367,21 +405,48 @@ clawctl exec alice channels status --probe
 
 ### DM Policies
 
-| Policy | Behavior |
-|--------|----------|
-| `pairing` | Unknown senders get a one-time approval code (default, recommended) |
-| `allowlist` | Only pre-approved phone numbers/user IDs can DM |
-| `open` | Anyone can DM (not recommended for public bots) |
+| Policy | Behavior | Default for |
+|--------|----------|-------------|
+| `allowlist` | Only pre-approved phone numbers/user IDs can DM | WhatsApp, Signal |
+| `pairing` | Unknown senders get a one-time approval code | Telegram, Discord, Slack |
+| `open` | Anyone can DM (not recommended) | — |
+| `disabled` | Reject all DMs | — |
 
 ### Group Policies
 
 | Policy | Behavior |
 |--------|----------|
+| `allowlist` | Only respond in allowlisted groups (default) |
 | `open` | Respond to all group messages |
-| `allowlist` | Only respond in allowlisted groups |
 | `disabled` | Ignore all group messages |
 
 By default, group messages require `@mention` (`requireMention: true`).
+
+### Outbound Actions
+
+Each channel has actions that can be individually toggled. Safe defaults set dangerous actions to OFF:
+
+| Action | Default | Description |
+|--------|---------|-------------|
+| `sendMessage` / `messages` | OFF | Send messages to contacts |
+| `reactions` | ON | React to messages |
+| `polls` | OFF | Create polls |
+| `moderation` | OFF | Moderate channels (Discord/Slack) |
+| `deleteMessage` | OFF | Delete messages (Telegram) |
+| `permissions` | OFF | Manage permissions (Discord/Slack) |
+| `search`, `memberInfo`, `channelInfo` | ON | Read-only lookups |
+
+### Policy Enforcement
+
+Admin policy (`clawctl policy init`) includes `requireOutboundAllowlist`: if outbound messaging is enabled on a channel, that channel must have an `allowFrom` list. This prevents agents from messaging arbitrary contacts.
+
+```bash
+# Check all instances against policy
+clawctl policy validate
+
+# Auto-fix violations (disables sendMessage where no allowFrom exists)
+clawctl policy enforce --restart
+```
 
 ---
 

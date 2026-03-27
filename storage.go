@@ -638,7 +638,7 @@ func cmdMigrate(args []string) error {
 
 	// Step 4: Restart
 	info("Starting instance with S3 workspace...")
-	dcRun(paths, ref.RegistryName(), "up", "-d", "openclaw-gateway")
+	dcRun(paths, ref.RegistryName(), "up", "-d", gatewayService(paths, ref.RegistryName()))
 
 	if cleanup {
 		info("Removing local workspace copy...")

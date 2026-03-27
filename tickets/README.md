@@ -4,12 +4,14 @@
 
 | # | Title | Priority | Status | Depends On |
 |---|-------|----------|--------|------------|
-| 1 | [Security Hardening](ticket_1_security-hardening.md) | P0 Critical | Open | — |
-| 2 | [Admin Policy Layer](ticket_2_admin-policy.md) | P1 High | Open | — |
-| 3 | [Runtime Adapter Pattern](ticket_3_runtime-adapter.md) | P2 Medium | Open | — |
-| 4 | [Multi-Tenant Access Control](ticket_4_multi-tenant.md) | P2 Medium | Open | Ticket 2 |
-| 5 | [Image Management](ticket_5_image-management.md) | P2 Medium | Open | — |
-| 6 | [Security Matrix & Audit](ticket_6_security-matrix.md) | P1 High | Partial | — |
+| 1 | [Security Hardening](ticket_1_security-hardening.md) | P0 Critical | **Done** | — |
+| 2 | [Admin Policy Layer](ticket_2_admin-policy.md) | P1 High | **Done** | — |
+| 3 | [Runtime Adapter Pattern](ticket_3_runtime-adapter.md) | P2 Medium | **Done** | — |
+| 4 | [Multi-Tenant Access Control](ticket_4_multi-tenant.md) | P2 Medium | **Done** | Ticket 2 |
+| 5 | [Image Management](ticket_5_image-management.md) | P2 Medium | **Done** | — |
+| 6 | [Security Matrix & Audit](ticket_6_security-matrix.md) | P1 High | **Done** | — |
+| 7 | [Runtime UX](ticket_7_runtime-ux.md) | P1 High | **Done** | Ticket 3 |
+| 8 | [One-Click Onboarding](ticket_8_onboarding.md) | P0 Critical | Open | All (1-7) |
 
 ## Context
 

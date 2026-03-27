@@ -132,6 +132,10 @@ Examples:
 	"channel": `Usage: clawctl channel add <instance> <channel> [--token=...]
        clawctl channel status <instance>
        clawctl channel remove <instance> <channel>
+       clawctl channel security <instance> [<channel>]
+       clawctl channel send <instance> <channel> --enable|--disable
+       clawctl channel allow <instance> <channel> <contact...>
+       clawctl channel deny <instance> <channel> <contact>
        clawctl channel <instance> <channel>  (interactive wizard)
 
 Quick-add a messaging channel with one command. Sets config, restarts
@@ -146,15 +150,32 @@ Supported quick-add channels:
 
 Options:
   --dm-policy=<policy>   DM access policy: pairing (default), allowlist, open
+  --allow-send           Enable outbound messaging (OFF by default)
+
+Security:
+  security <instance> [<channel>]   Show security posture (policies, actions, contacts)
+  send <instance> <ch> --enable     Enable outbound messaging
+  send <instance> <ch> --disable    Disable outbound messaging
+  allow <instance> <ch> <contact>   Add contact to allowFrom list
+  deny <instance> <ch> <contact>    Remove contact from allowFrom list
+
+Safe defaults applied on 'channel add':
+  - Outbound messaging (sendMessage/messages): OFF
+  - Reactions and read-only lookups: ON
+  - Group policy: allowlist
+  Use --allow-send to enable outbound messaging during setup.
 
 Examples:
   clawctl channel add alice telegram --token=123:ABC...
-  clawctl channel add alice discord --token=BOT_TOKEN
-  clawctl channel add alice slack --bot-token=xoxb-... --app-token=xapp-...
   clawctl channel add alice whatsapp
+  clawctl channel add alice whatsapp --allow-send
+  clawctl channel security alice
+  clawctl channel security alice whatsapp
+  clawctl channel send alice whatsapp --enable
+  clawctl channel allow alice whatsapp +1234567890
+  clawctl channel deny alice whatsapp +1234567890
   clawctl channel status alice
   clawctl channel remove alice telegram
-  clawctl channel alice telegram   (legacy interactive wizard)
 
 After adding, approve the pairing code:
   clawctl approve alice telegram <CODE>
@@ -282,6 +303,56 @@ Examples:
   clawctl proxy setup --domain=ai.example.com --dry-run
   clawctl proxy status`,
 
+	"runtime": `Usage: clawctl runtime <subcommand>
+
+Manage agent runtimes. clawctl can manage different containerized agent
+gateways, not just OpenClaw.
+
+Most users just need --image= (same runtime, different Docker image):
+  clawctl create alice --image=openclaw:slim
+  clawctl create alice --image=nemoclaw:latest
+
+Custom runtimes are for agents with different ports, health endpoints,
+or CLI commands:
+
+Subcommands:
+  list                     List available runtimes
+  show <name> [--json]     Show full runtime configuration
+  add <name> [options]     Register a custom runtime
+  init <name>              Scaffold runtime JSON + compose template
+  test <name>              Validate runtime (image, compose, health)
+  detect <image>           Auto-detect settings from Docker image
+  export <name>            Export runtime definition (for sharing)
+  import <file>            Import a shared runtime definition
+  remove <name>            Remove a custom runtime
+
+Options for add:
+  --from=<runtime>         Inherit from an existing runtime (override only what's different)
+  --image=<image>          Default Docker image
+  --health=<endpoint>      Health check endpoint (default: /healthz)
+  --port=<port>            Internal gateway port (default: 18789)
+  --no-channels            Disable channel support
+  --no-cli                 No CLI service
+
+Examples:
+  # Compatible fork — inherit from openclaw, change image
+  clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest
+
+  # Divergent fork — different health endpoint
+  clawctl runtime add nanoclaw --from=openclaw --image=nanoclaw:latest --health=/status
+
+  # Completely different agent — scaffold and customize
+  clawctl runtime init my-python-agent
+  clawctl runtime test my-python-agent
+  clawctl create alice --runtime=my-python-agent
+
+  # Auto-detect from image
+  clawctl runtime detect my-agent:latest
+
+  # Share with team
+  clawctl runtime export nemoclaw > nemoclaw.json
+  clawctl runtime import nemoclaw.json`,
+
 	"access": `Usage: clawctl access <init|show|grant|revoke|audit>
 
 Manage who can use clawctl and what they can do.
@@ -347,7 +418,7 @@ Examples:
   clawctl upgrade --all --image=openclaw:v2026.4.1
   clawctl upgrade team/sarah    # recreate with same image (picks up compose changes)`,
 
-	"policy": `Usage: clawctl policy <init|show|validate>
+	"policy": `Usage: clawctl policy <init|show|validate|enforce>
 
 Manage admin security policy. Policy constrains what instances can do.
 
@@ -355,23 +426,26 @@ Subcommands:
   init                Create policy.json with secure defaults (--force to overwrite)
   show                Print current policy
   validate            Check all instances against policy
+  enforce [--restart] Fix all violations automatically
 
 Policy controls:
-  allowedBindModes    Restrict network binding (e.g., ["loopback"] only)
-  maxInstances        Hard cap on instance count
-  memoryLimitMB       Per-instance memory limit
-  cpuLimit            Per-instance CPU limit
-  requireSandbox      Force sandbox mode on all agents
-  allowedToolProfiles Restrict tool profiles
-  requireDmPairing    Force pairing on all channels
-  blockedChannels     Block specific channels
-  allowedImages       Restrict which Docker images can be used
-  auditLog            Enable command audit logging
+  allowedBindModes         Restrict network binding (e.g., ["loopback"] only)
+  maxInstances             Hard cap on instance count
+  memoryLimitMB            Per-instance memory limit
+  cpuLimit                 Per-instance CPU limit
+  requireSandbox           Force sandbox mode on all agents
+  allowedToolProfiles      Restrict tool profiles
+  requireDmPairing         Force pairing on all channels
+  requireOutboundAllowlist Require allowFrom when outbound messaging is enabled
+  blockedChannels          Block specific channels
+  allowedImages            Restrict which Docker images can be used
+  auditLog                 Enable command audit logging
 
 Examples:
   clawctl policy init
   clawctl policy show
-  clawctl policy validate`,
+  clawctl policy validate
+  clawctl policy enforce --restart`,
 
 	"config": `Usage: clawctl config <show|get|set|edit> <instance> [args...]
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -45,7 +44,8 @@ func cmdConfigShow(args []string) error {
 	noSecrets := hasFlag(args[1:], "--no-secrets")
 
 	ref, _ := ParseRef(name)
-	configPath := filepath.Join(ref.Dir(paths), "openclaw.json")
+	rt := mustResolveRuntime(paths, name)
+	configPath := rt.ConfigPath(ref.Dir(paths))
 
 	cfg, err := readInstanceConfig(configPath)
 	if err != nil {
@@ -77,7 +77,8 @@ func cmdConfigGet(args []string) error {
 	}
 
 	ref, _ := ParseRef(name)
-	configPath := filepath.Join(ref.Dir(paths), "openclaw.json")
+	rt := mustResolveRuntime(paths, name)
+	configPath := rt.ConfigPath(ref.Dir(paths))
 
 	cfg, err := readInstanceConfig(configPath)
 	if err != nil {
@@ -121,7 +122,8 @@ func cmdConfigSet(args []string) error {
 	}
 
 	ref, _ := ParseRef(name)
-	configPath := filepath.Join(ref.Dir(paths), "openclaw.json")
+	rt := mustResolveRuntime(paths, name)
+	configPath := rt.ConfigPath(ref.Dir(paths))
 
 	cfg, err := readInstanceConfig(configPath)
 	if err != nil {
@@ -157,7 +159,8 @@ func cmdConfigEdit(args []string) error {
 	}
 
 	ref, _ := ParseRef(name)
-	configPath := filepath.Join(ref.Dir(paths), "openclaw.json")
+	rt := mustResolveRuntime(paths, name)
+	configPath := rt.ConfigPath(ref.Dir(paths))
 
 	editor := os.Getenv("EDITOR")
 	if editor == "" {

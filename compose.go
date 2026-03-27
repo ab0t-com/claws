@@ -7,18 +7,22 @@ import (
 )
 
 // dc runs docker compose with the right flags for an instance.
-// name can be "instance" or "group/instance".
+// It resolves the runtime from instance.env to determine compose template,
+// project name, and override file.
 func dc(paths Paths, name string, args ...string) *exec.Cmd {
 	ref, _ := ParseRef(name)
+	rt := mustResolveRuntime(paths, name)
 	dir := ref.Dir(paths)
 	envFile := filepath.Join(dir, "instance.env")
-	override := filepath.Join(dir, "docker-compose.override.yml")
+	override := rt.OverridePath(dir)
 
-	composeArgs := []string{"-f", paths.ComposeTemplate}
+	composeTemplate := rt.ComposeTemplatePath(paths)
+
+	composeArgs := []string{"-f", composeTemplate}
 	if _, err := os.Stat(override); err == nil {
 		composeArgs = append(composeArgs, "-f", override)
 	}
-	composeArgs = append(composeArgs, "--env-file", envFile, "-p", ref.ProjectName())
+	composeArgs = append(composeArgs, "--env-file", envFile, "-p", rt.MakeProjectName(ref))
 	composeArgs = append(composeArgs, args...)
 
 	cmd := exec.Command("docker", append([]string{"compose"}, composeArgs...)...)
@@ -31,15 +35,18 @@ func dc(paths Paths, name string, args ...string) *exec.Cmd {
 // dcOutput runs docker compose and captures stdout.
 func dcOutput(paths Paths, name string, args ...string) (string, error) {
 	ref, _ := ParseRef(name)
+	rt := mustResolveRuntime(paths, name)
 	dir := ref.Dir(paths)
 	envFile := filepath.Join(dir, "instance.env")
-	override := filepath.Join(dir, "docker-compose.override.yml")
+	override := rt.OverridePath(dir)
 
-	composeArgs := []string{"-f", paths.ComposeTemplate}
+	composeTemplate := rt.ComposeTemplatePath(paths)
+
+	composeArgs := []string{"-f", composeTemplate}
 	if _, err := os.Stat(override); err == nil {
 		composeArgs = append(composeArgs, "-f", override)
 	}
-	composeArgs = append(composeArgs, "--env-file", envFile, "-p", ref.ProjectName())
+	composeArgs = append(composeArgs, "--env-file", envFile, "-p", rt.MakeProjectName(ref))
 	composeArgs = append(composeArgs, args...)
 
 	cmd := exec.Command("docker", append([]string{"compose"}, composeArgs...)...)
@@ -95,7 +102,8 @@ func splitFirst(s string, sep byte) []string {
 
 // containerStatus returns the status string from docker compose ps.
 func containerStatus(paths Paths, name string) string {
-	out, err := dcOutput(paths, name, "ps", "--format", "{{.Status}}", "openclaw-gateway")
+	rt := mustResolveRuntime(paths, name)
+	out, err := dcOutput(paths, name, "ps", "--format", "{{.Status}}", rt.GatewayService)
 	if err != nil {
 		return ""
 	}
@@ -113,23 +121,19 @@ func trimSpace(s string) string {
 	return s[i:j]
 }
 
-// resolveContainerName finds the actual container name for an instance's gateway service
-// by querying docker compose ps. Falls back to the conventional name if the query fails.
+// resolveContainerName finds the actual container name for an instance's gateway service.
 func resolveContainerName(paths Paths, name string) string {
 	ref, _ := ParseRef(name)
-	// Try docker compose ps --format json
-	out, err := dcOutput(paths, name, "ps", "--format", "json", "openclaw-gateway")
+	rt := mustResolveRuntime(paths, name)
+
+	out, err := dcOutput(paths, name, "ps", "--format", "json", rt.GatewayService)
 	if err == nil && len(trimSpace(out)) > 0 {
-		// docker compose ps --format json outputs one JSON object per line
-		// Look for "Name" field
 		for _, line := range splitLines(out) {
 			line = trimSpace(line)
 			if line == "" || line[0] != '{' {
 				continue
 			}
-			// Simple extraction without importing encoding/json to keep it lightweight
 			if idx := indexOf(line, '"'); idx >= 0 {
-				// Parse "Name":"<value>"
 				nameKey := `"Name":"`
 				if pos := indexOfStr(line, nameKey); pos >= 0 {
 					start := pos + len(nameKey)
@@ -141,8 +145,8 @@ func resolveContainerName(paths Paths, name string) string {
 			}
 		}
 	}
-	// Fallback to conventional name
-	return ref.ProjectName() + "-openclaw-gateway-1"
+	// Fallback to conventional name using runtime
+	return rt.DefaultContainerName(ref)
 }
 
 func indexOfStr(s, sub string) int {
@@ -154,7 +158,7 @@ func indexOfStr(s, sub string) int {
 	return -1
 }
 
-// containerRAM returns RAM usage string. name can be "instance" or "group/instance".
+// containerRAM returns RAM usage string.
 func containerRAM(paths Paths, name string) string {
 	containerName := resolveContainerName(paths, name)
 	cmd := exec.Command("docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", containerName)
