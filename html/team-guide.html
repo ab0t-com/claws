@@ -339,6 +339,10 @@
         Enterprise
         <small>Full fleet with RBAC + policy</small>
       </a>
+      <a href="#fleet-ops">
+        Fleet Operations
+        <small>Errors, drift, logs, auth, channels matrix</small>
+      </a>
     </div>
   </div>
 </div>
@@ -847,6 +851,172 @@ clawctl backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
 </div>
 
 <!-- ================================================================ -->
+<!-- FLEET OPERATIONS — observability commands added in v1.0.0 -->
+<!-- ================================================================ -->
+<div class="container">
+  <section id="fleet-ops">
+    <h2 class="section-title">Fleet Operations</h2>
+    <p class="subtitle">
+      Once you have more than one or two agents, you need fleet-wide answers,
+      not per-agent commands. These commands let you ask "what's broken?",
+      "what drifted?", and "which agents are on which channels?" without
+      shelling into containers or running per-instance loops.
+    </p>
+
+    <p>
+      Every command in this section is <strong>read-only</strong> unless
+      explicitly stated. They compose existing surfaces (audit log, registry,
+      Docker state) into one screen and emit copy-paste fix commands rather
+      than executing anything themselves &mdash; the same pattern as
+      <code>policy validate</code>.
+    </p>
+
+    <h3>1. <code>clawctl errors</code> — incident-triage umbrella</h3>
+    <p>
+      First command to run when something feels off. One screen, four sources:
+    </p>
+    <ul>
+      <li>Container state (running / restarting / exited + restart count)</li>
+      <li>Recent log errors per instance</li>
+      <li>Recent <code>clawctl</code> operations that returned error</li>
+      <li>Orphan Docker containers</li>
+    </ul>
+    <p>Plus a <strong>Fix paths</strong> trailer with directive commands to address each finding.</p>
+    <div class="cmd"><span class="c"># Default: 2-hour window</span>
+clawctl errors
+
+<span class="c"># Wider window, JSON for dashboards</span>
+clawctl errors --since=24h --json
+
+<span class="c"># Scope to one team</span>
+clawctl errors --group=backend</div>
+
+    <h3>2. <code>clawctl drift</code> — state consistency check</h3>
+    <p>
+      Detect any divergence between Docker reality and clawctl's view.
+      Four dimensions in one pass:
+    </p>
+    <table>
+      <thead>
+        <tr><th>Drift type</th><th>What it catches</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Forward orphan</strong></td><td>Docker container named <code>openclaw-*</code> that isn't in the port registry. Usually a leftover from a test run or manual <code>docker compose up</code>.</td></tr>
+        <tr><td><strong>Reverse orphan</strong></td><td>Registry entry whose expected Docker container is missing.</td></tr>
+        <tr><td><strong>Disk drift</strong></td><td>Instance directory on disk (has <code>instance.env</code>) that isn't in the registry.</td></tr>
+        <tr><td><strong>Registry drift</strong></td><td>Registry entry whose instance directory is gone.</td></tr>
+      </tbody>
+    </table>
+    <div class="cmd">clawctl drift
+clawctl drift --json | jq '.forward,.reverse'</div>
+
+    <h3>3. <code>clawctl orphans</code> — find and clean stray containers</h3>
+    <p>
+      Where <code>drift</code> shows you everything, <code>orphans</code> is
+      the focused tool for the most common drift class &mdash; a Docker
+      container with the <code>openclaw-</code> prefix that's not in
+      clawctl's registry. A restart-looping orphan can burn CPU and confuse
+      incident triage.
+    </p>
+    <div class="cmd"><span class="c"># See what's orphaned</span>
+clawctl orphans
+
+<span class="c"># Reverse view: registry entries with missing containers</span>
+clawctl orphans --reverse
+
+<span class="c"># Remove a single orphan (asks for confirmation)</span>
+clawctl orphans clean openclaw-stray-1
+
+<span class="c"># Remove every orphan (asks once, then deletes)</span>
+clawctl orphans clean --all --yes</div>
+
+    <h3>4. <code>clawctl logs --group -f</code> — interleaved live tail</h3>
+    <p>
+      Tail every member of a group in one terminal with a per-member ANSI
+      colour prefix. Ctrl-C exits cleanly. Without <code>-f</code>, a
+      sequential dump with section headers. <code>--grep</code> is
+      in-process and preserves order across members.
+    </p>
+    <div class="cmd"><span class="c"># Live multiplex tail of every backend agent</span>
+clawctl logs --group=backend -f
+
+<span class="c"># Filtered live tail: only lines matching "401"</span>
+clawctl logs --group=backend -f --grep=401
+
+<span class="c"># Last 24h of errors, sequential dump</span>
+clawctl logs --group=backend --since=24h --grep=error
+
+<span class="c"># Per-agent (same flags work)</span>
+clawctl logs sarah -f --since=1h</div>
+
+    <h3>5. <code>clawctl auth verify</code> + <code>auth status --probe</code></h3>
+    <p>
+      Per-instance auth liveness, with honest confidence reporting. Tries
+      three strategies in order:
+    </p>
+    <ol>
+      <li>The auth-check endpoint (most confident).</li>
+      <li><code>/readyz</code> <code>failing[]</code> inspection.</li>
+      <li>Log scan for auth errors in the last 5 minutes (a log-scan
+        &ldquo;ok&rdquo; means <em>no errors seen</em>, not <em>next call
+        will succeed</em>).</li>
+    </ol>
+    <div class="cmd"><span class="c"># Verify one agent — exits 0 only when verified</span>
+clawctl auth verify sarah
+
+<span class="c"># Fleet auth inventory</span>
+clawctl auth status
+
+<span class="c"># Same, but run verify per row and add a VERIFIED column</span>
+clawctl auth status --probe
+
+<span class="c"># Re-run OAuth even when already verified (rare)</span>
+clawctl auth sarah codex --force</div>
+
+    <h3>6. <code>clawctl channels</code> — fleet channel matrix</h3>
+    <p>
+      Rows are agents, columns are channel types (telegram, discord, slack,
+      signal, whatsapp). Cells show the <code>dmPolicy</code> when the
+      channel is enabled, or <code>—</code> when not configured. Answers
+      &ldquo;which agents are on which channels?&rdquo; without running
+      <code>channel status</code> per agent.
+    </p>
+    <div class="cmd"><span class="c"># Fleet-wide matrix</span>
+clawctl channels
+
+<span class="c"># Scope to one group</span>
+clawctl channels --group=backend
+
+<span class="c"># JSON for dashboards: { columns: [...], rows: [{name, cells}] }</span>
+clawctl channels --json</div>
+
+    <div class="tip">
+      <strong>Pluralised vs singular.</strong> <code>channels</code> (plural)
+      is the read-only fleet view. <code>channel</code> (singular) is the
+      per-agent verb &mdash; <code>add</code>, <code>remove</code>,
+      <code>status</code>, <code>security</code>, <code>send</code>,
+      <code>allow</code>, <code>deny</code>.
+    </div>
+
+    <h3>When to reach for which command</h3>
+    <table>
+      <thead>
+        <tr><th>Symptom</th><th>Start here</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>"Something feels off in production"</td><td><code>clawctl errors</code></td></tr>
+        <tr><td>"Docker shows containers I don't recognise"</td><td><code>clawctl orphans</code></td></tr>
+        <tr><td>"An agent stopped responding on Telegram"</td><td><code>clawctl auth verify &lt;name&gt;</code> then <code>clawctl logs &lt;name&gt; --since=10m</code></td></tr>
+        <tr><td>"Which agents are missing a channel?"</td><td><code>clawctl channels</code></td></tr>
+        <tr><td>"A 401 is bouncing between agents"</td><td><code>clawctl logs --group=&lt;g&gt; -f --grep=401</code></td></tr>
+        <tr><td>"What state is broken vs what config is broken?"</td><td><code>clawctl drift</code></td></tr>
+        <tr><td>"Audit something happened last night"</td><td><code>clawctl errors --since=12h</code> + <code>clawctl access audit --since=12h</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ================================================================ -->
 <!-- DARK: CHOOSING YOUR PATTERN -->
 <!-- ================================================================ -->
 <div class="dark">
@@ -910,7 +1080,7 @@ clawctl start my-team/first-agent</div>
     <p>
       clawctl &mdash; AI agent team manager<br>
       <a href="channels-guide.html">Channel Setup Guide</a> &middot;
-      <a href="https://github.com/openclaw/clawctl">GitHub</a>
+      <a href="https://github.com/ab0t-com/claws">GitHub</a>
     </p>
   </div>
 </footer>

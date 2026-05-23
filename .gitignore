@@ -1,24 +1,98 @@
-# Binaries
-clawctl
-clawctl-v1
-*.exe
+# =====================================================================
+# clawctl — repository ignore rules
+# =====================================================================
+# Conservative by design: when in doubt, ignore. Many of these globs
+# are also (defense-in-depth) covered by gitleaks hooks.
+# =====================================================================
 
-# Credentials / secrets
+# --- Built binaries (Go) ---
+# Anchored to repo root so they don't shadow cmd/clawctl/ source directory.
+/clawctl
+/clawctl-v1
+/clawctl-v2-mar27-backup
+*.exe
+# Go test binaries
+*.test
+# Go test cache
+*.out
+
+# --- Release artifacts ---
+/release/
+/dist/
+/build/
+*.tar.gz
+*.tgz
+*.zip
+# Checksums are kept inside /release/ — both are ignored
+
+# --- Credentials / secrets (never commit) ---
 credentials.txt
 *.env
 .env
+.env.*
+!.env.example
 *.pem
 *.key
+*.crt
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.p12
+*.pfx
+*.jks
+# OpenClaw-specific token / registry artefacts
+instance.env
+.port-registry
+.token-registry
+.access.json
 
-# IDE
+# --- Local agent state (never commit a developer's ~/.openclaw) ---
+.openclaw/
+
+# --- IDE / editor noise ---
 .idea/
 .vscode/
 *.swp
 *.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
 
-# OS
+# --- OS noise ---
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
 
-# Test artifacts
-*.tar.gz
+# --- Logs / scratch ---
+*.log
+tmp/
+.tmp/
+scratch/
+.scratch/
+
+# --- Go-specific ---
+# vendor/ is optional; keep it tracked if added intentionally.
+# Coverage output
+coverage.out
+coverage.html
+profile.out
+# Module cache fragments
+go.work
+go.work.sum
+
+# --- Docker scratch ---
+.docker-build/
+docker-compose.override.yml
+
+# --- Reports / worklogs (kept locally, not for public release) ---
+# Uncomment if reports/ should be excluded from public repo:
+# /reports/
+# /tickets/
+
+# --- Tooling local config ---
+.claude/
+.claude-memory/

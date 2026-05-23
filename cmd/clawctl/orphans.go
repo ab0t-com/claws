@@ -175,7 +175,7 @@ func cmdOrphans(args []string) error {
 		return cmdOrphansClean(args[1:])
 	default:
 		// No subcommand given but extra args present — treat as flags to list.
-		// e.g. `clawctl orphans --json`
+		// e.g. `clawctl orphans --json` or `clawctl orphans --reverse`.
 		if strings.HasPrefix(args[0], "-") {
 			return cmdOrphansList(args)
 		}
@@ -183,9 +183,69 @@ func cmdOrphans(args []string) error {
 	}
 }
 
+// reverseOrphan represents a registry entry whose Docker container is
+// missing. The inverse of orphanInfo. Distinct type because the fields
+// that make sense are different — a reverse orphan has no Container name
+// (that's the point) but has Project (computed) and Name (from registry).
+type reverseOrphan struct {
+	Name        string `json:"name"`        // registry entry name
+	Project     string `json:"project"`     // expected Docker project name
+	InstanceDir string `json:"instanceDir"` // host path
+}
+
+// discoverReverseOrphans walks the registry and returns entries whose
+// expected Docker project has no corresponding container. The inverse of
+// discoverOrphans (which walks Docker and finds registry-less containers).
+func discoverReverseOrphans(paths Paths) ([]reverseOrphan, error) {
+	entries, err := readRegistry(paths)
+	if err != nil {
+		return nil, err
+	}
+	// Build the set of project names that DO have a container.
+	out, err := exec.Command(
+		"docker", "ps", "-a",
+		"--filter", "name=openclaw-",
+		"--format", "{{.Names}}",
+	).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps failed: %w", err)
+	}
+	haveContainer := map[string]bool{}
+	for _, name := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if project := containerProject(strings.TrimSpace(name)); project != "" {
+			haveContainer[project] = true
+		}
+	}
+
+	var reverse []reverseOrphan
+	for _, e := range entries {
+		ref, err := ParseRef(e.Name)
+		if err != nil {
+			continue
+		}
+		rt := mustResolveRuntime(paths, e.Name)
+		project := rt.MakeProjectName(ref)
+		if haveContainer[project] {
+			continue
+		}
+		reverse = append(reverse, reverseOrphan{
+			Name:        e.Name,
+			Project:     project,
+			InstanceDir: ref.Dir(paths),
+		})
+	}
+	sort.Slice(reverse, func(i, j int) bool { return reverse[i].Name < reverse[j].Name })
+	return reverse, nil
+}
+
 func cmdOrphansList(args []string) error {
 	paths := resolvePaths()
 	jsonMode := hasFlag(args, "--json")
+	reverse := hasFlag(args, "--reverse")
+
+	if reverse {
+		return cmdOrphansListReverse(paths, jsonMode)
+	}
 
 	orphans, err := discoverOrphans(paths)
 	if err != nil {
@@ -303,6 +363,50 @@ func cmdOrphansClean(args []string) error {
 	}
 	if len(failed) > 0 {
 		return errorf("%d container(s) failed to remove: %s", len(failed), strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// cmdOrphansListReverse renders the inverse view: registry entries whose
+// Docker container is missing. Different presentation from forward
+// orphans because the per-finding action is different (the instance dir
+// might be intact but the container needs a `clawctl start`, or the
+// instance dir might be gone too — manual investigation).
+func cmdOrphansListReverse(paths Paths, jsonMode bool) error {
+	reverse, err := discoverReverseOrphans(paths)
+	if err != nil {
+		return err
+	}
+	if jsonMode {
+		if reverse == nil {
+			fmt.Println("[]")
+			return nil
+		}
+		data, _ := json.MarshalIndent(reverse, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+	if len(reverse) == 0 {
+		info("No reverse orphans found. Every registered instance has a corresponding container.")
+		return nil
+	}
+	bold := "\033[1m"
+	nc := "\033[0m"
+	yellow := "\033[0;33m"
+	fmt.Printf("%sReverse orphans (%d) — registered in clawctl but no Docker container%s\n\n", bold, len(reverse), nc)
+	for _, r := range reverse {
+		fmt.Printf("  %s%s%s\n", bold, r.Name, nc)
+		fmt.Printf("    project:       %s\n", r.Project)
+		fmt.Printf("    instance dir:  %s\n", r.InstanceDir)
+		// Distinguish "instance dir exists" (likely just needs start) from
+		// "instance dir gone" (manual cleanup) so the fix command differs.
+		if _, err := os.Stat(r.InstanceDir); err == nil {
+			fmt.Printf("    %sfix:%s           clawctl start %s\n", bold, nc, r.Name)
+		} else {
+			fmt.Printf("    %sfix:%s           %sinstance dir is missing — investigate, possibly: clawctl remove %s --purge%s\n",
+				bold, nc, yellow, r.Name, nc)
+		}
+		fmt.Println()
 	}
 	return nil
 }

@@ -116,6 +116,10 @@ func main() {
 		err = cmdOrphans(args)
 	case "channels":
 		err = cmdChannelsMatrix(args)
+	case "errors":
+		err = cmdErrors(args)
+	case "drift":
+		err = cmdDrift(args)
 	case "help", "--help", "-h":
 		if len(args) > 0 {
 			printTopicHelp(args[0])
@@ -263,6 +267,9 @@ func printHelp() {
 		{"Diagnostics", []string{
 			"version                    Show version and environment",
 			"orphans [clean]            List containers not in clawctl's registry (clean = remove)",
+			"orphans --reverse          List registry entries that have no Docker container",
+			"drift                      Umbrella: orphans + reverse + disk/registry mismatch",
+			"errors [--since=2h]        Incident-triage view: container state + log errors + audit errors + orphans",
 		}},
 		{"Operations", []string{
 			"logs <name> [-f]           View instance logs",

@@ -7,12 +7,28 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
 // Integration tests build and run the binary against a temp OPENCLAW_ROOT.
 
 var testBinary string
+
+// testRootCleanupRegistered tracks which temp roots have already had a
+// docker-cleanup hook registered. Without this, every clawctl(...) call
+// inside a test would stack another t.Cleanup. With it, we register exactly
+// one cleanup per root — fires at test teardown, walks the registry, and
+// tears down any Docker compose project we accidentally brought up.
+//
+// Why this exists: tests that exercise code paths like `--auth=codex`
+// (which runs `docker compose run --rm openclaw-cli ...`) bring up the
+// gateway dependency container. `--rm` removes the CLI sidecar but does
+// not remove the dependency. Without cleanup, every such test run leaves
+// a restart-looping orphan with mounts pointing at the now-deleted
+// t.TempDir(). Surfaced and motivated by ticket
+// `test-harness-orphan-containers-2026-05-23`.
+var testRootCleanupRegistered sync.Map
 
 func TestMain(m *testing.M) {
 	// Build binary to temp location
@@ -46,6 +62,7 @@ func TestMain(m *testing.M) {
 
 func clawctl(t *testing.T, root string, args ...string) (string, error) {
 	t.Helper()
+	registerDockerCleanup(t, root)
 	bin := testBinary
 	cmd := exec.Command(bin, args...)
 	cmd.Env = append(os.Environ(),
@@ -55,6 +72,119 @@ func clawctl(t *testing.T, root string, args ...string) (string, error) {
 	)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+// registerDockerCleanup registers a t.Cleanup, exactly once per root, that
+// tears down any Docker compose projects this test created via clawctl. It
+// reads the port registry at cleanup time and runs `docker compose down -v
+// --remove-orphans` against each project name. Best-effort: errors are
+// ignored (most cleanups target projects that were never started under
+// CLAWCTL_SKIP_VALIDATE — fast no-ops). The cleanup fires before t.TempDir
+// is removed, so containers stop before their mount sources vanish — which
+// is the entire point.
+func registerDockerCleanup(t *testing.T, root string) {
+	if _, loaded := testRootCleanupRegistered.LoadOrStore(root, true); loaded {
+		return
+	}
+	t.Cleanup(func() {
+		// We intentionally don't pull the test binary here — reading the
+		// registry file directly is faster and avoids re-exec'ing during
+		// cleanup. Same logic clawctl uses internally to enumerate
+		// projects.
+		regPath := filepath.Join(root, ".port-registry")
+		data, err := os.ReadFile(regPath)
+		if err != nil {
+			return
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			name := parts[1]
+			// Project name mirrors Runtime.MakeProjectName: "openclaw-" +
+			// dashed instance name (group/name → group-name).
+			project := "openclaw-" + strings.ReplaceAll(name, "/", "-")
+			// Best-effort teardown. --remove-orphans cleans CLI sidecars
+			// that survived their parent test if any. -v removes named
+			// volumes, which the test never persists deliberately.
+			_ = exec.Command("docker", "compose", "-p", project, "down", "-v", "--remove-orphans").Run()
+		}
+		// Also clean orphan containers matching the test's project prefix
+		// — catches projects that started but failed to register (e.g., a
+		// test that exercised --auth chains and then assert-failed before
+		// reaching the registry write). Cheap and surgical: we filter on
+		// the same TestName prefix that's already in t.TempDir's name, so
+		// we never touch projects we didn't create.
+		testHint := strings.TrimSuffix(filepath.Base(root), filepath.Ext(filepath.Base(root)))
+		if testHint != "" {
+			// Best-effort, no error propagation.
+			out, _ := exec.Command("docker", "ps", "-a",
+				"--filter", "name=openclaw-",
+				"--format", "{{.Names}}\t{{.Label \"com.docker.compose.project.config_files\"}}").Output()
+			for _, line := range strings.Split(string(out), "\n") {
+				parts := strings.SplitN(line, "\t", 2)
+				if len(parts) != 2 {
+					continue
+				}
+				name, configFiles := parts[0], parts[1]
+				// Only kill a container if its compose project's config
+				// path lives under THIS test's root — never anyone else's.
+				if strings.Contains(configFiles, root) {
+					_ = exec.Command("docker", "rm", "-f", name).Run()
+				}
+			}
+		}
+	})
+}
+
+// TestRegisterDockerCleanup_OncePerRoot proves the dedup invariant: the
+// cleanup is registered exactly once per root, no matter how many clawctl
+// calls a test makes. We don't (and can't easily) assert that the cleanup
+// fired with the right docker arguments — the real Docker call is best-
+// effort and ignores results — but we can make sure we're not stacking
+// N cleanups per test and slowing teardown to a crawl.
+func TestRegisterDockerCleanup_OncePerRoot(t *testing.T) {
+	root := t.TempDir()
+	// Reset the package-level map for hermeticity. In production this map
+	// is process-wide; in tests the same root can be reused across runs of
+	// `go test`, and the sync.Map persists across function boundaries
+	// inside a single binary invocation. We delete the key explicitly so
+	// this test produces the same result regardless of run order.
+	testRootCleanupRegistered.Delete(root)
+
+	// First call: registers.
+	registerDockerCleanup(t, root)
+	// Subsequent calls: must not register again.
+	registerDockerCleanup(t, root)
+	registerDockerCleanup(t, root)
+
+	if _, ok := testRootCleanupRegistered.Load(root); !ok {
+		t.Errorf("expected root %q to be registered in the sync.Map", root)
+	}
+	// The actual t.Cleanup count is private to testing.T, but if the map
+	// is being consulted correctly, only one cleanup will run at teardown.
+}
+
+// TestRegisterDockerCleanup_HandlesMissingRegistry confirms the cleanup
+// hook doesn't crash on a test that never wrote a registry (e.g., one
+// that called clawctl(t, root, "help") and nothing else). Cheap defensive
+// check matching the worklog claim that cleanup is best-effort.
+func TestRegisterDockerCleanup_HandlesMissingRegistry(t *testing.T) {
+	root := t.TempDir()
+	testRootCleanupRegistered.Delete(root)
+	registerDockerCleanup(t, root)
+	// No registry file at root/.port-registry. Cleanup must not panic
+	// when it tries to read. We can't *force* it to fire here (that's
+	// t.Cleanup's job), but the implementation explicitly handles os.ReadFile
+	// returning err — and that's what this test asserts by inspection.
+	if _, err := os.Stat(filepath.Join(root, ".port-registry")); err == nil {
+		t.Errorf("setup invariant broken: registry should not exist at start of this test")
+	}
 }
 
 func TestIntegration_CreateBasic(t *testing.T) {

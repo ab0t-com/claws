@@ -139,6 +139,52 @@ Examples:
   clawctl list --json
   clawctl list --rich --json    # full identity record per agent`,
 
+	"drift": `Usage: clawctl drift [--json]
+
+State consistency check across four dimensions:
+  1. Forward orphans   — Docker containers with the openclaw- prefix that
+                          aren't in the port registry. (Same data as
+                          'clawctl orphans'.)
+  2. Reverse orphans   — Registry entries whose expected Docker container
+                          is missing. (Same data as 'clawctl orphans --reverse'.)
+  3. Disk drift        — Instance directories on disk (have instance.env)
+                          that aren't in the registry.
+  4. Registry drift    — Registry entries whose instance directory is gone.
+
+Read-only. Emits per-finding fix commands; never executes anything.
+
+Options:
+  --json    Machine-readable output with all four sections.
+
+Examples:
+  clawctl drift
+  clawctl drift --json | jq '.forward,.reverse'`,
+
+	"errors": `Usage: clawctl errors [--since=<dur>] [--group=<name>] [--json]
+
+Incident-triage umbrella view. Composes four read paths into one screen:
+  1. Container state (running/restarting/exited + restart count)
+  2. Recent log errors per instance
+  3. Recent clawctl operations that returned error
+  4. Orphan Docker containers (containers not in clawctl's registry)
+
+Plus a "Fix paths" trailer with directive commands to address each finding.
+
+Read-only. Composes existing surfaces ('activity', 'access audit', 'orphans');
+no new state. Useful as the first command to run when something feels off.
+
+Options:
+  --since=<dur>    Time window for log and audit errors (default: 2h)
+  --group=<name>   Scope container + log + audit sections to one team
+                   (orphans are global by definition)
+  --json           Machine-readable output: { containers, logErrors,
+                   auditErrors, orphans, fixPaths }
+
+Examples:
+  clawctl errors
+  clawctl errors --since=24h --group=team
+  clawctl errors --json   # for dashboards / alert pipelines`,
+
 	"channels": `Usage: clawctl channels [--group=<name>] [--json]
 
 Fleet-wide channel matrix: rows are agents, columns are channel types
@@ -276,16 +322,17 @@ Options:
   -f                Follow log output (stream)
   --since=<dur>     Only show logs since this duration ago (e.g. 1h, 24h)
   --grep=<pattern>  Case-insensitive substring filter (in-process; preserves order)
-  --group=<name>    Tail every member of a group sequentially with section headers
-
-Note: --group= with -f is not yet supported (interleaved multi-instance follow
-is its own work item). For real-time, follow one instance at a time.
+  --group=<name>    Tail every member of a group. Without -f: sequential dump
+                    with section headers. With -f: live multiplex with a
+                    per-member ANSI color prefix; Ctrl-C exits cleanly.
 
 Examples:
   clawctl logs alice
   clawctl logs alice -f
   clawctl logs alice --since=1h --grep=error
-  clawctl logs --group=backend --since=24h --grep=401`,
+  clawctl logs --group=backend --since=24h --grep=401
+  clawctl logs --group=backend -f                # live multiplex tail
+  clawctl logs --group=backend -f --grep=401     # filtered live tail`,
 
 	"exec": `Usage: clawctl exec <name> <command...>
 
@@ -362,6 +409,7 @@ Examples:
 	"auth": `Usage: clawctl auth <name> codex
        clawctl auth <name> apikey <provider> <key>
        clawctl auth status [name] [--group=<g>] [--json]
+       clawctl auth verify <name> [--json]
 
 Configure or inspect authentication for an instance.
 
@@ -371,19 +419,37 @@ Verbs:
   status [name]            Read-only inventory: model, token, channel
                            creds, last auth event from the audit log.
                            No name: covers every registered instance.
+                           Add --probe to also run the per-instance verify
+                           and add a VERIFIED column.
+  verify <name>            Per-instance liveness check: tries (1) the auth-
+                           check endpoint, (2) /readyz failing[] inspection,
+                           (3) log scan for auth errors in the last 5m.
+                           Exits 0 only on verified ok. Honest about
+                           confidence — log-scan "ok" means "no errors seen",
+                           not "next call will succeed."
 
-Options for status:
+Options for codex / apikey:
+  --force                  Re-run even if auth verify already passes
+                           (idempotence is on by default — retry-safe)
+
+Options for status / verify:
   --group=<name>           Limit status to one group/team
-  --json                   Machine-readable array
+  --json                   Machine-readable output
+  --probe                  (status only) Run verify per instance, add
+                           VERIFIED column, list per-failure fix commands
 
 Examples:
   clawctl auth alice codex
   clawctl auth alice apikey openai sk-...
   clawctl auth alice apikey anthropic sk-ant-...
-  clawctl auth status                          # whole fleet
+  clawctl auth status                          # whole fleet inventory
   clawctl auth status team/sarah               # one instance
   clawctl auth status --group=backend          # one team
-  clawctl auth status --json                   # for dashboards`,
+  clawctl auth status --probe                  # fleet auth + verify in one screen
+  clawctl auth status --probe --group=team --json   # for monitoring / CI
+  clawctl auth verify team/sarah               # "is auth actually working?"
+  clawctl auth verify team/sarah --json        # for CI / alerts
+  clawctl auth team/sarah codex --force        # rotate (overrides idempotence)`,
 
 	"backup": `Usage: clawctl backup <name> [<output-path>] [--exclude-credentials]
 
@@ -844,7 +910,7 @@ var topicHelp = map[string]string{
     WhatsApp   No token needed (QR scan)               (~5 min)
     Signal     Needs signal-cli + phone number         (~5 min)
 
-  Full step-by-step guides: see channels-guide.html
+  Full step-by-step guides: see html/channels-guide.html
 
   Connect to an agent:
 

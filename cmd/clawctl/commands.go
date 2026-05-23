@@ -1070,20 +1070,19 @@ func cmdLogs(args []string) error {
 	if filterGroup != "" && name != "" {
 		return errorf("specify either positional instance name or --group=, not both")
 	}
-	if filterGroup != "" && follow {
-		// Interleaved multi-instance follow requires goroutine multiplexing
-		// with per-line prefix tagging. Deferred to its own ticket. For now,
-		// fail directive so operators don't think they're getting it.
-		return errorf("--group= with -f (interleaved follow) is not yet supported — run -f per instance, or omit -f for sequential tail")
-	}
 
-	// Group fan-out (non-follow only): iterate members, prefix each line.
+	// Group fan-out: two paths.
+	// Follow: goroutine-multiplexed live tail with per-member color prefix.
+	// Non-follow: sequential per-member dump with section headers.
 	if filterGroup != "" {
 		entries, _ := readRegistry(paths)
 		members := filterEntriesByGroup(entries, filterGroup)
 		if len(members) == 0 {
 			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
 			return nil
+		}
+		if follow {
+			return logsGroupFollow(paths, members, grep)
 		}
 		// Pass-through flags minus --group= and the positional (none here).
 		var passThrough []string
@@ -1193,23 +1192,42 @@ func cmdExec(args []string) error {
 
 func cmdAuth(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name]")
+		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name] | clawctl auth verify <name>")
 	}
-	// `auth status` is a read-only fleet inspection that lives next to the
-	// auth verbs because operators look for "is auth working?" under the
-	// same noun they used to set it up. Mirrors how `channel status` sits
-	// next to `channel add`.
+	// `auth status` and `auth verify` are read-only inspections that live
+	// next to the auth verbs because operators look for "is auth working?"
+	// under the same noun they used to set it up. Mirrors how `channel
+	// status` sits next to `channel add`.
 	if args[0] == "status" {
 		return cmdAuthStatus(args[1:])
 	}
+	if args[0] == "verify" {
+		return cmdAuthVerify(args[1:])
+	}
 	if len(args) < 2 {
-		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name]")
+		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name] | clawctl auth verify <name>")
 	}
 	paths := resolvePaths()
 	name := args[0]
 	method := args[1]
+	force := hasFlag(args, "--force")
 	if err := requireInstance(paths, name); err != nil {
 		return err
+	}
+
+	// Idempotence preflight: if auth already verifies, no-op unless --force.
+	// Skipped/inconclusive results do NOT short-circuit (we can't safely
+	// claim "already works" without evidence). Only an explicit verified=true
+	// means we can skip the dance — matches the Cloudflare-style "verify is
+	// a first-class verb" principle: same primitive answers the "skip?"
+	// question that answers the "is it working?" question.
+	if !force {
+		pre := verifyOneInstance(paths, name)
+		if pre.Verified {
+			info(fmt.Sprintf("'%s' is already authed and verified (strategy: %s) — no action needed", name, pre.Strategy))
+			fmt.Println("  Pass --force to re-run anyway (e.g., to rotate to a fresh credential).")
+			return nil
+		}
 	}
 
 	switch method {
@@ -1220,11 +1238,11 @@ func cmdAuth(args []string) error {
 		}
 		info("Restarting gateway...")
 		dcRun(paths, name, "restart", gatewayService(paths, name))
-		info(fmt.Sprintf("Auth complete for '%s'.", name))
+		return reportPostAuthVerify(paths, name)
 
 	case "apikey":
 		if len(args) < 4 {
-			return errorf("usage: clawctl auth <name> apikey <provider> <key>")
+			return errorf("usage: clawctl auth <name> apikey <provider> <key> [--force]")
 		}
 		provider, key := args[2], args[3]
 		info(fmt.Sprintf("Adding %s API key to '%s'...", provider, name))
@@ -1233,12 +1251,68 @@ func cmdAuth(args []string) error {
 		}
 		info("Restarting gateway...")
 		dcRun(paths, name, "restart", gatewayService(paths, name))
-		info(fmt.Sprintf("Auth complete for '%s'.", name))
+		return reportPostAuthVerify(paths, name)
 
 	default:
 		return errorf("unknown auth method '%s' — use 'codex' or 'apikey'", method)
 	}
-	return nil
+}
+
+// reportPostAuthVerify runs auth verify after a successful credential
+// install + gateway restart, then surfaces a truthful result. Replaces
+// the legacy "==> Auth complete" message which was aspirational (told the
+// operator the CLI flow finished, not that the credential actually works).
+//
+// Three outcomes:
+//   - verified=true: print success, exit 0.
+//   - verified=false (explicit failure): print directive error, return error.
+//   - inconclusive: print warning, exit 0 (the install itself succeeded;
+//     we just can't *prove* the credential works yet because no log signal
+//     has materialised). Operator gets the next-step hint.
+func reportPostAuthVerify(paths Paths, name string) error {
+	// Give the gateway a beat to come up after restart. Without this, the
+	// /readyz probe races and the log scan window is empty.
+	time.Sleep(3 * time.Second)
+
+	res := verifyOneInstance(paths, name)
+	red := "\033[0;31m"
+	yellow := "\033[0;33m"
+	nc := "\033[0m"
+
+	switch {
+	case res.Verified:
+		switch res.Strategy {
+		case "endpoint":
+			info(fmt.Sprintf("Auth applied to '%s' and verified via upstream check.", name))
+		case "readyz":
+			info(fmt.Sprintf("Auth applied to '%s'; /readyz reports auth subsystem ready.", name))
+		case "logs":
+			info(fmt.Sprintf("Auth applied to '%s'; no auth errors observed in last 5m.", name))
+			fmt.Printf("  %s(log-scan confidence — send a test message via a channel to fully confirm)%s\n", "\033[0;90m", nc)
+		default:
+			info(fmt.Sprintf("Auth applied to '%s'.", name))
+		}
+		return nil
+	case res.Strategy == "skipped":
+		// Install succeeded; verification was inconclusive (gateway running
+		// but no recent activity to read). Don't fail the command — the
+		// credential is in place; we just can't prove it works yet.
+		fmt.Printf("%s==> Auth applied to '%s'; verification inconclusive — %s%s\n", yellow, name, res.Error, nc)
+		if res.FixCommand != "" {
+			fmt.Printf("  Next: %s\n", res.FixCommand)
+		}
+		return nil
+	default:
+		// Verification produced an explicit failure signal. The install
+		// itself completed but the credential isn't working — almost
+		// certainly the wrong credential or one that's already expired.
+		// Surface honestly and exit non-zero.
+		fmt.Printf("%s==> ERROR: auth applied to '%s' but verification failed: %s%s\n", red, name, res.Error, nc)
+		if res.FixCommand != "" {
+			fmt.Printf("  Fix: %s\n", res.FixCommand)
+		}
+		return errorf("post-install verification failed")
+	}
 }
 
 // cmdChannel and cmdApprove are in channel.go

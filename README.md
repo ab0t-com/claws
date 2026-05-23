@@ -1,12 +1,27 @@
 # clawctl
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Multi-instance manager for [OpenClaw](https://github.com/openclaw/openclaw). Run multiple isolated AI agent instances on a single server, each with its own identity, credentials, channels, and workspace.
+
+## Install
+
+```bash
+# Recommended — pinned release with checksum verification:
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+
+# Or specify a version:
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh -s -- --version=v1.0.0
+```
+
+The installer downloads the latest GitHub release, verifies the SHA256 against `SHA256SUMS`, and installs to `/usr/local/bin` (or `~/.local/bin` if not writable). Pass `--help` to see all options.
 
 ## Quick Start
 
 ```bash
-# 1. Build
-go build -o clawctl .
+# 1. Build from source (or use install.sh above)
+./scripts/rebuild.sh                     # build + vet + short tests
+# or:  go build -o clawctl ./cmd/clawctl/
 
 # 2. Initialize
 ./clawctl init
@@ -202,3 +217,41 @@ Instances are configured via layered JSON merge:
 - **Docker Compose substrate** — shared template + per-instance override
 - **File locking** — `flock()` on all registry/config writes
 - **150+ tests** — unit + integration, all passing
+
+## Repository Layout
+
+```
+.
+├── cmd/clawctl/         Go source (all .go files, package main)
+├── html/                Static UI / landing pages bundled in releases
+├── docs/                Markdown documentation (channels, runtimes)
+├── scripts/
+│   ├── install.sh       End-user installer (remote + local-dev + local-release)
+│   ├── rebuild.sh       Local-dev inner-loop build (+ vet + short tests)
+│   ├── release.sh       Cross-compile linux/darwin × amd64/arm64 → release/
+│   ├── install-hooks.sh Installs gitleaks + git hooks
+│   ├── security-audit.sh Deployment hardening check (bundled in releases)
+│   └── hooks/           pre-commit / pre-push / commit-msg (gitleaks)
+├── docker-compose.yml   Substrate template for instance containers
+├── LICENSE              MIT
+├── .gitleaks.toml       Secret-scanning rules
+└── .gitignore
+```
+
+Release tarballs are produced by `scripts/release.sh` and contain the binary, `docker-compose.yml`, `install.sh`, `security-audit.sh`, `LICENSE`, `README.md`, `html/`, `docs/`, and a per-target `MANIFEST.txt` of SHA256 sums.
+
+## Contributing
+
+```bash
+# Install git hooks + gitleaks (secret-scanning at commit time)
+./scripts/install-hooks.sh
+
+# Inner-loop:
+./scripts/rebuild.sh             # build + vet + short tests
+./scripts/rebuild.sh --quick     # build only
+./scripts/rebuild.sh --race      # build + tests with -race
+```
+
+## License
+
+[MIT](LICENSE) © 2026 ab0t.com
