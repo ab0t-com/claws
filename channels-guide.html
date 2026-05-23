@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>clawctl — Channel Setup Guide</title>
+  <meta name="description" content="Step-by-step guides for connecting your AI agents to Telegram, Discord, Slack, WhatsApp, and Signal.">
+  <meta name="theme-color" content="#fafafa">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
+  <style>
+    :root {
+      --white: #fafafa;
+      --off-white: #f4f2ef;
+      --cream: #edeae4;
+      --warm-gray: #c8c3ba;
+      --mid-gray: #8a8580;
+      --charcoal: #3a3632;
+      --ink: #1a1714;
+      --dark-bg: #141210;
+      --dark-surface: #1e1c18;
+      --dark-border: #2e2a24;
+      --dark-text: #e8e4de;
+      --dark-muted: #9a958e;
+      --coral: #e8634a;
+      --coral-soft: #f09080;
+      --sage: #7da67d;
+      --gold: #c8a86e;
+      --max-width: 860px;
+      --section-pad: clamp(40px, 8vw, 80px);
+      --border-thick: 3px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--white);
+      color: var(--ink);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 clamp(20px, 4vw, 40px);
+    }
+
+    /* --- Header --- */
+    header {
+      padding: var(--section-pad) 0 40px;
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    header p {
+      margin-top: 16px;
+      font-size: 1.15rem;
+      color: var(--mid-gray);
+      max-width: 600px;
+    }
+
+    /* --- Nav --- */
+    nav {
+      padding: 24px 0;
+      border-bottom: 1.5px solid var(--cream);
+      position: sticky;
+      top: 0;
+      background: var(--white);
+      z-index: 10;
+    }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      display: inline-block;
+      padding: 8px 18px;
+      border: 2px solid var(--charcoal);
+      border-radius: 100px;
+      text-decoration: none;
+      color: var(--charcoal);
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.15s;
+    }
+    nav a:hover, nav a:focus {
+      background: var(--ink);
+      color: var(--white);
+      border-color: var(--ink);
+    }
+    nav .platform-icon { margin-right: 6px; }
+
+    /* --- Platform sections --- */
+    .platform {
+      padding: var(--section-pad) 0;
+      border-bottom: 1.5px solid var(--cream);
+    }
+    .platform:last-of-type { border-bottom: none; }
+
+    .platform h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .platform .subtitle {
+      color: var(--mid-gray);
+      font-size: 1rem;
+      margin-bottom: 32px;
+    }
+    .platform .difficulty {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-left: 12px;
+      vertical-align: middle;
+    }
+    .easy { background: #e8f5e9; color: #2e7d32; }
+    .medium { background: #fff3e0; color: #e65100; }
+    .hard { background: #fce4ec; color: #c62828; }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+    }
+    .steps li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 56px;
+      margin-bottom: 28px;
+      min-height: 40px;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 38px;
+      height: 38px;
+      border: 2px solid var(--charcoal);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+    .steps li strong {
+      display: block;
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+    .steps li p {
+      color: var(--charcoal);
+      font-size: 0.95rem;
+    }
+
+    code, .cmd {
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      background: var(--off-white);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.88em;
+      border: 1px solid var(--cream);
+    }
+
+    .cmd-block {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 0.88rem;
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+    .cmd-block .comment { color: var(--dark-muted); }
+
+    a.external {
+      color: var(--coral);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      font-weight: 600;
+    }
+    a.external:hover { color: var(--coral-soft); }
+
+    .tip {
+      background: #f0f7f0;
+      border-left: 4px solid var(--sage);
+      padding: 14px 18px;
+      margin: 20px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.92rem;
+    }
+    .tip strong { color: var(--sage); }
+
+    .warning {
+      background: #fff8f0;
+      border-left: 4px solid var(--gold);
+      padding: 14px 18px;
+      margin: 20px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.92rem;
+    }
+    .warning strong { color: #b8860b; }
+
+    /* --- Footer --- */
+    footer {
+      padding: 40px 0 var(--section-pad);
+      text-align: center;
+      color: var(--mid-gray);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--coral); }
+
+    /* --- Dark section (after all channels) --- */
+    .dark-section {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: var(--section-pad) 0;
+    }
+    .dark-section h2 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+    .dark-section code {
+      background: var(--dark-surface);
+      border-color: var(--dark-border);
+      color: var(--dark-text);
+    }
+    .dark-section .cmd-block {
+      background: var(--dark-surface);
+      border: 1px solid var(--dark-border);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Channel Setup Guide</h1>
+    <p>Step-by-step instructions for connecting your AI agents to every supported messaging platform.</p>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="#telegram"><span class="platform-icon">&#9992;</span> Telegram</a></li>
+      <li><a href="#discord"><span class="platform-icon">&#9883;</span> Discord</a></li>
+      <li><a href="#slack"><span class="platform-icon">&#9638;</span> Slack</a></li>
+      <li><a href="#whatsapp"><span class="platform-icon">&#9742;</span> WhatsApp</a></li>
+      <li><a href="#signal"><span class="platform-icon">&#9888;</span> Signal</a></li>
+    </ul>
+  </nav>
+
+  <!-- ============================================================ -->
+  <!-- TELEGRAM -->
+  <!-- ============================================================ -->
+  <section class="platform" id="telegram">
+    <h2>Telegram <span class="difficulty easy">~2 min</span></h2>
+    <p class="subtitle">Create a bot via @BotFather, paste the token, done.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>Open @BotFather in Telegram</strong>
+        <p>Go to <a class="external" href="https://t.me/BotFather" target="_blank" rel="noopener">t.me/BotFather</a> or search "BotFather" in the Telegram app.</p>
+      </li>
+      <li>
+        <strong>Create a new bot</strong>
+        <p>Send <code>/newbot</code>. BotFather will ask for a display name (anything you want) and a username (must end in <code>bot</code>, e.g., <code>my_team_bot</code>).</p>
+      </li>
+      <li>
+        <strong>Copy the token</strong>
+        <p>BotFather replies with a token like <code>7123456789:AAH...</code>. Copy the entire line.</p>
+      </li>
+      <li>
+        <strong>Add to your agent</strong>
+        <div class="cmd-block">
+          <span class="comment"># During setup (interactive prompt)</span><br>
+          clawctl setup<br><br>
+          <span class="comment"># Or add to an existing agent</span><br>
+          clawctl channel add my-agent telegram --token=7123456789:AAH...<br><br>
+          <span class="comment"># Or inline with create</span><br>
+          clawctl create alice --telegram=7123456789:AAH...
+        </div>
+      </li>
+      <li>
+        <strong>Approve the pairing</strong>
+        <p>Message the bot in Telegram. It will show a pairing code. Enter it:</p>
+        <div class="cmd-block">clawctl approve my-agent telegram CODE123</div>
+      </li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip:</strong> You can customize the bot's profile picture and description in @BotFather with <code>/setuserpic</code> and <code>/setdescription</code>.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- DISCORD -->
+  <!-- ============================================================ -->
+  <section class="platform" id="discord">
+    <h2>Discord <span class="difficulty medium">~5 min</span></h2>
+    <p class="subtitle">Create an application in the Discord Developer Portal, add a bot, invite it to your server.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>Go to the Developer Portal</strong>
+        <p>Visit <a class="external" href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a> and log in.</p>
+      </li>
+      <li>
+        <strong>Create a new application</strong>
+        <p>Click <strong>"New Application"</strong>. Give it a name (this appears in the sidebar). Click <strong>"Create"</strong>.</p>
+      </li>
+      <li>
+        <strong>Add a bot</strong>
+        <p>Go to the <strong>"Bot"</strong> tab in the left sidebar. Click <strong>"Add Bot"</strong> &rarr; <strong>"Yes, do it!"</strong>.</p>
+      </li>
+      <li>
+        <strong>Enable message content intent</strong>
+        <p>Still on the Bot tab, scroll down to <strong>"Privileged Gateway Intents"</strong>. Enable <strong>"Message Content Intent"</strong>. Save.</p>
+      </li>
+      <li>
+        <strong>Copy the token</strong>
+        <p>Click <strong>"Reset Token"</strong> (or "Copy" if visible). This is your bot token. Save it somewhere safe &mdash; you can only see it once.</p>
+      </li>
+      <li>
+        <strong>Invite the bot to your server</strong>
+        <p>Go to the <strong>"OAuth2"</strong> tab &rarr; <strong>"URL Generator"</strong>. Check these scopes:</p>
+        <ul style="margin: 8px 0 8px 20px; font-size: 0.92rem;">
+          <li><code>bot</code></li>
+          <li><code>applications.commands</code></li>
+        </ul>
+        <p>Under "Bot Permissions", select: <strong>Send Messages</strong>, <strong>Read Message History</strong>, <strong>Add Reactions</strong>, <strong>Use Slash Commands</strong>.</p>
+        <p>Copy the generated URL at the bottom and open it in your browser. Select your server and authorize.</p>
+      </li>
+      <li>
+        <strong>Add to your agent</strong>
+        <div class="cmd-block">
+          clawctl channel add my-agent discord --token=MTIz...<br><br>
+          <span class="comment"># Or inline with create</span><br>
+          clawctl create alice --discord=MTIz...
+        </div>
+      </li>
+      <li>
+        <strong>Approve the pairing</strong>
+        <p>DM the bot on Discord. Enter the pairing code:</p>
+        <div class="cmd-block">clawctl approve my-agent discord CODE123</div>
+      </li>
+    </ol>
+
+    <div class="warning">
+      <strong>Important:</strong> The "Message Content Intent" is required for the bot to read messages. Without it, the bot can see that a message was sent but not its content.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SLACK -->
+  <!-- ============================================================ -->
+  <section class="platform" id="slack">
+    <h2>Slack <span class="difficulty hard">~10 min</span></h2>
+    <p class="subtitle">Slack requires creating an app with two tokens (bot + app-level) and configuring socket mode.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>Go to the Slack API portal</strong>
+        <p>Visit <a class="external" href="https://api.slack.com/apps" target="_blank" rel="noopener">api.slack.com/apps</a> and sign in to your workspace.</p>
+      </li>
+      <li>
+        <strong>Create a new app</strong>
+        <p>Click <strong>"Create New App"</strong> &rarr; <strong>"From scratch"</strong>. Enter a name and select your workspace.</p>
+      </li>
+      <li>
+        <strong>Enable Socket Mode</strong>
+        <p>In the left sidebar, go to <strong>"Socket Mode"</strong>. Toggle it <strong>ON</strong>. When prompted, create an app-level token with the <code>connections:write</code> scope. Name it anything (e.g., "clawctl"). Copy the <code>xapp-...</code> token.</p>
+      </li>
+      <li>
+        <strong>Subscribe to events</strong>
+        <p>Go to <strong>"Event Subscriptions"</strong>. Toggle <strong>ON</strong>. Under "Subscribe to bot events", add:</p>
+        <ul style="margin: 8px 0 8px 20px; font-size: 0.92rem;">
+          <li><code>message.im</code> (direct messages to bot)</li>
+          <li><code>message.channels</code> (messages in public channels)</li>
+          <li><code>app_mention</code> (when someone @mentions the bot)</li>
+        </ul>
+        <p>Click <strong>"Save Changes"</strong>.</p>
+      </li>
+      <li>
+        <strong>Add bot scopes</strong>
+        <p>Go to <strong>"OAuth &amp; Permissions"</strong>. Under "Bot Token Scopes", add:</p>
+        <ul style="margin: 8px 0 8px 20px; font-size: 0.92rem;">
+          <li><code>chat:write</code></li>
+          <li><code>channels:history</code></li>
+          <li><code>im:history</code></li>
+          <li><code>im:read</code></li>
+          <li><code>reactions:write</code></li>
+          <li><code>users:read</code></li>
+        </ul>
+      </li>
+      <li>
+        <strong>Install to workspace</strong>
+        <p>Click <strong>"Install to Workspace"</strong> at the top of the OAuth page. Authorize. Copy the <strong>Bot User OAuth Token</strong> (<code>xoxb-...</code>).</p>
+      </li>
+      <li>
+        <strong>Add to your agent</strong>
+        <div class="cmd-block">
+          clawctl channel add my-agent slack \<br>
+          &nbsp;&nbsp;--bot-token=xoxb-... \<br>
+          &nbsp;&nbsp;--app-token=xapp-...
+        </div>
+      </li>
+      <li>
+        <strong>Invite the bot to a channel</strong>
+        <p>In Slack, go to the channel where you want the bot. Type <code>/invite @your-bot-name</code>.</p>
+      </li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip:</strong> You need <em>two</em> tokens for Slack. The <code>xoxb-</code> bot token handles API calls. The <code>xapp-</code> app-level token handles the WebSocket connection (Socket Mode).
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- WHATSAPP -->
+  <!-- ============================================================ -->
+  <section class="platform" id="whatsapp">
+    <h2>WhatsApp <span class="difficulty medium">~5 min</span></h2>
+    <p class="subtitle">WhatsApp uses QR code login &mdash; no developer portal needed. You'll need a phone number dedicated to the bot.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>Get a phone number for the bot</strong>
+        <p>You need a phone number that is <strong>not</strong> already registered with WhatsApp. A cheap prepaid SIM or a VoIP number works. You'll receive one SMS to verify it.</p>
+      </li>
+      <li>
+        <strong>Start the channel setup</strong>
+        <div class="cmd-block">clawctl channel add my-agent whatsapp</div>
+        <p>This starts an interactive flow that will display a QR code in your terminal.</p>
+      </li>
+      <li>
+        <strong>Scan the QR code</strong>
+        <p>Open WhatsApp on the phone with your bot's number. Go to <strong>Settings</strong> &rarr; <strong>Linked Devices</strong> &rarr; <strong>Link a Device</strong>. Scan the QR code shown in your terminal.</p>
+      </li>
+      <li>
+        <strong>Wait for connection</strong>
+        <p>The terminal will show connection progress. Once linked, the agent can receive and respond to WhatsApp messages.</p>
+      </li>
+      <li>
+        <strong>Approve the pairing</strong>
+        <p>Send a message to the bot's WhatsApp number from your personal phone. Enter the pairing code:</p>
+        <div class="cmd-block">clawctl approve my-agent whatsapp CODE123</div>
+      </li>
+    </ol>
+
+    <div class="warning">
+      <strong>Important:</strong> WhatsApp's default DM policy is <code>allowlist</code> (stricter than pairing). You must explicitly add approved contacts: <code>clawctl channel allow my-agent whatsapp +1234567890</code>
+    </div>
+
+    <div class="tip">
+      <strong>Tip:</strong> The QR session expires after ~60 seconds. If it times out, run the command again.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SIGNAL -->
+  <!-- ============================================================ -->
+  <section class="platform" id="signal">
+    <h2>Signal <span class="difficulty medium">~5 min</span></h2>
+    <p class="subtitle">Signal uses a phone number. You'll need signal-cli or a linked device setup.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>Get a phone number for the bot</strong>
+        <p>Like WhatsApp, you need a dedicated phone number. It cannot be your primary Signal number.</p>
+      </li>
+      <li>
+        <strong>Register the number</strong>
+        <p>You'll need <a class="external" href="https://github.com/AsamK/signal-cli" target="_blank" rel="noopener">signal-cli</a> installed on your server (or the OpenClaw image may include it). Register:</p>
+        <div class="cmd-block">signal-cli -u +1234567890 register<br>signal-cli -u +1234567890 verify CODE</div>
+      </li>
+      <li>
+        <strong>Add to your agent</strong>
+        <div class="cmd-block">clawctl channel add my-agent signal --number=+1234567890</div>
+      </li>
+      <li>
+        <strong>Approve contacts</strong>
+        <p>Signal defaults to <code>allowlist</code> mode. Add approved senders:</p>
+        <div class="cmd-block">clawctl channel allow my-agent signal +0987654321</div>
+      </li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip:</strong> Signal is the most privacy-focused option. Messages are end-to-end encrypted. The bot only sees messages from approved contacts.
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- DARK SECTION: Quick Reference -->
+<!-- ============================================================ -->
+<div class="dark-section">
+  <div class="container">
+    <h2>Quick Reference</h2>
+    <p style="color: var(--dark-muted); margin-bottom: 24px;">All the commands in one place.</p>
+
+    <div class="cmd-block">
+      <span class="comment"># Add channels</span><br>
+      clawctl channel add &lt;agent&gt; telegram --token=TOKEN<br>
+      clawctl channel add &lt;agent&gt; discord  --token=TOKEN<br>
+      clawctl channel add &lt;agent&gt; slack    --bot-token=xoxb-... --app-token=xapp-...<br>
+      clawctl channel add &lt;agent&gt; whatsapp<br>
+      clawctl channel add &lt;agent&gt; signal   --number=+1234567890<br><br>
+
+      <span class="comment"># Or inline with create</span><br>
+      clawctl create alice --telegram=TOKEN<br>
+      clawctl create alice --discord=TOKEN<br><br>
+
+      <span class="comment"># Approve pairing</span><br>
+      clawctl approve &lt;agent&gt; &lt;channel&gt; CODE<br><br>
+
+      <span class="comment"># Manage channels</span><br>
+      clawctl channel status &lt;agent&gt;<br>
+      clawctl channel security &lt;agent&gt;<br>
+      clawctl channel send &lt;agent&gt; telegram --enable<br>
+      clawctl channel allow &lt;agent&gt; telegram USER_ID<br>
+      clawctl channel remove &lt;agent&gt; telegram
+    </div>
+
+    <div style="margin-top: 32px;">
+      <p><strong>Security defaults applied on channel add:</strong></p>
+      <ul style="margin: 12px 0 0 20px; color: var(--dark-muted); font-size: 0.92rem; line-height: 2;">
+        <li>DM policy: <code>pairing</code> (strangers must be approved with a code)</li>
+        <li>Outbound messages: <strong>OFF</strong> (agent cannot send unsolicited messages)</li>
+        <li>Reactions: ON (agent can react to messages)</li>
+        <li>Read-only info: ON (agent can see member/channel info)</li>
+        <li>Moderation/admin actions: OFF</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p>clawctl &mdash; AI agent team manager. <a href="https://github.com/openclaw/clawctl">GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

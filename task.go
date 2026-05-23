@@ -200,7 +200,7 @@ func cmdTaskCreate(args []string) error {
 
 func cmdTaskList(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl task list <group> [--status=pending|claimed|done]")
+		return errorf("usage: clawctl task list <group> [--status=pending|claimed|done] [--json]")
 	}
 
 	paths := resolvePaths()
@@ -211,12 +211,8 @@ func cmdTaskList(args []string) error {
 		return errorf("group '%s' does not exist", groupName)
 	}
 
-	var filterStatus string
-	for _, a := range args[1:] {
-		if strings.HasPrefix(a, "--status=") {
-			filterStatus = a[9:]
-		}
-	}
+	filterStatus := flagValue(args[1:], "--status=")
+	jsonMode := hasFlag(args, "--json")
 
 	td := taskDir(paths, groupName)
 	tasks := listTasks(td)
@@ -229,6 +225,16 @@ func cmdTaskList(args []string) error {
 			}
 		}
 		tasks = filtered
+	}
+
+	if jsonMode {
+		if tasks == nil {
+			fmt.Println("[]")
+			return nil
+		}
+		data, _ := json.MarshalIndent(tasks, "", "  ")
+		fmt.Println(string(data))
+		return nil
 	}
 
 	if len(tasks) == 0 {

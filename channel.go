@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -394,10 +395,11 @@ func cmdChannelRemove(args []string) error {
 // cmdChannelStatus shows channel status for an instance.
 func cmdChannelStatus(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl channel status <instance>")
+		return errorf("usage: clawctl channel status <instance> [--json]")
 	}
 	paths := resolvePaths()
-	name := args[0]
+	name := firstPositional(args)
+	jsonMode := hasFlag(args, "--json")
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
@@ -412,7 +414,35 @@ func cmdChannelStatus(args []string) error {
 
 	channels, ok := cfg["channels"].(map[string]any)
 	if !ok || len(channels) == 0 {
-		fmt.Println("No channels configured.")
+		if jsonMode {
+			fmt.Println("[]")
+		} else {
+			fmt.Println("No channels configured.")
+		}
+		return nil
+	}
+
+	// JSON mode: emit a flat array of {name, enabled, dmPolicy} per channel.
+	if jsonMode {
+		type chRec struct {
+			Name     string `json:"name"`
+			Enabled  bool   `json:"enabled"`
+			DmPolicy string `json:"dmPolicy,omitempty"`
+		}
+		var out []chRec
+		for ch, v := range channels {
+			cm, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			enabled, _ := cm["enabled"].(bool)
+			dm, _ := cm["dmPolicy"].(string)
+			out = append(out, chRec{Name: ch, Enabled: enabled, DmPolicy: dm})
+		}
+		// Sort for deterministic JSON output.
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+		data, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(string(data))
 		return nil
 	}
 
@@ -483,17 +513,27 @@ func cmdApprove(args []string) error {
 
 func cmdChannelSecurity(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl channel security <instance> [<channel>]")
+		return errorf("usage: clawctl channel security <instance> [<channel>] [--json]")
 	}
 	paths := resolvePaths()
-	name := args[0]
+	jsonMode := hasFlag(args, "--json")
+	// Drop flags so positional indexing still works.
+	var positional []string
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			positional = append(positional, a)
+		}
+	}
+	name := ""
+	filterChannel := ""
+	if len(positional) >= 1 {
+		name = positional[0]
+	}
+	if len(positional) >= 2 {
+		filterChannel = positional[1]
+	}
 	if err := requireInstance(paths, name); err != nil {
 		return err
-	}
-
-	filterChannel := ""
-	if len(args) >= 2 {
-		filterChannel = args[1]
 	}
 
 	ref, _ := ParseRef(name)
@@ -505,7 +545,49 @@ func cmdChannelSecurity(args []string) error {
 
 	channels, ok := cfg["channels"].(map[string]any)
 	if !ok || len(channels) == 0 {
-		fmt.Println("No channels configured.")
+		if jsonMode {
+			fmt.Println("[]")
+		} else {
+			fmt.Println("No channels configured.")
+		}
+		return nil
+	}
+
+	// JSON mode: emit the full security posture for matched channels.
+	if jsonMode {
+		var out []map[string]any
+		for ch, v := range channels {
+			cm, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			if filterChannel != "" && ch != filterChannel {
+				continue
+			}
+			enabled, _ := cm["enabled"].(bool)
+			if !enabled {
+				continue
+			}
+			rec := map[string]any{
+				"channel":  ch,
+				"enabled":  enabled,
+				"dmPolicy": cm["dmPolicy"],
+				"groupPolicy": cm["groupPolicy"],
+			}
+			if af, ok := cm["allowFrom"].([]any); ok {
+				rec["allowFrom"] = af
+			}
+			if gaf, ok := cm["groupAllowFrom"].([]any); ok {
+				rec["groupAllowFrom"] = gaf
+			}
+			if actions, ok := cm["actions"].(map[string]any); ok {
+				rec["actions"] = actions
+			}
+			out = append(out, rec)
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i]["channel"].(string) < out[j]["channel"].(string) })
+		data, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(string(data))
 		return nil
 	}
 

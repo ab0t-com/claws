@@ -233,10 +233,25 @@ func cmdPolicyValidate(args []string) error {
 		return nil
 	}
 
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	jsonMode := hasFlag(args, "--json")
+
 	p := readPolicy(paths)
 	entries, err := readRegistry(paths)
 	if err != nil {
 		return err
+	}
+	entries = filterEntriesByGroup(entries, filterGroup)
+	if len(entries) == 0 && filterGroup != "" {
+		if jsonMode {
+			fmt.Println("[]")
+		} else {
+			fmt.Printf("No instances in group '%s'.\n", filterGroup)
+		}
+		return nil
 	}
 
 	bold := "\033[1m"
@@ -244,7 +259,20 @@ func cmdPolicyValidate(args []string) error {
 	green := "\033[0;32m"
 	red := "\033[0;31m"
 
-	fmt.Printf("%sPolicy validation%s\n\n", bold, nc)
+	if !jsonMode {
+		if filterGroup != "" {
+			fmt.Printf("%sPolicy validation (group: %s)%s\n\n", bold, filterGroup, nc)
+		} else {
+			fmt.Printf("%sPolicy validation%s\n\n", bold, nc)
+		}
+	}
+
+	type instanceReport struct {
+		Name     string   `json:"name"`
+		Issues   []string `json:"issues"`
+		Compliant bool    `json:"compliant"`
+	}
+	var jsonReports []instanceReport
 
 	violations := 0
 	for _, e := range entries {
@@ -296,6 +324,14 @@ func cmdPolicyValidate(args []string) error {
 			}
 		}
 
+		jsonReports = append(jsonReports, instanceReport{
+			Name: e.Name, Issues: issues, Compliant: len(issues) == 0,
+		})
+
+		if jsonMode {
+			violations += len(issues)
+			continue
+		}
 		if len(issues) == 0 {
 			fmt.Printf("  %s%-20s%s %s✓%s\n", bold, e.Name, nc, green, nc)
 		} else {
@@ -304,6 +340,19 @@ func cmdPolicyValidate(args []string) error {
 				violations++
 			}
 		}
+	}
+
+	if jsonMode {
+		if jsonReports == nil {
+			jsonReports = []instanceReport{}
+		}
+		data, _ := json.MarshalIndent(jsonReports, "", "  ")
+		fmt.Println(string(data))
+		// Non-zero exit on violations even in JSON mode — matches text path.
+		if violations > 0 {
+			return errorf("%d policy violation(s) found", violations)
+		}
+		return nil
 	}
 
 	fmt.Println()
@@ -321,16 +370,30 @@ func cmdPolicyEnforce(args []string) error {
 		return errorf("no policy configured — run: clawctl policy init")
 	}
 
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+
 	p := readPolicy(paths)
 	entries, err := readRegistry(paths)
 	if err != nil {
 		return err
 	}
+	entries = filterEntriesByGroup(entries, filterGroup)
+	if len(entries) == 0 && filterGroup != "" {
+		fmt.Printf("No instances in group '%s'.\n", filterGroup)
+		return nil
+	}
 
 	bold := "\033[1m"
 	nc := "\033[0m"
 
-	fmt.Printf("%sPolicy enforcement%s\n\n", bold, nc)
+	if filterGroup != "" {
+		fmt.Printf("%sPolicy enforcement (group: %s)%s\n\n", bold, filterGroup, nc)
+	} else {
+		fmt.Printf("%sPolicy enforcement%s\n\n", bold, nc)
+	}
 
 	fixed := 0
 	needsRestart := map[string]bool{}

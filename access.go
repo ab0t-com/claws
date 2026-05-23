@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -176,11 +177,30 @@ func cmdToken(args []string) error {
 }
 
 func cmdTokenRotate(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl token rotate <instance>")
-	}
 	paths := resolvePaths()
-	name := args[0]
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	name := firstPositional(args)
+	if filterGroup != "" && name != "" {
+		return errorf("specify either positional instance name or --group=, not both")
+	}
+	if filterGroup != "" {
+		entries, _ := readRegistry(paths)
+		members := filterEntriesByGroup(entries, filterGroup)
+		if len(members) == 0 {
+			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
+			return nil
+		}
+		if !confirmGroupOp("rotate tokens for", filterGroup, len(members), hasFlag(args, "--yes")) {
+			return nil
+		}
+		return runOnGroup(paths, filterGroup, "Rotating tokens for", cmdTokenRotate, args)
+	}
+	if name == "" {
+		return errorf("usage: clawctl token rotate <instance> | clawctl token rotate --group=<name> [--yes]")
+	}
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
@@ -242,7 +262,7 @@ func cmdTokenShow(args []string) error {
 
 func cmdAccess(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl access <init|show|grant|revoke|audit>")
+		return errorf("usage: clawctl access <init|show|grant|revoke|audit|tail>")
 	}
 	switch args[0] {
 	case "init":
@@ -255,9 +275,96 @@ func cmdAccess(args []string) error {
 		return cmdAccessRevoke(args[1:])
 	case "audit":
 		return cmdAccessAudit(args[1:])
+	case "tail":
+		return cmdAccessTail(args[1:])
 	default:
 		return errorf("unknown access subcommand: %s", args[0])
 	}
+}
+
+// cmdAccessTail follows the audit log line-by-line. Without -f, prints the
+// last N lines and exits. With -f, polls the file every 500ms for new lines
+// (simple stat+seek; the audit log is append-only and small enough that
+// inotify would be over-engineering). Useful during incident triage when
+// you want to see operator actions in real time.
+func cmdAccessTail(args []string) error {
+	paths := resolvePaths()
+	logPath := filepath.Join(paths.Root, auditLogFile)
+	follow := hasFlag(args, "-f") || hasFlag(args, "--follow")
+	tailN := 20
+	if v := flagValue(args, "--tail="); v != "" {
+		fmt.Sscanf(v, "%d", &tailN)
+	}
+
+	// Read what's currently in the file and print the last tailN lines.
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		// File may not exist yet (no commands run). Continue in follow mode
+		// so the operator can wait; otherwise report friendly empty.
+		if !follow {
+			fmt.Println("No audit log found (no audited commands yet).")
+			return nil
+		}
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	start := 0
+	if len(lines) > tailN {
+		start = len(lines) - tailN
+	}
+	for _, line := range lines[start:] {
+		if line == "" {
+			continue
+		}
+		printAuditLine(line)
+	}
+	if !follow {
+		return nil
+	}
+
+	// Follow loop: seek to current end and poll.
+	f, err := os.Open(logPath)
+	if err != nil {
+		// Wait for the file to appear if it doesn't exist yet.
+		for {
+			time.Sleep(500 * time.Millisecond)
+			f, err = os.Open(logPath)
+			if err == nil {
+				break
+			}
+		}
+	}
+	defer f.Close()
+	f.Seek(0, 2) // os.SEEK_END
+	reader := bufio.NewReader(f)
+	for {
+		line, err := reader.ReadString('\n')
+		if line != "" {
+			printAuditLine(strings.TrimRight(line, "\n"))
+		}
+		if err != nil {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
+// printAuditLine renders one JSONL audit entry as a single human line.
+// Matches the per-line format of cmdAccessAudit so operators see a
+// consistent shape whether they tail or query history.
+func printAuditLine(line string) {
+	var entry map[string]any
+	if json.Unmarshal([]byte(line), &entry) != nil {
+		return
+	}
+	ts, _ := entry["ts"].(string)
+	user, _ := entry["user"].(string)
+	cmd, _ := entry["cmd"].(string)
+	result, _ := entry["result"].(string)
+	entryArgs, _ := entry["args"].([]any)
+	argStrs := make([]string, len(entryArgs))
+	for i, a := range entryArgs {
+		argStrs[i], _ = a.(string)
+	}
+	fmt.Printf("  %s  %-10s  %-10s  %-6s  %s\n", ts, user, cmd, result, strings.Join(argStrs, " "))
 }
 
 func cmdAccessInit(args []string) error {
@@ -424,10 +531,18 @@ func cmdAccessAudit(args []string) error {
 		}
 	}
 	cutoff := time.Now().Add(-since)
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
 
 	bold := "\033[1m"
 	nc := "\033[0m"
-	fmt.Printf("%sAudit log (last %s)%s\n\n", bold, since, nc)
+	if filterGroup != "" {
+		fmt.Printf("%sAudit log (last %s, group: %s)%s\n\n", bold, since, filterGroup, nc)
+	} else {
+		fmt.Printf("%sAudit log (last %s)%s\n\n", bold, since, nc)
+	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	shown := 0
@@ -453,12 +568,42 @@ func cmdAccessAudit(args []string) error {
 		for i, a := range entryArgs {
 			argStrs[i], _ = a.(string)
 		}
+		// --group= filter: keep only entries whose first non-flag arg parses
+		// as an instance ref in the named group. Audit entries with no
+		// parseable instance arg (e.g., `init`, `setup`, `policy show`) are
+		// dropped from a group-scoped view rather than shown unattributed.
+		if filterGroup != "" && !auditEntryInGroup(argStrs, filterGroup) {
+			continue
+		}
 		fmt.Printf("  %s  %-10s  %-10s  %-6s  %s\n", ts, user, cmd, result, strings.Join(argStrs, " "))
 		shown++
 	}
 
 	if shown == 0 {
-		fmt.Println("  No entries in time range.")
+		if filterGroup != "" {
+			fmt.Printf("  No entries for group '%s' in time range.\n", filterGroup)
+		} else {
+			fmt.Println("  No entries in time range.")
+		}
 	}
 	return nil
+}
+
+// auditEntryInGroup reports whether the first non-flag argument of an audit
+// entry parses as an instance ref in the named group. It is conservative:
+// entries with no positional arg, or whose positional arg fails to parse as
+// a ref, are treated as not-in-group. This is deliberate — a `--group=`
+// filter should narrow, not surface unrelated noise.
+func auditEntryInGroup(argStrs []string, group string) bool {
+	for _, a := range argStrs {
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		ref, err := ParseRef(a)
+		if err != nil {
+			return false
+		}
+		return ref.Group == group
+	}
+	return false
 }

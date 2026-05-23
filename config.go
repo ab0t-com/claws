@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // Version is set at build time via -ldflags "-X main.Version=..."
@@ -19,7 +20,8 @@ const (
 )
 
 var (
-	nameRegex = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	nameRegex   = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	quietCreate bool // when true, cmdCreate suppresses standalone output (used by setup flow)
 )
 
 // Paths resolves all paths from OPENCLAW_ROOT and SCRIPT_DIR.
@@ -217,4 +219,108 @@ func hasFlag(args []string, flag string) bool {
 		}
 	}
 	return false
+}
+
+// padVisible returns s left-padded with spaces so that its *visible* width
+// (excluding ANSI SGR escape sequences) is exactly width. If s is already
+// wider than width, it is returned unchanged. Use this for fixed-width
+// column rendering when a value may or may not contain color codes — Go's
+// printf %-Ns counts bytes, which causes columns to skew based on whether
+// a row has color or not.
+func padVisible(s string, width int) string {
+	visible := 0
+	inEscape := false
+	for _, r := range s {
+		if r == '\033' {
+			inEscape = true
+			continue
+		}
+		if inEscape {
+			if r == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		visible++
+	}
+	if visible >= width {
+		return s
+	}
+	pad := width - visible
+	// strings.Repeat with a non-negative count is safe; the visible<width
+	// guard above ensures positivity here.
+	out := make([]byte, len(s)+pad)
+	copy(out, s)
+	for i := 0; i < pad; i++ {
+		out[len(s)+i] = ' '
+	}
+	return string(out)
+}
+
+// firstPositional returns the first arg that does not begin with '-'. It is
+// the symmetric companion of flagValue for commands that take both a single
+// positional name and one or more flags, where the name's position in args
+// is not guaranteed (e.g., `clawctl restart --hard alpha` vs
+// `clawctl restart alpha --hard`). Returns "" if every arg is a flag.
+func firstPositional(args []string) string {
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return ""
+}
+
+// flagValue returns the value of the first --foo=bar style flag matching prefix
+// ("--group=", "--since=", etc.), or "" if no such flag is present. The prefix
+// must include the trailing '=' so the caller can disambiguate similarly-named
+// flags ("--group" vs "--group-defaults"). This wraps the manual
+// strings.HasPrefix + slice-offset idiom used across the codebase so call sites
+// stay self-documenting and a typoed offset can never silently return the
+// wrong value.
+func flagValue(args []string, prefix string) string {
+	for _, a := range args {
+		if strings.HasPrefix(a, prefix) {
+			return a[len(prefix):]
+		}
+	}
+	return ""
+}
+
+// filterEntriesByGroup returns the subset of entries belonging to the named
+// group. An empty group returns entries unchanged so callers can pass through
+// the flag value without conditional logic. Names that fail to parse (which
+// should never happen for entries from readRegistry, but defensive) are
+// dropped from the filtered output.
+func filterEntriesByGroup(entries []RegistryEntry, group string) []RegistryEntry {
+	if group == "" {
+		return entries
+	}
+	out := make([]RegistryEntry, 0, len(entries))
+	for _, e := range entries {
+		ref, err := ParseRef(e.Name)
+		if err != nil {
+			continue
+		}
+		if ref.Group == group {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// requireGroup is the standard precondition for any command that accepts
+// --group=<name>. It returns nil when group is empty (i.e., no filter
+// requested), or when the group exists on disk. It returns a directive error
+// message otherwise. Callers can rely on this single check rather than each
+// re-implementing the existence test.
+func requireGroup(paths Paths, group string) error {
+	if group == "" {
+		return nil
+	}
+	groupDir := filepath.Join(paths.Root, group)
+	if !IsGroup(groupDir) {
+		return fmt.Errorf("group '%s' does not exist — see: clawctl group list", group)
+	}
+	return nil
 }

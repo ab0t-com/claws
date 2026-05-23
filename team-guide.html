@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>clawctl — Team Setup Guide</title>
+  <meta name="description" content="How to design and deploy AI agent teams for your organization. Complete examples for startups, agencies, research labs, and enterprises.">
+  <meta name="theme-color" content="#fafafa">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
+  <style>
+    :root {
+      --white: #fafafa;
+      --off-white: #f4f2ef;
+      --cream: #edeae4;
+      --warm-gray: #c8c3ba;
+      --mid-gray: #8a8580;
+      --charcoal: #3a3632;
+      --ink: #1a1714;
+      --dark-bg: #141210;
+      --dark-surface: #1e1c18;
+      --dark-border: #2e2a24;
+      --dark-text: #e8e4de;
+      --dark-muted: #9a958e;
+      --coral: #e8634a;
+      --coral-soft: #f09080;
+      --coral-deep: #c44e38;
+      --sage: #7da67d;
+      --sage-soft: #a3c4a3;
+      --gold: #c8a86e;
+      --gold-soft: #dfc99a;
+      --max-width: 920px;
+      --section-pad: clamp(50px, 8vw, 100px);
+      --border-thick: 3px;
+      --font-display: 'Georgia', 'Times New Roman', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 clamp(20px, 4vw, 40px);
+    }
+
+    /* --- Header --- */
+    header {
+      padding: var(--section-pad) 0 40px;
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+    header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    header .lead {
+      margin-top: 20px;
+      font-size: 1.15rem;
+      color: var(--mid-gray);
+      max-width: 640px;
+      line-height: 1.7;
+    }
+
+    /* --- TOC --- */
+    .toc {
+      padding: 32px 0;
+      border-bottom: 1.5px solid var(--cream);
+    }
+    .toc h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+    }
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .toc a {
+      display: block;
+      padding: 14px 18px;
+      border: 2px solid var(--cream);
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--charcoal);
+      transition: all 0.15s;
+    }
+    .toc a:hover {
+      border-color: var(--ink);
+      background: var(--off-white);
+    }
+    .toc a small {
+      display: block;
+      font-weight: 400;
+      font-size: 0.82rem;
+      color: var(--mid-gray);
+      margin-top: 2px;
+    }
+
+    /* --- Sections --- */
+    section {
+      padding: var(--section-pad) 0;
+      border-bottom: 1.5px solid var(--cream);
+    }
+    section:last-of-type { border-bottom: none; }
+
+    h2.section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-top: 36px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    p { margin-bottom: 14px; }
+    p:last-child { margin-bottom: 0; }
+
+    .subtitle {
+      color: var(--mid-gray);
+      font-size: 1.05rem;
+      margin-bottom: 32px;
+    }
+
+    /* --- Tags --- */
+    .tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .tag-agents { background: #e8f5e9; color: #2e7d32; }
+    .tag-time { background: #e3f2fd; color: #1565c0; }
+    .tag-pattern { background: #f3e5f5; color: #7b1fa2; }
+    .tag-channels { background: #fff3e0; color: #e65100; }
+
+    /* --- Code blocks --- */
+    code {
+      font-family: var(--font-mono);
+      background: var(--off-white);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.86em;
+      border: 1px solid var(--cream);
+    }
+
+    .cmd {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: 18px 22px;
+      border-radius: 8px;
+      margin: 18px 0;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      overflow-x: auto;
+      line-height: 1.7;
+      white-space: pre;
+    }
+    .cmd .c { color: var(--dark-muted); }
+    .cmd .h { color: var(--coral-soft); }
+
+    /* --- Diagram --- */
+    .diagram {
+      background: var(--off-white);
+      border: 2px solid var(--cream);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 24px 0;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* --- Tip / Warning --- */
+    .tip {
+      background: #f0f7f0;
+      border-left: 4px solid var(--sage);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.93rem;
+    }
+    .tip strong { color: var(--sage); }
+
+    .warning {
+      background: #fff8f0;
+      border-left: 4px solid var(--gold);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.93rem;
+    }
+    .warning strong { color: #b8860b; }
+
+    /* --- Use-case cards --- */
+    .use-case {
+      background: var(--off-white);
+      border: 2px solid var(--cream);
+      border-radius: 10px;
+      padding: 28px;
+      margin: 28px 0;
+    }
+    .use-case h4 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    .use-case p { font-size: 0.93rem; }
+
+    /* --- Tables --- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.92rem;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1.5px solid var(--cream);
+    }
+    th {
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--mid-gray);
+    }
+    td code { font-size: 0.82rem; }
+
+    /* --- Dark sections --- */
+    .dark {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: var(--section-pad) 0;
+      border-bottom: none;
+    }
+    .dark h2 { color: var(--dark-text); }
+    .dark .subtitle { color: var(--dark-muted); }
+    .dark code { background: var(--dark-surface); border-color: var(--dark-border); color: var(--dark-text); }
+    .dark .cmd { background: var(--dark-surface); border: 1px solid var(--dark-border); }
+    .dark th { color: var(--dark-muted); }
+    .dark td { border-color: var(--dark-border); }
+    .dark a { color: var(--coral-soft); }
+
+    /* --- Footer --- */
+    footer {
+      padding: 40px 0 var(--section-pad);
+      text-align: center;
+      color: var(--mid-gray);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--coral); text-decoration: underline; text-underline-offset: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Team Setup Guide</h1>
+    <p class="lead">
+      How to design and deploy AI agent teams with clawctl.
+      Real examples for different team sizes, industries, and use cases &mdash;
+      from a solo founder's first bot to an enterprise fleet.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h2>In this guide</h2>
+    <div class="toc-grid">
+      <a href="#concepts">
+        Core Concepts
+        <small>Teams, agents, channels, roles</small>
+      </a>
+      <a href="#patterns">
+        Team Patterns
+        <small>Flat, manager/worker, multi-team</small>
+      </a>
+      <a href="#solo">
+        Solo Founder
+        <small>1 agent, personal assistant</small>
+      </a>
+      <a href="#startup">
+        Startup Engineering
+        <small>3 agents, shared codebase</small>
+      </a>
+      <a href="#support">
+        Customer Support
+        <small>Multi-channel support team</small>
+      </a>
+      <a href="#research">
+        Research Lab
+        <small>Manager + specialist workers</small>
+      </a>
+      <a href="#agency">
+        Agency / Multi-Tenant
+        <small>Separate teams per client</small>
+      </a>
+      <a href="#enterprise">
+        Enterprise
+        <small>Full fleet with RBAC + policy</small>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- CONCEPTS -->
+<!-- ================================================================ -->
+<div class="container">
+  <section id="concepts">
+    <h2 class="section-title">Core Concepts</h2>
+    <p class="subtitle">Three things to understand. Everything else is optional.</p>
+
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>What it is</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Team</strong></td>
+          <td>A group of agents that share a workspace, skills, and task queue. Created with <code>clawctl team create</code>.</td>
+          <td><code>research</code>, <code>support</code>, <code>acme-corp</code></td>
+        </tr>
+        <tr>
+          <td><strong>Agent</strong></td>
+          <td>An individual AI running in a Docker container. Has its own auth, config, and port. Created with <code>clawctl create team/name</code>.</td>
+          <td><code>research/sarah</code>, <code>support/triage</code></td>
+        </tr>
+        <tr>
+          <td><strong>Channel</strong></td>
+          <td>A messaging platform connection. People talk to agents through channels. Added with <code>clawctl channel add</code>.</td>
+          <td>Telegram, Discord, Slack, WhatsApp</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Optional Concepts (power users)</h3>
+
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>When you need it</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Roles</strong></td><td>Manager agents delegate tasks to worker agents. For teams with automated task routing.</td></tr>
+        <tr><td><strong>Policy</strong></td><td>Admin-enforced security rules. Auto-created on setup with secure defaults. Edit if you need custom limits.</td></tr>
+        <tr><td><strong>Access control</strong></td><td>Multiple humans administering the same server. Controls who can run which commands.</td></tr>
+        <tr><td><strong>Shared resources</strong></td><td>Skills, workspace files, and hooks shared across agents in a team. Enabled by default in teams.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <strong>Start simple.</strong> You only need to think about teams, agents, and channels. Everything else is handled by defaults or can be added later.
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================ -->
+<!-- PATTERNS -->
+<!-- ================================================================ -->
+<div class="dark">
+  <div class="container">
+    <section id="patterns" style="padding: 0; border: none;">
+      <h2 class="section-title">Team Patterns</h2>
+      <p class="subtitle">Choose a structure based on how your agents need to collaborate.</p>
+
+      <h3>1. Solo Agent</h3>
+      <p>One agent, one channel. The simplest setup. Good for personal assistants and single-purpose bots.</p>
+      <div class="diagram">  You  ──&gt;  [Telegram]  ──&gt;  agent</div>
+
+      <h3>2. Flat Team</h3>
+      <p>Multiple agents at the same level. Each has its own channel and specialty, but they share a workspace so they can see each other's files. No hierarchy.</p>
+      <div class="diagram">  You  ──&gt;  [Telegram]  ──&gt;  team/frontend    ─┐
+  You  ──&gt;  [Discord]   ──&gt;  team/backend     ├── shared workspace
+  You  ──&gt;  [Slack]     ──&gt;  team/devops      ─┘</div>
+
+      <h3>3. Manager / Worker</h3>
+      <p>One manager agent receives tasks from humans and delegates to specialized workers. Workers report back to the manager. Best for automated workflows.</p>
+      <div class="diagram">  You  ──&gt;  [Telegram]  ──&gt;  team/lead  (manager)
+                                  │
+                        ┌─────────┼─────────┐
+                        v         v         v
+                    team/code  team/test  team/docs  (workers)</div>
+
+      <h3>4. Multi-Team</h3>
+      <p>Separate teams with isolated workspaces. Each team is independent. Good for agencies serving multiple clients or departments with different data.</p>
+      <div class="diagram">  client-a/                     client-b/
+    ├── analyst                   ├── writer
+    ├── researcher                └── editor
+    └── shared workspace              └── shared workspace
+          (isolated)                        (isolated)</div>
+    </section>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- EXAMPLE 1: SOLO FOUNDER -->
+<!-- ================================================================ -->
+<div class="container">
+  <section id="solo">
+    <h2 class="section-title">Example 1: Solo Founder</h2>
+    <p class="subtitle">A personal AI assistant for a founder who wants help with coding, writing, and research.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">1 agent</span>
+      <span class="tag tag-time">5 minutes</span>
+      <span class="tag tag-pattern">Solo</span>
+      <span class="tag tag-channels">Telegram</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>You're a solo founder or indie hacker. You want a personal AI you can message from your phone at any time. It should remember context across conversations and have access to your project files.</p>
+
+    <h3>Setup</h3>
+    <div class="cmd"><span class="c"># One command does everything</span>
+clawctl setup</div>
+
+    <p>Follow the prompts:</p>
+    <div class="cmd"><span class="c"># Team name</span>
+my-team
+
+<span class="c"># Agent name</span>
+assistant
+
+<span class="c"># Auth: choose Codex (1)</span>
+1
+
+<span class="c"># Channel: choose Telegram (1)</span>
+1
+
+<span class="c"># Paste your bot token from @BotFather</span>
+7123456789:AAH...
+
+<span class="c"># Add another agent? No</span>
+n</div>
+
+    <p>That's it. Message your bot on Telegram, approve the pairing code, and you're live.</p>
+
+    <h3>What you get</h3>
+    <table>
+      <tr><td><code>my-team/assistant</code></td><td>Your agent, running on port 18789</td></tr>
+      <tr><td>Telegram connected</td><td>DM pairing required (strangers can't message it)</td></tr>
+      <tr><td>Codex auth</td><td>Uses OpenAI models via OAuth</td></tr>
+      <tr><td>Tool profile: coding</td><td>Can read/write files, run commands in its workspace</td></tr>
+    </table>
+
+    <div class="tip">
+      <strong>Tip:</strong> Put your project files in the agent's workspace directory and it can reference them in conversations. Find the path with <code>clawctl status my-team/assistant</code>.
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- EXAMPLE 2: STARTUP ENGINEERING -->
+  <!-- ================================================================ -->
+  <section id="startup">
+    <h2 class="section-title">Example 2: Startup Engineering Team</h2>
+    <p class="subtitle">Three specialized agents sharing a codebase. The whole team talks to them on Slack.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">3 agents</span>
+      <span class="tag tag-time">10 minutes</span>
+      <span class="tag tag-pattern">Flat team</span>
+      <span class="tag tag-channels">Slack</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>A 5&ndash;15 person engineering team. You want agents that your whole team can interact with on Slack &mdash; one for frontend questions, one for backend, one for infrastructure. They share the same codebase so they understand the full system.</p>
+
+    <h3>Setup</h3>
+    <div class="cmd"><span class="c"># Create the team</span>
+clawctl team create eng
+
+<span class="c"># Create three specialized agents</span>
+clawctl create eng/frontend --auth=codex
+clawctl create eng/backend --auth=codex
+clawctl create eng/infra --auth=codex
+
+<span class="c"># Connect each to your Slack workspace</span>
+<span class="c"># (You need one Slack app per agent — see channels-guide.html)</span>
+clawctl channel add eng/frontend slack --bot-token=xoxb-FE... --app-token=xapp-FE...
+clawctl channel add eng/backend slack --bot-token=xoxb-BE... --app-token=xapp-BE...
+clawctl channel add eng/infra slack --bot-token=xoxb-IF... --app-token=xapp-IF...
+
+<span class="c"># Start all three</span>
+clawctl start eng/frontend
+clawctl start eng/backend
+clawctl start eng/infra</div>
+
+    <h3>Customize each agent</h3>
+    <p>Give each agent different instructions by editing their config:</p>
+    <div class="cmd"><span class="c"># Make the frontend agent focus on React/TypeScript</span>
+clawctl config edit eng/frontend
+<span class="c"># Add to agents.defaults.instructions:</span>
+<span class="c"># "You are a frontend specialist. Focus on React, TypeScript, CSS..."</span>
+
+<span class="c"># Make infra focus on AWS/Terraform/Docker</span>
+clawctl config edit eng/infra
+<span class="c"># "You are an infrastructure specialist. Focus on AWS, Terraform, Docker..."</span></div>
+
+    <h3>Team workspace</h3>
+    <p>All three agents share <code>eng/shared/workspace/</code>. Clone your repo there:</p>
+    <div class="cmd">cd ~/.openclaw/eng/shared/workspace
+git clone git@github.com:your-org/your-repo.git</div>
+    <p>Now all agents can read the same codebase and reference each other's work.</p>
+
+    <h3>Architecture</h3>
+    <div class="diagram">  #frontend channel  ──&gt;  eng/frontend   ─┐
+  #backend channel   ──&gt;  eng/backend    ├── shared workspace (your repo)
+  #infra channel     ──&gt;  eng/infra      ─┘
+                                              shared skills</div>
+
+    <div class="tip">
+      <strong>Tip:</strong> Invite each bot to its own Slack channel (#frontend, #backend, #infra). Team members join the channels they care about.
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- EXAMPLE 3: CUSTOMER SUPPORT -->
+  <!-- ================================================================ -->
+  <section id="support">
+    <h2 class="section-title">Example 3: Customer Support</h2>
+    <p class="subtitle">Agents on different platforms handling customer inquiries. One for Telegram, one for Discord, one for WhatsApp.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">3 agents</span>
+      <span class="tag tag-time">15 minutes</span>
+      <span class="tag tag-pattern">Flat team</span>
+      <span class="tag tag-channels">Telegram + Discord + WhatsApp</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>A company that provides support across multiple platforms. Customers message on Telegram, Discord, or WhatsApp and get AI-assisted responses. Agents share a knowledge base (docs, FAQs, runbooks).</p>
+
+    <h3>Setup</h3>
+    <div class="cmd"><span class="c"># Create the team</span>
+clawctl team create support
+
+<span class="c"># One agent per platform</span>
+clawctl create support/telegram-bot --auth=codex --telegram=7123456789:AAH...
+clawctl create support/discord-bot --auth=codex --discord=MTIz...
+clawctl create support/whatsapp-bot --auth=codex
+
+<span class="c"># WhatsApp needs interactive QR setup</span>
+clawctl channel add support/whatsapp-bot whatsapp
+
+<span class="c"># Start all</span>
+clawctl start-all</div>
+
+    <h3>Add your knowledge base</h3>
+    <div class="cmd"><span class="c"># Put docs in the shared workspace</span>
+cp -r ~/company/docs ~/.openclaw/support/shared/workspace/docs
+cp ~/company/faq.md ~/.openclaw/support/shared/workspace/
+
+<span class="c"># Add a shared skill for support responses</span>
+cat > ~/.openclaw/support/shared/skills/support-agent.md &lt;&lt;'EOF'
+You are a customer support agent for [Company Name].
+Always be helpful, empathetic, and professional.
+Reference the docs in your workspace for accurate answers.
+If you don't know the answer, say so and offer to escalate.
+Never share internal information or pricing that isn't public.
+EOF</div>
+
+    <h3>Enable outbound messaging (carefully)</h3>
+    <p>By default, agents can only reply &mdash; they cannot initiate conversations. If you want an agent to proactively message approved contacts:</p>
+    <div class="cmd"><span class="c"># Enable outbound on Telegram, but only to approved contacts</span>
+clawctl channel send support/telegram-bot telegram --enable
+clawctl channel allow support/telegram-bot telegram 123456789</div>
+
+    <div class="warning">
+      <strong>Security note:</strong> Outbound messaging requires an <code>allowFrom</code> list. The agent can only message contacts you explicitly approve. This is enforced by policy.
+    </div>
+
+    <h3>Monitor</h3>
+    <div class="cmd"><span class="c"># System overview</span>
+clawctl status
+
+<span class="c"># Live dashboard (auto-refreshing)</span>
+clawctl dashboard
+
+<span class="c"># Recent activity across all agents</span>
+clawctl activity --since=4h</div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- EXAMPLE 4: RESEARCH LAB -->
+  <!-- ================================================================ -->
+  <section id="research">
+    <h2 class="section-title">Example 4: Research Lab</h2>
+    <p class="subtitle">A manager agent delegates research tasks to specialized workers. The manager coordinates; workers do the deep work.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">4 agents</span>
+      <span class="tag tag-time">15 minutes</span>
+      <span class="tag tag-pattern">Manager / Worker</span>
+      <span class="tag tag-channels">Telegram</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>A research team that wants to give a high-level instruction ("Investigate the feasibility of X") and have it automatically broken down and assigned to specialist agents.</p>
+
+    <h3>Setup</h3>
+    <div class="cmd"><span class="c"># Create the team</span>
+clawctl team create research
+
+<span class="c"># Create the manager (you talk to this one)</span>
+clawctl create research/lead --role=manager --auth=codex --telegram=BOT_TOKEN
+
+<span class="c"># Create specialist workers</span>
+clawctl create research/papers --role=worker --manager=lead --auth=codex
+clawctl create research/data --role=worker --manager=lead --auth=codex
+clawctl create research/code --role=worker --manager=lead --auth=codex
+
+<span class="c"># Start all</span>
+clawctl start-all</div>
+
+    <h3>How it works</h3>
+    <div class="diagram">  You  ──&gt;  [Telegram]  ──&gt;  research/lead  (manager)
+                                     │
+                                     │  dispatches tasks
+                                     │
+                          ┌──────────┼──────────┐
+                          v          v          v
+                     research/   research/   research/
+                     papers      data        code
+                     (worker)    (worker)    (worker)
+                          │          │          │
+                          └──────────┴──────────┘
+                                     │
+                              shared workspace
+                              shared task queue</div>
+
+    <h3>Using the task queue</h3>
+    <p>The manager dispatches work. Workers claim and complete tasks.</p>
+    <div class="cmd"><span class="c"># Manager creates a task (or you can create manually)</span>
+clawctl task create research "Review papers on transformer efficiency"
+
+<span class="c"># See the queue</span>
+clawctl task list research
+
+<span class="c"># A worker claims it</span>
+clawctl task claim research TASK_ID --by=papers
+
+<span class="c"># When done</span>
+clawctl task complete research TASK_ID</div>
+
+    <div class="tip">
+      <strong>Tip:</strong> Workers write their results to the shared workspace. The manager can read those files when summarizing findings for you.
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- EXAMPLE 5: AGENCY / MULTI-TENANT -->
+  <!-- ================================================================ -->
+  <section id="agency">
+    <h2 class="section-title">Example 5: Agency / Multi-Tenant</h2>
+    <p class="subtitle">Separate isolated teams for each client. Data never crosses boundaries.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">6+ agents</span>
+      <span class="tag tag-time">20 minutes</span>
+      <span class="tag tag-pattern">Multi-team</span>
+      <span class="tag tag-channels">Mixed</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>An agency or consultancy deploying AI agents for multiple clients. Each client gets their own isolated team with their own data, credentials, and channels. No data leakage between clients.</p>
+
+    <h3>Setup</h3>
+    <div class="cmd"><span class="c"># Client A: e-commerce company</span>
+clawctl team create acme
+clawctl create acme/support --auth=codex --telegram=ACME_BOT_TOKEN
+clawctl create acme/analytics --auth=codex
+clawctl start acme/support
+clawctl start acme/analytics
+
+<span class="c"># Client B: SaaS startup</span>
+clawctl team create widgetco
+clawctl create widgetco/assistant --auth=codex --discord=WIDGET_BOT_TOKEN
+clawctl create widgetco/developer --auth=codex --slack-bot=xoxb-WC... --slack-app=xapp-WC...
+clawctl start widgetco/assistant
+clawctl start widgetco/developer
+
+<span class="c"># Client C: law firm</span>
+clawctl team create lawfirm
+clawctl create lawfirm/research --auth=codex
+clawctl start lawfirm/research</div>
+
+    <h3>Isolation guarantees</h3>
+    <table>
+      <thead>
+        <tr><th>Boundary</th><th>How it's enforced</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>File system</td><td>Each team has its own <code>shared/workspace/</code>. Agents can only see their team's files.</td></tr>
+        <tr><td>Docker</td><td>Each agent runs in its own container with <code>cap_drop: ALL</code> and no Docker socket access.</td></tr>
+        <tr><td>Network</td><td>Agents are bound to loopback by default. They can't reach each other's ports.</td></tr>
+        <tr><td>Credentials</td><td>Each agent has its own <code>instance.env</code> with <code>chmod 600</code>. Tokens are per-agent.</td></tr>
+        <tr><td>Channels</td><td>Each agent connects to its own bot. DM pairing ensures only approved users can chat.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Manage per-client with access control</h3>
+    <div class="cmd"><span class="c"># Grant your client liaison operator access to their agents only</span>
+clawctl access grant alice operator
+<span class="c"># Then edit .access.json to scope alice to "acme/*" instances</span></div>
+
+    <div class="warning">
+      <strong>Important:</strong> For true multi-tenant production, consider running separate clawctl instances (separate <code>OPENCLAW_ROOT</code> dirs) per client. This gives you OS-level isolation on top of container isolation.
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- EXAMPLE 6: ENTERPRISE -->
+  <!-- ================================================================ -->
+  <section id="enterprise">
+    <h2 class="section-title">Example 6: Enterprise Fleet</h2>
+    <p class="subtitle">Full deployment with strict security, RBAC, audit logging, image pinning, and automated compliance.</p>
+
+    <div class="tags">
+      <span class="tag tag-agents">8+ agents</span>
+      <span class="tag tag-time">30 minutes</span>
+      <span class="tag tag-pattern">Multi-team + Manager/Worker</span>
+      <span class="tag tag-channels">Slack + Telegram</span>
+    </div>
+
+    <h3>Who this is for</h3>
+    <p>An organization deploying AI agents at scale. You need audit trails, role-based access, approved images, and policy enforcement. Multiple teams with different needs on the same server.</p>
+
+    <h3>Phase 1: Secure foundation</h3>
+    <div class="cmd"><span class="c"># Initialize with secure defaults</span>
+clawctl init
+
+<span class="c"># Tighten the policy</span>
+clawctl config set policy requireSandbox true
+clawctl config set policy allowedImages '["openclaw:v2026.3.*"]'
+clawctl config set policy maxInstances 12
+clawctl config set policy blockedChannels '["signal"]'
+
+<span class="c"># Set up access control</span>
+clawctl access grant devops-lead admin
+clawctl access grant eng-team operator
+clawctl access grant interns user</div>
+
+    <h3>Phase 2: Pin a tested image</h3>
+    <div class="cmd"><span class="c"># Pull a specific version</span>
+clawctl image pull openclaw:v2026.3.25
+
+<span class="c"># All new agents will use this image (enforced by policy)</span></div>
+
+    <h3>Phase 3: Deploy teams</h3>
+    <div class="cmd"><span class="c"># Engineering team (manager + workers)</span>
+clawctl team create eng
+clawctl create eng/lead --role=manager --image=openclaw:v2026.3.25 --auth=codex
+clawctl create eng/frontend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+clawctl create eng/backend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+clawctl create eng/qa --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+
+<span class="c"># Data team (flat)</span>
+clawctl team create data
+clawctl create data/analyst --image=openclaw:v2026.3.25 --auth=codex
+clawctl create data/pipeline --image=openclaw:v2026.3.25 --auth=codex
+
+<span class="c"># Connect channels</span>
+clawctl channel add eng/lead slack --bot-token=xoxb-ENG... --app-token=xapp-ENG...
+clawctl channel add data/analyst slack --bot-token=xoxb-DATA... --app-token=xapp-DATA...
+
+<span class="c"># Start everything</span>
+clawctl start-all</div>
+
+    <h3>Phase 4: Ongoing operations</h3>
+    <div class="cmd"><span class="c"># Daily status check</span>
+clawctl status
+
+<span class="c"># Compliance validation</span>
+clawctl policy validate
+
+<span class="c"># Review who did what</span>
+clawctl access audit --since=24h
+
+<span class="c"># Full security audit</span>
+clawctl audit
+
+<span class="c"># Upgrade all agents to a new image (with health-check rollback)</span>
+clawctl upgrade --all --image=openclaw:v2026.4.1
+
+<span class="c"># Back up critical agents</span>
+clawctl backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
+
+    <h3>Enterprise checklist</h3>
+    <table>
+      <thead>
+        <tr><th></th><th>Item</th><th>Command</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>&#9745;</td><td>Secure policy created</td><td><code>clawctl policy show</code></td></tr>
+        <tr><td>&#9745;</td><td>Access control with RBAC</td><td><code>clawctl access show</code></td></tr>
+        <tr><td>&#9745;</td><td>Audit logging enabled</td><td><code>clawctl access audit</code></td></tr>
+        <tr><td>&#9745;</td><td>Images pinned to tested versions</td><td><code>clawctl image list</code></td></tr>
+        <tr><td>&#9745;</td><td>All agents loopback-only</td><td><code>clawctl policy validate</code></td></tr>
+        <tr><td>&#9745;</td><td>DM pairing on all channels</td><td><code>clawctl channel security &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Outbound messaging OFF or allowlisted</td><td><code>clawctl channel security &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Regular backups</td><td><code>clawctl backup &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Health monitoring</td><td><code>clawctl dashboard</code></td></tr>
+        <tr><td>&#9745;</td><td>Security audit passing</td><td><code>clawctl audit</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ================================================================ -->
+<!-- DARK: CHOOSING YOUR PATTERN -->
+<!-- ================================================================ -->
+<div class="dark">
+  <div class="container" style="padding-top: 60px; padding-bottom: 60px;">
+    <h2 class="section-title">Choosing Your Pattern</h2>
+    <p class="subtitle">Not sure which example fits? Start here.</p>
+
+    <table>
+      <thead>
+        <tr><th>If you are...</th><th>Start with</th><th>Grow into</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>One person, one bot</td>
+          <td><a href="#solo">Solo Founder</a></td>
+          <td><a href="#startup">Startup</a> when you add teammates</td>
+        </tr>
+        <tr>
+          <td>Small team, shared codebase</td>
+          <td><a href="#startup">Startup Engineering</a></td>
+          <td><a href="#research">Research Lab</a> for task delegation</td>
+        </tr>
+        <tr>
+          <td>Customer-facing bots</td>
+          <td><a href="#support">Customer Support</a></td>
+          <td><a href="#enterprise">Enterprise</a> for audit + compliance</td>
+        </tr>
+        <tr>
+          <td>Automated research pipeline</td>
+          <td><a href="#research">Research Lab</a></td>
+          <td><a href="#enterprise">Enterprise</a> at scale</td>
+        </tr>
+        <tr>
+          <td>Multiple clients</td>
+          <td><a href="#agency">Agency</a></td>
+          <td>Separate servers per client for full isolation</td>
+        </tr>
+        <tr>
+          <td>Regulated / compliance-heavy</td>
+          <td><a href="#enterprise">Enterprise</a></td>
+          <td>Custom policy + restricted tool profiles</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top: 40px;">
+      <h3 style="color: var(--dark-text);">Quick start (any pattern)</h3>
+      <div class="cmd"><span class="c"># Interactive guided setup — works for all patterns</span>
+clawctl setup
+
+<span class="c"># Or the scripted version</span>
+clawctl team create my-team
+clawctl create my-team/first-agent --auth=codex --telegram=TOKEN
+clawctl start my-team/first-agent</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p>
+      clawctl &mdash; AI agent team manager<br>
+      <a href="channels-guide.html">Channel Setup Guide</a> &middot;
+      <a href="https://github.com/openclaw/clawctl">GitHub</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

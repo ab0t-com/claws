@@ -74,3 +74,60 @@ func TestIntegration_InitThenCreate(t *testing.T) {
 		t.Errorf("should create instance successfully: %s", out)
 	}
 }
+
+// 1d: Verify init creates policy.json and .access.json
+func TestIntegration_InitCreatesPolicy(t *testing.T) {
+	root := t.TempDir()
+	os.RemoveAll(root)
+
+	out, err := clawctl(t, root, "init")
+	if err != nil {
+		t.Fatalf("init failed: %v\n%s", err, out)
+	}
+
+	// policy.json should exist with secure defaults
+	policyPath := filepath.Join(root, "policy.json")
+	data, err := os.ReadFile(policyPath)
+	if err != nil {
+		t.Fatalf("init should create policy.json: %v", err)
+	}
+	if !strings.Contains(string(data), "loopback") {
+		t.Error("policy should contain loopback bind mode")
+	}
+	if !strings.Contains(string(data), "\"auditLog\": true") {
+		t.Error("policy should have auditLog enabled")
+	}
+
+	// .access.json should exist
+	accessPath := filepath.Join(root, ".access.json")
+	data, err = os.ReadFile(accessPath)
+	if err != nil {
+		t.Fatalf("init should create .access.json: %v", err)
+	}
+	if !strings.Contains(string(data), "admin") {
+		t.Error(".access.json should contain admin role")
+	}
+	if !strings.Contains(string(data), "operator") {
+		t.Error(".access.json should contain operator role")
+	}
+}
+
+// 1d: Verify init doesn't overwrite existing policy/access
+func TestIntegration_InitPreservesExistingPolicy(t *testing.T) {
+	root := t.TempDir()
+	os.RemoveAll(root)
+
+	// First init
+	clawctl(t, root, "init")
+
+	// Modify policy
+	custom := `{"maxInstances": 99}`
+	os.WriteFile(filepath.Join(root, "policy.json"), []byte(custom), 0600)
+
+	// Second init should not overwrite
+	clawctl(t, root, "init")
+	data, _ := os.ReadFile(filepath.Join(root, "policy.json"))
+	if !strings.Contains(string(data), "99") {
+		t.Error("init should not overwrite existing policy.json")
+	}
+}

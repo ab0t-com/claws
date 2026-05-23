@@ -96,9 +96,65 @@ func cmdInit(args []string) error {
 		os.WriteFile(defaultsPath, []byte(defaultsSkeleton), 0644)
 		info("Created defaults.json skeleton")
 	}
+
+	// 6. Create policy.json with secure defaults (if not present)
+	if !policyExists(paths) {
+		p := Policy{
+			AllowedBindModes:         []string{"loopback"},
+			MaxInstances:             8,
+			MemoryLimitMB:            2048,
+			CPULimit:                 2.0,
+			AllowDockerSocket:        false,
+			RequireSandbox:           false,
+			RequireDmPairing:         true,
+			RequireOutboundAllowlist: true,
+			AllowedImages:            []string{"openclaw:*"},
+			AuditLog:                 true,
+		}
+		if err := writePolicy(paths, p); err != nil {
+			return errorf("failed to create policy: %v", err)
+		}
+		info("Created policy.json (secure defaults: loopback-only, DM pairing, audit on)")
+	} else {
+		fmt.Println("  policy.json already present")
+	}
+
+	// 7. Create .access.json with current user as admin (if not present)
+	if !accessExists(paths) {
+		username := os.Getenv("USER")
+		if username == "" {
+			username = "ubuntu"
+		}
+		ac := AccessConfig{
+			Roles: map[string]Role{
+				"admin": {
+					Users:    []string{username},
+					Commands: []string{"*"},
+				},
+				"operator": {
+					Users: []string{},
+					Commands: []string{
+						"start", "stop", "restart", "logs", "exec", "health",
+						"status", "list", "dashboard", "activity", "stats",
+						"config show", "channel status", "tunnel", "backup",
+					},
+				},
+				"user": {
+					Users:    []string{},
+					Commands: []string{"status", "health", "logs", "list"},
+				},
+			},
+		}
+		if err := writeAccessConfig(paths, ac); err != nil {
+			return errorf("failed to create access config: %v", err)
+		}
+		info(fmt.Sprintf("Created .access.json (admin: %s)", username))
+	} else {
+		fmt.Println("  .access.json already present")
+	}
 	fmt.Println()
 
-	// 6. Check Docker
+	// 8. Check Docker
 	info("Checking Docker...")
 	if _, err := exec.LookPath("docker"); err != nil {
 		warn("Docker not found — install: https://docs.docker.com/get-docker/")
@@ -110,7 +166,7 @@ func cmdInit(args []string) error {
 		}
 	}
 
-	// 7. Check image
+	// 9. Check image
 	image := os.Getenv("OPENCLAW_IMAGE")
 	if image == "" {
 		image = "openclaw:local"
@@ -122,10 +178,12 @@ func cmdInit(args []string) error {
 	}
 
 	fmt.Println()
-	info("Init complete.")
+	info("Init complete. Security policy and access control are configured.")
 	fmt.Println()
 	fmt.Println("  Next steps:")
-	fmt.Println("    clawctl create <name>       # create your first instance")
+	fmt.Println("    clawctl setup               # guided team setup (recommended)")
+	fmt.Println("    clawctl create <name>       # create an instance manually")
 	fmt.Println("    clawctl doctor              # diagnose any remaining issues")
+	fmt.Println("    clawctl policy show          # review security policy")
 	return nil
 }

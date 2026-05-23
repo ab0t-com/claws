@@ -1,0 +1,212 @@
+CLAW ECOSYSTEM & COMPARABLE ALWAYS-ON AI AGENTS — 2026-05-20
+============================================================
+
+Definition (your framing): a "claw" is an always-on AI agent — an "AI
+employee" — that runs persistently, holds identity and memory, and is
+reachable on messaging surfaces. OpenClaw coined the term. clawctl's
+runtime adapter (see docs/runtimes.md) was designed so the same control
+plane can drive any of the agents below.
+
+This list is grouped: (1) the "claw" family proper, (2) other always-on
+personal/companion agents, (3) autonomous coding agents (overlapping
+territory because they're shifting to "always on" too), (4) enterprise
+"AI employee" platforms. Each entry has a primary link and a short take.
+
+
+------------------------------------------------------------
+1. THE CLAW FAMILY (OpenClaw lineage)
+------------------------------------------------------------
+
+OpenClaw
+  https://github.com/openclaw/openclaw
+  Your project. Self-hosted, open-source AI agent runtime. Multi-channel
+  inbox across 20+ platforms (WhatsApp, Telegram, Discord, Slack,
+  Signal, iMessage, Matrix, Teams, Google Chat, etc.). Persistent
+  session memory as JSONL transcripts. Coined "claw" = always-on agent.
+  clawctl is its native control plane.
+
+NVIDIA NemoClaw
+  https://www.nvidia.com/en-us/ai/nemoclaw/
+  https://developer.nvidia.com/blog/build-a-secure-always-on-local-ai-agent-with-nvidia-nemoclaw-and-openclaw/
+  Enterprise hardening layer on top of OpenClaw: OpenShell sandbox,
+  policy engine, privacy router. Targets dedicated NVIDIA hardware for
+  24/7 agents that must never send sensitive data to the cloud. Fills
+  the "policy enforcement + audit" niche; comparable to (and could
+  consume) clawctl's policy.json.
+
+NanoClaw
+  https://github.com/nanocoai/nanoclaw
+  https://nanoclaw.dev/
+  Lighter, container-isolated alternative to OpenClaw. Each Claude
+  agent runs in its own Linux container with filesystem isolation
+  (not just app-layer permission checks). Connects to WhatsApp,
+  Telegram, Slack, Discord, Gmail. Built on Anthropic's Agents SDK.
+  This is the prototypical "different runtime, same shape" target for
+  clawctl runtime adapter — exact spec is in our docs/runtimes.md
+  example.
+
+ClawHub
+  Referenced from the OpenClaw ecosystem articles (e.g.,
+  https://innfactory.ai/en/blog/openclaw-ecosystem-clawhub-nemoclaw-nanoclaw-ai-agent-guide/
+  https://www.frankx.ai/blog/openclaw-explained-ai-agent-everyone-talking-about
+  Skill registry / marketplace for OpenClaw with VirusTotal scanning
+  on uploaded skills. Adjacent to clawctl rather than competitive;
+  clawctl could mount its output via the shared/skills/ volume.
+
+
+------------------------------------------------------------
+2. ALWAYS-ON PERSONAL / COMPANION AGENTS
+------------------------------------------------------------
+
+Hermes Agent  (Nous Research)
+  https://github.com/nousresearch/hermes-agent
+  https://hermes-agent.nousresearch.com/
+  Self-hosted, open-source, MIT licensed. Runs as a background process,
+  takes instructions over Telegram/Discord/Slack, keeps working after
+  the chat closes. Builds reusable skills from experience and improves
+  them in-place. Listed as "most used agent in the world" on OpenRouter
+  in early 2026 (>140k GitHub stars). Closest functional cousin to
+  OpenClaw — both are 20+ channel, persistent, self-host, command-line.
+  Strong candidate for a clawctl runtime adapter entry.
+
+Pi  (Inflection AI)
+  https://pi.ai/
+  https://hey.pi.ai/
+  Hosted, not self-hosted. Emotionally-intelligent personal companion;
+  24/7 availability via web, iOS, Android, Alexa. Remembers past
+  conversations for continuity. Free to use, no sign-up. Not directly
+  drivable by clawctl (closed SaaS), but useful as the "everyone's seen
+  one of these" reference for what an always-on personal AI looks like
+  to a non-technical user.
+
+Claude Code "Chyros"  (Anthropic)
+  https://www.mindstudio.ai/blog/what-is-claude-code-chyros-background-agent
+  Anthropic's persistent background coding agent surfaced in the
+  2026-05 Claude Code source. Version 2.1 added Agent View and a /goal
+  command — set a completion condition, agent keeps working across
+  turns until met. Hosted but local-CLI integrated. Not self-host;
+  positions Anthropic in the always-on space without ceding the
+  surface to OpenClaw-style runtimes.
+
+Cursor Background Agents
+  https://www.mindstudio.ai/blog/claude-code-vs-cursor-automations-agentic-workflows
+  https://www.builder.io/blog/cursor-vs-claude-code
+  Cloud VM where an agent runs a task autonomously. Describe the task,
+  start the agent, close Cursor — return to find the work done. Similar
+  shape to Chyros but cloud-VM-per-task rather than persistent
+  background process per identity.
+
+
+------------------------------------------------------------
+3. AUTONOMOUS CODING AGENTS (overlapping space)
+------------------------------------------------------------
+
+Devin  (Cognition AI)
+  https://www.cognition.ai/
+  https://venturebeat.com/ai/cognition-emerges-from-stealth-to-launch-ai-software-engineer-devin
+  "First fully autonomous AI software engineer." Operates with its own
+  shell, code editor, browser inside a sandboxed compute environment.
+  Plans, codes, debugs, iterates with minimal human input. Devin 2.0
+  (April 2025) cut pricing from $500/mo to $20/mo. Hosted. Comparable
+  positioning to a "claw" — long-running, identity-bearing — but
+  scoped to coding rather than general messaging-mediated work.
+
+Replit Agent
+  https://replit.com/
+  https://www.respan.ai/market-map/compare/devin-vs-replit-agent
+  Cloud IDE-integrated agent. Describe app in natural language; agent
+  plans, scaffolds, installs deps, codes, deploys to a live URL. Lower
+  autonomy than Devin; targets students, beginners, rapid prototyping.
+  Free tier. Not self-host.
+
+Codex (CLI agent mode)  (OpenAI)
+  https://www.morphllm.com/comparisons/cursor-vs-claude-code-vs-codex
+  OpenAI's CLI counterpart to Claude Code, with cloud sandbox and agent
+  modes. Less mature than Claude Code or Cursor as of mid-2026 per
+  comparative reviews. Hosted.
+
+
+------------------------------------------------------------
+4. STATEFUL AGENT FRAMEWORKS (drivable by clawctl adapter)
+------------------------------------------------------------
+
+Letta  (formerly MemGPT)
+  https://github.com/letta-ai/letta
+  https://www.letta.com/
+  Open-source framework (Apache-2.0) for stateful agents with three-
+  tier memory inspired by OS memory management: core (RAM-like),
+  archival (vector-store, disk-like), recall (conversation history).
+  Has a self-hostable Letta server plus a desktop+CLI ("Letta Code")
+  for coding agents. Closest framework cousin — clawctl could wrap
+  a Letta server in a container and adapt to it via runtime adapter.
+
+n8n (with AI agent nodes)
+  https://n8n.io/workflows/5311-ai-powered-telegram-and-whatsapp-business-agent-workflow/
+  Workflow tool, not an agent runtime, but the n8n+Redis+nginx
+  combination is the standard "build your own messaging agent" stack
+  for non-Claw users. Useful reference for the operator persona that
+  is one tier up from clawctl's ICP.
+
+
+------------------------------------------------------------
+5. ENTERPRISE "AI EMPLOYEE" PLATFORMS
+------------------------------------------------------------
+
+Salesforce Agentforce
+  https://www.salesforce.com/agentforce/
+  Hosted, deeply integrated with the Salesforce ecosystem. "Build and
+  customize autonomous AI agents to support employees and customers
+  24/7." Targets enterprise CRM-adjacent work. Not self-host; not
+  comparable to a "claw" — it's a different category.
+
+Moveworks
+  https://www.moveworks.com/
+  AI assistant platform for employee/IT support across business apps.
+  Hosted; admin metrics + governance. Adjacent category, different
+  buyer.
+
+NVIDIA + ServiceNow autonomous agents
+  https://blogs.nvidia.com/blog/servicenow-autonomous-ai-agents-enterprises/
+  Joint enterprise stack — governed autonomous agents from employee
+  desktop to AI factory. Not directly comparable to a self-host claw;
+  evidence that "always-on, governed" is the platform direction.
+
+Gloat  (HR-focused)
+  https://joshbersin.com/2026/03/gloat-enters-the-crowded-war-for-ai-agents-in-hr/
+  HR-domain agents — talent matching, skills inference. Listed for
+  completeness; vertical-specific.
+
+Microsoft Copilot (agent SKU)
+  https://www.microsoft.com/en-us/worklab/work-trend-index/agents-human-agency-and-the-opportunity-for-every-organization
+  Microsoft's "agents and human agency" positioning. Hosted. Vendor
+  capture of the channel surface most enterprises actually message on
+  (Teams + Outlook). Different buyer; relevant context for why
+  self-host operators want a clawctl-flavored alternative.
+
+
+------------------------------------------------------------
+NOTES FOR clawctl POSITIONING
+------------------------------------------------------------
+
+- The strongest functional comparison is OpenClaw vs. Hermes Agent.
+  Both are open-source, self-host, multi-channel, persistent. clawctl
+  could (a) ship a built-in `hermes` runtime alongside `openclaw` and
+  (b) frame itself as "the control plane for your claw — works with
+  OpenClaw, Hermes, or your own." That's a stronger pitch than
+  positioning clawctl as OpenClaw-exclusive.
+
+- NemoClaw and NanoClaw are *complements*, not competitors. NemoClaw
+  is policy/sandbox hardening; NanoClaw is container-level isolation.
+  Both would naturally drop in as runtime entries under clawctl.
+
+- Pi, Devin, Replit Agent, Cursor — useful as marketing reference
+  points ("you've used one of these — clawctl runs the open-source,
+  self-host kind") but not technically adapter targets because they're
+  closed SaaS.
+
+- Letta is the most interesting non-claw adapter candidate. Open
+  source, Apache-2.0, has its own runtime, and the memory model is
+  complementary to OpenClaw's session-as-JSONL approach.
+
+------------------------------------------------------------
+END

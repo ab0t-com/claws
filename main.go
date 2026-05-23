@@ -7,8 +7,8 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		printHelp()
-		os.Exit(1)
+		printFirstRun()
+		os.Exit(0)
 	}
 
 	cmd := os.Args[1]
@@ -40,6 +40,8 @@ func main() {
 		err = cmdList(args)
 	case "status":
 		err = cmdStatus(args)
+	case "info":
+		err = cmdInfo(args)
 	case "remove", "rm":
 		err = cmdRemove(args)
 	case "logs":
@@ -66,6 +68,8 @@ func main() {
 		err = cmdRestore(args)
 	case "group":
 		err = cmdGroup(args)
+	case "team":
+		err = cmdTeam(args)
 	case "storage":
 		err = cmdStorage(args)
 	case "migrate":
@@ -100,14 +104,24 @@ func main() {
 		err = cmdAudit(args)
 	case "config":
 		err = cmdConfig(args)
+	case "setup":
+		err = cmdSetup(args)
 	case "init":
 		err = cmdInit(args)
 	case "version", "--version", "-v":
 		err = cmdVersion(args)
 	case "doctor":
 		err = cmdDoctor(args)
+	case "orphans":
+		err = cmdOrphans(args)
+	case "channels":
+		err = cmdChannelsMatrix(args)
 	case "help", "--help", "-h":
-		printHelp()
+		if len(args) > 0 {
+			printTopicHelp(args[0])
+		} else {
+			printHelp()
+		}
 	default:
 		printHelp()
 		os.Exit(1)
@@ -127,6 +141,11 @@ func printHelp() {
 		title string
 		lines []string
 	}{
+		{"Getting Started", []string{
+			"setup                      Guided interactive onboarding",
+			"init                       First-run setup (creates dirs, security, deps)",
+			"doctor                     Check Docker, image, disk, tools",
+		}},
 		{"Lifecycle", []string{
 			"create <name>              Create a new instance",
 			"create <group>/<name>      Create instance in a group",
@@ -138,15 +157,19 @@ func printHelp() {
 			"remove <name> [--purge]    Remove (--purge deletes all data)",
 		}},
 		{"Info", []string{
-			"list                       List all instances",
-			"status <name>              Show instance details",
-			"health [name...]           Deep health probe (live + ready)",
-			"stats                      Docker stats for all instances",
-			"dashboard [--interval=5s]  Live refreshing status view",
+			"list [--rich] [--group=<g>]  List instances (--rich adds model, role, channels)",
+			"status [--group=<g>]         Unified system overview (health + policy)",
+			"status <name>                Show instance details",
+			"info <name>                  Deep info: identity, channels, creds, recent activity",
+			"health [name...] [--group=<g>] Deep health probe (live + ready)",
+			"stats                        Docker stats for all instances",
+			"dashboard [--interval=5s]    Live refreshing status view",
 		}},
 		{"Auth & Channels", []string{
 			"auth <name> codex              OAuth flow for OpenAI Codex",
 			"auth <name> apikey <p> <k>     Register API key",
+			"auth status [name]             Fleet auth inventory (no secrets)",
+			"channels                       Fleet channel matrix (rows=agents, cols=channels)",
 			"channel add <n> telegram --token=<t>  Quick-add Telegram",
 			"channel add <n> discord --token=<t>   Quick-add Discord",
 			"channel add <n> slack --bot-token=<t> --app-token=<t>",
@@ -163,8 +186,10 @@ func printHelp() {
 			"backup <name> [<file>]     Tarball instance to file",
 			"restore <name> <file>      Restore instance from backup",
 		}},
-		{"Groups", []string{
-			"group create <name>        Create a group",
+		{"Groups & Teams", []string{
+			"team create <name>         Create team (group + shared + tasks)",
+			"team list                  List all teams/groups",
+			"group create <name>        Create a group (manual)",
 			"group list                 List all groups",
 			"group add <group> <inst>   Move instance into group",
 			"group remove <name>        Remove group",
@@ -236,9 +261,8 @@ func printHelp() {
 			"config edit <name>             Open config in $EDITOR",
 		}},
 		{"Diagnostics", []string{
-			"init                       First-run setup (creates dirs, checks deps)",
 			"version                    Show version and environment",
-			"doctor                     Check Docker, image, disk, tools",
+			"orphans [clean]            List containers not in clawctl's registry (clean = remove)",
 		}},
 		{"Operations", []string{
 			"logs <name> [-f]           View instance logs",
@@ -259,5 +283,42 @@ func printHelp() {
 			fmt.Printf("  %s\n", l)
 		}
 	}
+	fmt.Println()
+}
+
+// printFirstRun detects whether the system is initialized and prints
+// an appropriate welcome message or brief status summary.
+func printFirstRun() {
+	bold := "\033[1m"
+	nc := "\033[0m"
+
+	paths := resolvePaths()
+	if _, err := os.Stat(paths.Root); os.IsNotExist(err) {
+		// Uninitialized system — welcome message
+		fmt.Printf("%sWelcome to clawctl%s — AI agent team manager.\n\n", bold, nc)
+		fmt.Println("  Looks like this is your first time. Run:")
+		fmt.Println()
+		fmt.Printf("    %sclawctl setup%s    — guided setup (recommended)\n", bold, nc)
+		fmt.Printf("    %sclawctl init%s     — manual setup (advanced)\n", bold, nc)
+		fmt.Printf("    %sclawctl help%s     — see all commands\n", bold, nc)
+		fmt.Println()
+		return
+	}
+
+	// Initialized system — brief status + help hint
+	count := instanceCount(paths)
+	fmt.Printf("%sclawctl%s — AI agent team manager\n\n", bold, nc)
+	if count == 0 {
+		fmt.Println("  No agents running yet.")
+		fmt.Println()
+		fmt.Printf("    %sclawctl setup%s    — guided team setup\n", bold, nc)
+		fmt.Printf("    %sclawctl create%s   — create an agent\n", bold, nc)
+	} else {
+		fmt.Printf("  %d agent(s) registered.\n", count)
+		fmt.Println()
+		fmt.Printf("    %sclawctl list%s       — see all agents\n", bold, nc)
+		fmt.Printf("    %sclawctl dashboard%s  — live status view\n", bold, nc)
+	}
+	fmt.Printf("    %sclawctl help%s      — see all commands\n", bold, nc)
 	fmt.Println()
 }

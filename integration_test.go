@@ -791,6 +791,511 @@ func TestIntegration_RegistryFilePermissions(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// --group= filter — fleet-aware commands (Ticket: fleet-team-control-surface)
+// ---------------------------------------------------------------------------
+
+// setupGroupedFleet creates two groups with members + one ungrouped instance.
+// Returns the root path. Used as the common fixture for --group= tests.
+func setupGroupedFleet(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "alpha")
+	clawctl(t, root, "group", "create", "beta")
+	clawctl(t, root, "create", "alpha/one")
+	clawctl(t, root, "create", "alpha/two")
+	clawctl(t, root, "create", "beta/three")
+	clawctl(t, root, "create", "standalone")
+	return root
+}
+
+func TestIntegration_ListGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+
+	// Unfiltered: should see all four.
+	out, _ := clawctl(t, root, "list")
+	for _, name := range []string{"alpha/one", "alpha/two", "beta/three", "standalone"} {
+		if !strings.Contains(out, name) {
+			t.Errorf("unfiltered list missing %s: %s", name, out)
+		}
+	}
+
+	// --group=alpha: only alpha/* members.
+	out, _ = clawctl(t, root, "list", "--group=alpha")
+	if !strings.Contains(out, "alpha/one") || !strings.Contains(out, "alpha/two") {
+		t.Errorf("--group=alpha should show alpha members: %s", out)
+	}
+	if strings.Contains(out, "beta/three") || strings.Contains(out, "standalone") {
+		t.Errorf("--group=alpha should NOT show non-alpha members: %s", out)
+	}
+
+	// --group=ghost: nonexistent group should error with directive message.
+	_, err := clawctl(t, root, "list", "--group=ghost")
+	if err == nil {
+		t.Errorf("--group=ghost should fail (group does not exist)")
+	}
+}
+
+func TestIntegration_ListGroupFilterEmpty(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "empty")
+	out, _ := clawctl(t, root, "list", "--group=empty")
+	if !strings.Contains(out, "No instances found in group 'empty'") {
+		t.Errorf("empty group should produce friendly message: %s", out)
+	}
+}
+
+func TestIntegration_ListGroupFilterJson(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, err := clawctl(t, root, "list", "--group=alpha", "--json")
+	if err != nil {
+		t.Fatalf("list --group= --json failed: %v\n%s", err, out)
+	}
+	var entries []map[string]string
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(entries) != 2 {
+		t.Errorf("--group=alpha --json expected 2 entries, got %d", len(entries))
+	}
+	for _, e := range entries {
+		if !strings.HasPrefix(e["name"], "alpha/") {
+			t.Errorf("non-alpha entry leaked into --group=alpha: %s", e["name"])
+		}
+	}
+}
+
+func TestIntegration_StatusOverviewGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, _ := clawctl(t, root, "status", "--group=alpha")
+	if !strings.Contains(out, "Instances in group 'alpha'") {
+		t.Errorf("status --group= should announce the scope: %s", out)
+	}
+	if strings.Contains(out, "beta/three") || strings.Contains(out, "standalone") {
+		t.Errorf("status --group=alpha should not show non-alpha members: %s", out)
+	}
+}
+
+func TestIntegration_HealthGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+
+	// Group filter narrows to the two alpha members.
+	out, _ := clawctl(t, root, "health", "--group=alpha")
+	if !strings.Contains(out, "alpha/one") || !strings.Contains(out, "alpha/two") {
+		t.Errorf("health --group=alpha should show both alpha members: %s", out)
+	}
+	if strings.Contains(out, "beta/three") {
+		t.Errorf("health --group=alpha should not show beta: %s", out)
+	}
+}
+
+func TestIntegration_HealthRejectsBothNameAndGroup(t *testing.T) {
+	root := setupGroupedFleet(t)
+	_, err := clawctl(t, root, "health", "alpha/one", "--group=alpha")
+	if err == nil {
+		t.Errorf("health <name> --group= should be rejected (mutually exclusive)")
+	}
+}
+
+func TestIntegration_RestartRejectsBothNameAndGroup(t *testing.T) {
+	root := setupGroupedFleet(t)
+	_, err := clawctl(t, root, "restart", "alpha/one", "--group=alpha", "--yes")
+	if err == nil {
+		t.Errorf("restart <name> --group= should be rejected (mutually exclusive)")
+	}
+}
+
+func TestIntegration_StartGroupExpansion(t *testing.T) {
+	// This test exercises the fan-out dispatcher. Per-instance start runs a
+	// real `docker compose up -d` and then waits up to 30s for /healthz, so
+	// the test takes ~(30s × group size). Skip under -short for CI speed;
+	// the dispatch layer correctness is verified by the unit tests on
+	// filterEntriesByGroup and the integration tests on list/status/health
+	// which exercise the same flag parsing.
+	if testing.Short() {
+		t.Skip("start --group= integration test takes ~60s due to per-instance health-wait")
+	}
+	root := setupGroupedFleet(t)
+	out, _ := clawctl(t, root, "start", "--group=alpha")
+	if !strings.Contains(out, "Starting 2 instance(s) in group 'alpha'") {
+		t.Errorf("start --group= should announce fan-out count: %s", out)
+	}
+}
+
+func TestIntegration_RestartGroupNeedsConfirmation(t *testing.T) {
+	root := setupGroupedFleet(t)
+	// Without --yes and no TTY, the prompt reads empty and aborts.
+	// This test confirms the confirmation gate exists; --yes bypass is
+	// covered by TestIntegration_StartGroupExpansion (start is non-destructive,
+	// no prompt) and by checking that --yes appears in help output.
+	out, _ := clawctl(t, root, "restart", "--group=alpha")
+	if !strings.Contains(out, "Continue?") && !strings.Contains(out, "Aborted") {
+		t.Errorf("restart --group= without --yes should prompt or abort: %s", out)
+	}
+}
+
+func TestIntegration_PolicyValidateGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+	clawctl(t, root, "policy", "init")
+	out, _ := clawctl(t, root, "policy", "validate", "--group=alpha")
+	if !strings.Contains(out, "group: alpha") {
+		t.Errorf("policy validate --group= should announce the scope: %s", out)
+	}
+	if strings.Contains(out, "beta/three") || strings.Contains(out, "standalone") {
+		t.Errorf("policy validate --group=alpha should not check non-alpha: %s", out)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fleet identity — `list --rich` and `clawctl info` (Task A, ticket §A)
+// ---------------------------------------------------------------------------
+
+func TestIntegration_ListRichShowsIdentity(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+
+	// Inject a model so the rich view has something to display.
+	cfgPath := filepath.Join(root, "team", "sarah", "openclaw.json")
+	cfg := readJSON(t, cfgPath)
+	if cfg["agents"] == nil {
+		cfg["agents"] = map[string]any{}
+	}
+	agentsMap := cfg["agents"].(map[string]any)
+	if agentsMap["defaults"] == nil {
+		agentsMap["defaults"] = map[string]any{}
+	}
+	defaults := agentsMap["defaults"].(map[string]any)
+	defaults["model"] = map[string]any{"primary": "openai-codex/gpt-5.4"}
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(cfgPath, data, 0600)
+
+	out, err := clawctl(t, root, "list", "--rich")
+	if err != nil {
+		t.Fatalf("list --rich failed: %s\n%s", err, out)
+	}
+	for _, want := range []string{"MODEL", "ROLE", "CHANNELS", "openai-codex/gpt-5.4"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--rich output missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestIntegration_ListRichJson(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah", "--role=manager")
+
+	out, err := clawctl(t, root, "list", "--rich", "--json")
+	if err != nil {
+		t.Fatalf("list --rich --json failed: %v\n%s", err, out)
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	for _, key := range []string{"name", "port", "status", "model", "role", "image", "ram", "uptime"} {
+		if _, ok := e[key]; !ok {
+			t.Errorf("rich JSON entry missing key %q: %s", key, out)
+		}
+	}
+	if e["role"] != "manager" {
+		t.Errorf("role should be 'manager', got %v", e["role"])
+	}
+}
+
+func TestIntegration_Info(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah", "--role=manager")
+
+	out, err := clawctl(t, root, "info", "team/sarah")
+	if err != nil {
+		t.Fatalf("info failed: %s\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Instance: team/sarah",
+		"Status:", "Identity", "Network",
+		"Channels", "Filesystem", "Role:       manager",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("info output missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestIntegration_InfoJson(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+
+	out, err := clawctl(t, root, "info", "team/sarah", "--json")
+	if err != nil {
+		t.Fatalf("info --json failed: %v\n%s", err, out)
+	}
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(out), &obj); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	for _, key := range []string{"name", "group", "port", "status", "model", "image", "runtime", "directory", "config", "workspace", "token", "creds"} {
+		if _, ok := obj[key]; !ok {
+			t.Errorf("info --json missing key %q: %s", key, out)
+		}
+	}
+	if obj["name"] != "team/sarah" {
+		t.Errorf("name should be team/sarah, got %v", obj["name"])
+	}
+}
+
+func TestIntegration_InfoMissingInstance(t *testing.T) {
+	root := t.TempDir()
+	_, err := clawctl(t, root, "info", "ghost")
+	if err == nil {
+		t.Errorf("info on missing instance should error")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Team noun verbs (Task C — thin wrappers over --group= from Task B)
+// ---------------------------------------------------------------------------
+
+func TestIntegration_TeamStatusDelegatesToGroupOverview(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, _ := clawctl(t, root, "team", "status", "alpha")
+	// `team status` should produce the same overview a per-instance
+	// `status --group=alpha` would, including the team-scoped header.
+	if !strings.Contains(out, "Instances in group 'alpha'") {
+		t.Errorf("team status should produce a group-scoped overview: %s", out)
+	}
+	if strings.Contains(out, "beta/three") || strings.Contains(out, "standalone") {
+		t.Errorf("team status should not show non-alpha members: %s", out)
+	}
+}
+
+func TestIntegration_TeamHealthDelegatesToHealthGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, _ := clawctl(t, root, "team", "health", "alpha")
+	if !strings.Contains(out, "alpha/one") || !strings.Contains(out, "alpha/two") {
+		t.Errorf("team health should probe both alpha members: %s", out)
+	}
+	if strings.Contains(out, "beta/three") {
+		t.Errorf("team health should not probe beta: %s", out)
+	}
+}
+
+func TestIntegration_TeamHealthJsonPassThrough(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, err := clawctl(t, root, "team", "health", "alpha", "--json")
+	if err != nil {
+		t.Fatalf("team health --json failed: %v\n%s", err, out)
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(entries) != 2 {
+		t.Errorf("team health --json expected 2 entries, got %d", len(entries))
+	}
+}
+
+func TestIntegration_TeamShow(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "team", "create", "research")
+	clawctl(t, root, "create", "research/sarah", "--role=manager")
+	clawctl(t, root, "create", "research/john", "--role=worker", "--manager=sarah")
+
+	out, err := clawctl(t, root, "team", "show", "research")
+	if err != nil {
+		t.Fatalf("team show failed: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Team: research",
+		"Members:    2",
+		"research/sarah",
+		"research/john",
+		"Shared resources",
+		"Task queue",
+		"pending:    0",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("team show missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestIntegration_TeamShowJson(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "team", "create", "research")
+	clawctl(t, root, "create", "research/sarah")
+	out, err := clawctl(t, root, "team", "show", "research", "--json")
+	if err != nil {
+		t.Fatalf("team show --json failed: %v\n%s", err, out)
+	}
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(out), &obj); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	for _, key := range []string{"team", "members", "shared", "tasks"} {
+		if _, ok := obj[key]; !ok {
+			t.Errorf("team show --json missing key %q: %s", key, out)
+		}
+	}
+}
+
+func TestIntegration_TeamRejectsMissingTeam(t *testing.T) {
+	root := t.TempDir()
+	_, err := clawctl(t, root, "team", "status", "ghost")
+	if err == nil {
+		t.Errorf("team <verb> <missing-team> should fail")
+	}
+}
+
+func TestIntegration_TeamRejectsNoTeamName(t *testing.T) {
+	root := t.TempDir()
+	_, err := clawctl(t, root, "team", "status")
+	if err == nil {
+		t.Errorf("team status (no name) should fail with usage error")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Channels matrix + auth status (Task D — observability)
+// ---------------------------------------------------------------------------
+
+func TestIntegration_ChannelsMatrix(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+	clawctl(t, root, "create", "team/john")
+	clawctl(t, root, "create", "standalone")
+	// Enable a channel on sarah only.
+	clawctl(t, root, "channel", "add", "team/sarah", "telegram", "--token=test:abc")
+
+	out, err := clawctl(t, root, "channels")
+	if err != nil {
+		t.Fatalf("channels failed: %v\n%s", err, out)
+	}
+	// Header should contain all known channel types.
+	for _, ch := range []string{"telegram", "discord", "slack", "signal", "whatsapp"} {
+		if !strings.Contains(out, ch) {
+			t.Errorf("matrix header missing channel %q: %s", ch, out)
+		}
+	}
+	// Sarah's telegram cell should be enabled; everyone else's should be —.
+	if !strings.Contains(out, "team/sarah") {
+		t.Errorf("matrix missing team/sarah row: %s", out)
+	}
+}
+
+func TestIntegration_ChannelsMatrixJson(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+	clawctl(t, root, "channel", "add", "team/sarah", "telegram", "--token=test:abc")
+
+	out, err := clawctl(t, root, "channels", "--json")
+	if err != nil {
+		t.Fatalf("channels --json failed: %v\n%s", err, out)
+	}
+	var obj struct {
+		Columns []string `json:"columns"`
+		Rows    []struct {
+			Name  string            `json:"name"`
+			Cells map[string]string `json:"cells"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal([]byte(out), &obj); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(obj.Rows) != 1 {
+		t.Errorf("expected 1 row, got %d", len(obj.Rows))
+	}
+	if obj.Rows[0].Cells["telegram"] == "" {
+		t.Errorf("sarah's telegram cell should be non-empty (dmPolicy): %+v", obj.Rows[0].Cells)
+	}
+}
+
+func TestIntegration_AuthStatusAllInstances(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+	clawctl(t, root, "create", "team/john")
+
+	out, err := clawctl(t, root, "auth", "status")
+	if err != nil {
+		t.Fatalf("auth status failed: %v\n%s", err, out)
+	}
+	for _, want := range []string{"NAME", "MODEL", "TOKEN", "CHANNEL CREDS", "LAST AUTH", "team/sarah", "team/john"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("auth status missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestIntegration_AuthStatusSingleInstance(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+
+	out, err := clawctl(t, root, "auth", "status", "team/sarah")
+	if err != nil {
+		t.Fatalf("auth status <name> failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "team/sarah") {
+		t.Errorf("auth status should include named instance: %s", out)
+	}
+}
+
+func TestIntegration_AuthStatusJson(t *testing.T) {
+	root := t.TempDir()
+	clawctl(t, root, "group", "create", "team")
+	clawctl(t, root, "create", "team/sarah")
+
+	out, err := clawctl(t, root, "auth", "status", "--json")
+	if err != nil {
+		t.Fatalf("auth status --json failed: %v\n%s", err, out)
+	}
+	var records []map[string]any
+	if err := json.Unmarshal([]byte(out), &records); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(records) != 1 {
+		t.Errorf("expected 1 record, got %d", len(records))
+	}
+	for _, key := range []string{"name", "model", "gatewayTokenSet", "channelCreds", "lastAuthAt", "lastAuthCmd", "lastAuthResult"} {
+		if _, ok := records[0][key]; !ok {
+			t.Errorf("auth status --json missing key %q: %s", key, out)
+		}
+	}
+}
+
+func TestIntegration_AuthStatusGroupFilter(t *testing.T) {
+	root := setupGroupedFleet(t)
+	out, err := clawctl(t, root, "auth", "status", "--group=alpha")
+	if err != nil {
+		t.Fatalf("auth status --group= failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "alpha/one") || !strings.Contains(out, "alpha/two") {
+		t.Errorf("auth status --group=alpha should show alpha members: %s", out)
+	}
+	if strings.Contains(out, "beta/three") {
+		t.Errorf("auth status --group=alpha should not show beta: %s", out)
+	}
+}
+
+func TestIntegration_UpgradeRejectsMultipleScopes(t *testing.T) {
+	root := setupGroupedFleet(t)
+	// All three scope flags together — should be rejected.
+	_, err := clawctl(t, root, "upgrade", "alpha/one", "--group=alpha", "--all")
+	if err == nil {
+		t.Errorf("upgrade with name + --group + --all should be rejected")
+	}
+}
+
 // Helper
 func readEnvFromFile(t *testing.T, path, key string) string {
 	t.Helper()

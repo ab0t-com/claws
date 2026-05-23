@@ -106,21 +106,38 @@ func cmdImagePin(args []string) error {
 
 func cmdUpgrade(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: clawctl upgrade <instance|--all> [--image=<image:tag>]")
+		return errorf("usage: clawctl upgrade <instance|--all|--group=<name>> [--image=<image:tag>]")
 	}
 
 	paths := resolvePaths()
 	all := hasFlag(args, "--all")
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
 
-	var targetImage string
-	for _, a := range args {
-		if strings.HasPrefix(a, "--image=") {
-			targetImage = a[8:]
-		}
+	targetImage := flagValue(args, "--image=")
+
+	// Mutual-exclusion guard: --all, --group=, and a positional name select
+	// different scopes; combining them is ambiguous.
+	positional := firstPositional(args)
+	scopeCount := 0
+	if all {
+		scopeCount++
+	}
+	if filterGroup != "" {
+		scopeCount++
+	}
+	if positional != "" {
+		scopeCount++
+	}
+	if scopeCount > 1 {
+		return errorf("specify exactly one of: <instance name>, --all, or --group=<name>")
 	}
 
 	var names []string
-	if all {
+	switch {
+	case all:
 		entries, err := readRegistry(paths)
 		if err != nil {
 			return err
@@ -128,15 +145,27 @@ func cmdUpgrade(args []string) error {
 		for _, e := range entries {
 			names = append(names, e.Name)
 		}
-	} else {
-		name := args[0]
-		if strings.HasPrefix(name, "--") {
-			return errorf("usage: clawctl upgrade <instance|--all> [--image=<image:tag>]")
-		}
-		if err := requireInstance(paths, name); err != nil {
+	case filterGroup != "":
+		entries, err := readRegistry(paths)
+		if err != nil {
 			return err
 		}
-		names = []string{name}
+		members := filterEntriesByGroup(entries, filterGroup)
+		if len(members) == 0 {
+			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
+			return nil
+		}
+		if !confirmGroupOp("upgrade", filterGroup, len(members), hasFlag(args, "--yes")) {
+			return nil
+		}
+		for _, e := range members {
+			names = append(names, e.Name)
+		}
+	default:
+		if err := requireInstance(paths, positional); err != nil {
+			return err
+		}
+		names = []string{positional}
 	}
 
 	// Policy check on target image

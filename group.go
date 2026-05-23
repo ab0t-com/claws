@@ -147,6 +147,284 @@ func GroupSharedDir(paths Paths, groupName string) string {
 // Commands: group create / group list / group add
 // ---------------------------------------------------------------------------
 
+// cmdTeam is the team-noun dispatcher. It exposes the operations that
+// operators most often want at *team* (not per-instance) altitude:
+// create/list for setup, and start/stop/restart/status/health/show/
+// rotate-tokens/upgrade for everyday ops. Most verbs are thin wrappers
+// that delegate to the per-instance commands with --group=<name> injected
+// — the team noun is the operator-friendly way to spell that filter.
+func cmdTeam(args []string) error {
+	if len(args) < 1 {
+		return errorf("usage: clawctl team <create|list|start|stop|restart|status|health|show|rotate-tokens|upgrade> [args...]")
+	}
+	switch args[0] {
+	case "create":
+		return cmdTeamCreate(args[1:])
+	case "list", "ls":
+		return cmdGroupList(args[1:])
+	case "start":
+		return cmdTeamDelegate(args[1:], cmdStart, "team start")
+	case "stop":
+		return cmdTeamDelegate(args[1:], cmdStop, "team stop")
+	case "restart":
+		return cmdTeamDelegate(args[1:], cmdRestart, "team restart")
+	case "status":
+		return cmdTeamDelegate(args[1:], cmdStatus, "team status")
+	case "health":
+		return cmdTeamDelegate(args[1:], cmdHealth, "team health")
+	case "show":
+		return cmdTeamShow(args[1:])
+	case "rotate-tokens":
+		return cmdTeamDelegate(args[1:], cmdTokenRotate, "team rotate-tokens")
+	case "upgrade":
+		return cmdTeamDelegate(args[1:], cmdUpgrade, "team upgrade")
+	case "apply-policy":
+		return cmdTeamApplyPolicy(args[1:])
+	case "apply-config":
+		return cmdTeamApplyConfig(args[1:])
+	default:
+		return errorf("unknown team subcommand: %s — use create, list, start, stop, restart, status, health, show, rotate-tokens, upgrade, apply-policy, or apply-config", args[0])
+	}
+}
+
+// cmdTeamApplyPolicy enforces the admin policy across every member of a
+// team, restarting affected instances. Thin wrapper over
+// `clawctl policy enforce --group=<team> --restart`. Prompts unless --yes.
+func cmdTeamApplyPolicy(args []string) error {
+	teamName := firstPositional(args)
+	if teamName == "" {
+		return errorf("usage: clawctl team apply-policy <team> [--yes]")
+	}
+	paths := resolvePaths()
+	if err := requireGroup(paths, teamName); err != nil {
+		return err
+	}
+	members, _ := ListGroupMembers(paths, teamName)
+	if len(members) == 0 {
+		info(fmt.Sprintf("No instances in group '%s'.", teamName))
+		return nil
+	}
+	if !confirmGroupOp("apply policy + restart", teamName, len(members), hasFlag(args, "--yes")) {
+		return nil
+	}
+	forwarded := []string{"--group=" + teamName, "--restart"}
+	return cmdPolicyEnforce(forwarded)
+}
+
+// cmdTeamApplyConfig sets the same config key on every member of a team.
+// Useful for fleet-wide setting changes ("set tools.profile to messaging
+// across the whole team") without a per-instance loop. Confirmation gated
+// because a bad config can break the whole team at once.
+func cmdTeamApplyConfig(args []string) error {
+	positional := []string{}
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			positional = append(positional, a)
+		}
+	}
+	if len(positional) < 3 {
+		return errorf("usage: clawctl team apply-config <team> <key> <value> [--yes]")
+	}
+	teamName, key, value := positional[0], positional[1], positional[2]
+	paths := resolvePaths()
+	if err := requireGroup(paths, teamName); err != nil {
+		return err
+	}
+	members, _ := ListGroupMembers(paths, teamName)
+	if len(members) == 0 {
+		info(fmt.Sprintf("No instances in group '%s'.", teamName))
+		return nil
+	}
+	if !confirmGroupOp(fmt.Sprintf("set %s=%s on", key, value), teamName, len(members), hasFlag(args, "--yes")) {
+		return nil
+	}
+	var failed []string
+	for _, m := range members {
+		full := teamName + "/" + m
+		if err := cmdConfigSet([]string{full, key, value}); err != nil {
+			warn(fmt.Sprintf("'%s' failed: %v", full, err))
+			failed = append(failed, full)
+		}
+	}
+	if len(failed) > 0 {
+		return errorf("%d instance(s) failed: %s", len(failed), strings.Join(failed, ", "))
+	}
+	info(fmt.Sprintf("Config %s=%s applied to %d instance(s) in group '%s'. Restart to apply: clawctl team restart %s", key, value, len(members), teamName, teamName))
+	return nil
+}
+
+// cmdTeamDelegate is the shared shim for team-noun verbs that map cleanly
+// onto a per-instance command with --group=<name>. It validates the team
+// exists, injects --group=<name>, strips the team name from positional args
+// (so the underlying command doesn't see it as an instance name), and calls
+// the per-instance handler. Pass-through flags (--yes, --hard, --json, etc.)
+// reach the per-instance handler unchanged.
+func cmdTeamDelegate(args []string, perInstance func([]string) error, usage string) error {
+	teamName := firstPositional(args)
+	if teamName == "" {
+		return errorf("usage: clawctl %s <team> [flags]", usage)
+	}
+	paths := resolvePaths()
+	if err := requireGroup(paths, teamName); err != nil {
+		return err
+	}
+	// Drop the team-name positional from forwarded args; keep every flag.
+	var forwarded []string
+	dropped := false
+	for _, a := range args {
+		if a == teamName && !dropped {
+			dropped = true
+			continue
+		}
+		forwarded = append(forwarded, a)
+	}
+	forwarded = append(forwarded, "--group="+teamName)
+	return perInstance(forwarded)
+}
+
+// cmdTeamShow renders an all-in-one team summary: members, identity per
+// member, shared resources, task queue depth. The closest thing to a "team
+// dashboard" without the live-refresh of `clawctl dashboard`. Read-only.
+func cmdTeamShow(args []string) error {
+	teamName := firstPositional(args)
+	if teamName == "" {
+		return errorf("usage: clawctl team show <team> [--json]")
+	}
+	paths := resolvePaths()
+	if err := requireGroup(paths, teamName); err != nil {
+		return err
+	}
+	jsonMode := hasFlag(args, "--json")
+	groupDir := filepath.Join(paths.Root, teamName)
+
+	// Member identities (uses the same gatherRichInfo as `list --rich`).
+	entries, _ := readRegistry(paths)
+	members := filterEntriesByGroup(entries, teamName)
+	var memberInfo []richInstanceInfo
+	for _, e := range members {
+		memberInfo = append(memberInfo, gatherRichInfo(paths, e.Name))
+	}
+
+	// Shared resource presence — same checks rebuildGroupOverride uses.
+	sharedDir := filepath.Join(groupDir, "shared")
+	sharedSkills := dirExists(filepath.Join(sharedDir, "skills"))
+	sharedWorkspace := dirExists(filepath.Join(sharedDir, "workspace"))
+	sharedHooks := dirExists(filepath.Join(sharedDir, "hooks"))
+
+	// Task queue depth.
+	tasksDir := filepath.Join(groupDir, "shared", "tasks")
+	pending := countJSONFiles(filepath.Join(tasksDir, "pending"))
+	claimed := countJSONFiles(filepath.Join(tasksDir, "claimed"))
+	done := countJSONFiles(filepath.Join(tasksDir, "done"))
+
+	if jsonMode {
+		obj := map[string]any{
+			"team":    teamName,
+			"members": memberInfo,
+			"shared": map[string]bool{
+				"skills":    sharedSkills,
+				"workspace": sharedWorkspace,
+				"hooks":     sharedHooks,
+			},
+			"tasks": map[string]int{
+				"pending": pending,
+				"claimed": claimed,
+				"done":    done,
+			},
+		}
+		data, _ := json.MarshalIndent(obj, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	bold := "\033[1m"
+	nc := "\033[0m"
+	green := "\033[0;32m"
+	red := "\033[0;31m"
+
+	fmt.Printf("%sTeam: %s%s\n", bold, teamName, nc)
+	fmt.Printf("  Directory:  %s\n", groupDir)
+	fmt.Printf("  Members:    %d\n", len(memberInfo))
+	fmt.Println()
+
+	fmt.Printf("%sMembers%s\n", bold, nc)
+	if len(memberInfo) == 0 {
+		fmt.Println("  (no instances yet — use: clawctl create " + teamName + "/<name>)")
+	} else {
+		for _, m := range memberInfo {
+			role := orDash(m.Role)
+			model := orDash(m.Model)
+			channels := "—"
+			if len(m.Channels) > 0 {
+				channels = strings.Join(m.Channels, ",")
+			}
+			fmt.Printf("  %-18s  %-10s  %-26s  role=%-8s  channels=%s\n",
+				m.Name, m.Status, truncate(model, 26), role, channels)
+		}
+	}
+	fmt.Println()
+
+	fmt.Printf("%sShared resources%s\n", bold, nc)
+	fmt.Printf("  skills:     %s\n", presentMark(sharedSkills, green, red, nc))
+	fmt.Printf("  workspace:  %s\n", presentMark(sharedWorkspace, green, red, nc))
+	fmt.Printf("  hooks:      %s\n", presentMark(sharedHooks, green, red, nc))
+	fmt.Println()
+
+	fmt.Printf("%sTask queue%s\n", bold, nc)
+	fmt.Printf("  pending:    %d\n", pending)
+	fmt.Printf("  claimed:    %d\n", claimed)
+	fmt.Printf("  done:       %d\n", done)
+	return nil
+}
+
+func dirExists(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
+}
+
+func countJSONFiles(path string) int {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+			n++
+		}
+	}
+	return n
+}
+
+func presentMark(present bool, green, red, nc string) string {
+	if present {
+		return green + "yes" + nc
+	}
+	return red + "no" + nc
+}
+
+func cmdTeamCreate(args []string) error {
+	if len(args) < 1 {
+		return errorf("usage: clawctl team create <name>")
+	}
+	// Create the group
+	if err := cmdGroupCreate(args); err != nil {
+		return err
+	}
+	// Enable all shared resources
+	name := args[0]
+	paths := resolvePaths()
+	groupDir := filepath.Join(paths.Root, name)
+	os.MkdirAll(filepath.Join(groupDir, "shared", "skills"), 0755)
+	os.MkdirAll(filepath.Join(groupDir, "shared", "workspace"), 0755)
+	os.MkdirAll(filepath.Join(groupDir, "shared", "hooks"), 0755)
+	os.MkdirAll(filepath.Join(groupDir, "tasks"), 0755)
+	info("Shared resources enabled (skills, workspace, hooks, tasks)")
+	fmt.Println()
+	fmt.Printf("  Add agents: clawctl create %s/<name>\n", name)
+	return nil
+}
+
 func cmdGroup(args []string) error {
 	if len(args) < 1 {
 		return errorf("usage: clawctl group <create|list|add|remove|shared> [args...]")
@@ -215,9 +493,28 @@ func cmdGroupCreate(args []string) error {
 
 func cmdGroupList(args []string) error {
 	paths := resolvePaths()
+	jsonMode := hasFlag(args, "--json")
 	groups, err := ListGroups(paths)
 	if err != nil {
 		return err
+	}
+
+	if jsonMode {
+		type grec struct {
+			Group     string `json:"group"`
+			Members   int    `json:"members"`
+			Directory string `json:"directory"`
+		}
+		out := make([]grec, 0, len(groups))
+		for _, g := range groups {
+			members, _ := ListGroupMembers(paths, g)
+			out = append(out, grec{
+				Group: g, Members: len(members), Directory: filepath.Join(paths.Root, g),
+			})
+		}
+		data, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(string(data))
+		return nil
 	}
 
 	if len(groups) == 0 {

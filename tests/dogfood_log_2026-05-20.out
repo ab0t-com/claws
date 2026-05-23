@@ -1,0 +1,1296 @@
+[1m=== clawctl smoke / dogfood ===[0m
+binary: /tmp/clawctl-dogfood
+root:   /tmp/clawctl-dogfood-XzY6Kj  (will NOT touch /home/ubuntu/.openclaw)
+skip:   CLAWCTL_SKIP_VALIDATE=1
+port:   CLAWCTL_BASE_PORT=29789
+
+
+[1m# B1 — first-run welcome (uninitialized)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl [0m
+[1mWelcome to clawctl[0m — AI agent team manager.
+
+  Looks like this is your first time. Run:
+
+    [1mclawctl setup[0m    — guided setup (recommended)
+    [1mclawctl init[0m     — manual setup (advanced)
+    [1mclawctl help[0m     — see all commands
+
+[0;90m  (exit=0)[0m
+
+[1m# B2 — clawctl --version[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl --version[0m
+clawctl dev
+  go:     go1.22.12
+  os:     linux/amd64
+  docker: 29.3.0
+  compose: 5.1.0
+  image:  openclaw:local
+[0;90m  (exit=0)[0m
+
+[1m# B3 — clawctl help (count sections)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1mclawctl[0m — Multi-instance OpenClaw manager
+
+Usage: clawctl <command> [args...]
+
+[1mGetting Started:[0m
+  setup                      Guided interactive onboarding
+  init                       First-run setup (creates dirs, security, deps)
+  doctor                     Check Docker, image, disk, tools
+
+[1mLifecycle:[0m
+  create <name>              Create a new instance
+  create <group>/<name>      Create instance in a group
+  create <name> --from=<src> Create from template (copies config)
+  create <g>/<n> --role=manager|worker  Assign role
+  start <name>               Start an instance
+  stop <name>                Stop an instance
+  restart <name>             Restart an instance
+  remove <name> [--purge]    Remove (--purge deletes all data)
+
+[1mInfo:[0m
+  (help has 130 lines / 0
+0 sections)
+
+[1m# B4-B9 — clawctl help setup[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1msetup[0m
+
+Getting Started with clawctl
+
+  The fastest way to get running:
+
+    clawctl setup         Guided interactive onboarding (recommended)
+    clawctl init          Manual setup (creates dirs, policy, access)
+    clawctl doctor        Verify environment is ready
+
+  After setup, manage your agents:
+
+    clawctl list          See all agents
+    clawctl start <name>  Start an agent
+    clawctl dashboard     Live status view
+
+[1m# B4-B9 — clawctl help security[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1msecurity[0m
+
+Security Guide
+
+  clawctl ships with secure defaults. On init/setup, it creates:
+
+    policy.json     Admin security policy (bind modes, limits, DM pairing)
+    .access.json    Role-based access control (admin/operator/user)
+    .audit.log      Command audit trail (when policy.auditLog = true)
+
+  Key commands:
+
+    clawctl policy show              Show current policy
+    clawctl policy validate          Check all instances against policy
+    clawctl policy enforce --restart Fix violations and restart affected
+
+[1m# B4-B9 — clawctl help channels[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1mchannels[0m
+
+Channel Guide
+
+  Get bot tokens:
+
+    Telegram   t.me/BotFather                         (~2 min)
+    Discord    discord.com/developers/applications     (~5 min)
+    Slack      api.slack.com/apps                      (~10 min)
+    WhatsApp   No token needed (QR scan)               (~5 min)
+    Signal     Needs signal-cli + phone number         (~5 min)
+
+  Full step-by-step guides: see channels-guide.html
+
+  Connect to an agent:
+
+[1m# B4-B9 — clawctl help groups[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1mgroups[0m
+
+Groups & Teams Guide
+
+  Groups organize agents into teams with shared resources:
+
+    clawctl group create <name>        Create a group
+    clawctl group list                 List all groups
+    clawctl group shared <name> --all  Enable shared skills + workspace
+
+  Create agents in a group:
+
+    clawctl create <group>/<name>              Auto-shares resources
+    clawctl create team/lead --role=manager    Assign manager role
+    clawctl create team/dev1 --role=worker     Assign worker role
+
+[1m# B4-B9 — clawctl help commands[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[1mcommands[0m
+
+Command Quick Reference
+
+  setup                 Guided onboarding (recommended for new users)
+  create <name>         Create an agent (supports --auth=, --telegram=, etc.)
+  start/stop <name>     Start or stop an agent
+  list                  List all agents
+  status                System overview (health + policy + access)
+  team create <name>    Create a team with shared resources
+  channel add <n> <ch>  Connect a messaging channel
+  policy show           View security policy
+  audit                 Run security audit
+  doctor                Check environment health
+
+
+[1m# B4-B9 — clawctl help bogus[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+Unknown help topic: bogus
+
+Available topics:
+  setup      Getting started guide
+  security   Security and policy guide
+  channels   Messaging channel guide
+  groups     Groups and teams guide
+  commands   Full command reference
+
+Or get help for any command:
+  clawctl <command> --help
+
+[1m# B10 — clawctl create --help[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+Usage: clawctl create <name|group/name> [options]
+
+Create a new OpenClaw instance.
+
+Arguments:
+  <name>              Instance name (lowercase, letters/numbers/hyphens)
+  <group/name>        Create instance inside an existing group
+
+Options:
+  --from=<instance>   Copy config from an existing instance (template)
+  --role=manager      Assign manager role (group only)
+  --role=worker       Assign worker role (group only)
+  --manager=<name>    Specify manager instance for this worker
+  --shared-skills     Mount shared skills directory
+  --shared-workspace  Mount shared workspace directory
+  --shared-hooks      Mount shared hooks directory
+  --shared            Enable shared skills + workspace
+  --no-shared-workspace  Disable default group workspace sharing
+  --bind=<mode>       Network binding: loopback (default, local only), lan, wan
+  --image=<image>     Docker image (default: openclaw:local)
+  --auth=codex        Chain Codex OAuth after creation
+  --telegram=<token>  Chain Telegram channel add after creation
+  --discord=<token>   Chain Discord channel add after creation
+  --slack-bot=<token> Chain Slack channel add (use with --slack-app=<token>)
+
+
+[1m# C1 — clawctl init[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl init[0m
+[1mclawctl init[0m — setting up environment
+
+[0;32m==> Creating /tmp/clawctl-dogfood-XzY6Kj...[0m
+  /tmp/clawctl-dogfood-XzY6Kj
+  shared/skills/
+  shared/workspace/
+  .port-registry
+
+[0;32m==> Copied docker-compose.yml from /tmp/docker-compose.yml[0m
+[0;32m==> Created defaults.json skeleton[0m
+[0;32m==> Created policy.json (secure defaults: loopback-only, DM pairing, audit on)[0m
+[0;32m==> Created .access.json (admin: ubuntu)[0m
+
+[0;32m==> Checking Docker...[0m
+  Docker v29.3.0 — running
+  Image openclaw:local — found
+
+[0;32m==> Init complete. Security policy and access control are configured.[0m
+
+  Next steps:
+    clawctl setup               # guided team setup (recommended)
+    clawctl create <name>       # create an instance manually
+    clawctl doctor              # diagnose any remaining issues
+    clawctl policy show          # review security policy
+[0;90m  (exit=0)[0m
+
+[1m# C1 — verify announced files exist[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+  OK   .port-registry
+  OK   defaults.json
+  OK   policy.json
+  OK   .access.json
+  OK   shared/skills
+  OK   shared/workspace
+
+[1m# C2 — clawctl doctor[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl doctor[0m
+[1mclawctl doctor[0m — checking environment
+
+  [[0;32mOK[0m] Docker             running (v29.3.0)
+  [[0;32mOK[0m] Docker Compose     v5.1.0
+  [[0;32mOK[0m] OPENCLAW_ROOT      /tmp/clawctl-dogfood-XzY6Kj
+  [[0;32mOK[0m] Compose template   /tmp/clawctl-dogfood-XzY6Kj/docker-compose.yml
+  [[0;32mOK[0m] OpenClaw image     openclaw:local (sha256:733bebad4a8a)
+  [[0;32mOK[0m] Disk space         73.4 GB free
+  [[0;32mOK[0m] Instances          0 / 8 (max)
+  [[0;32mOK[0m] rclone             not installed — for S3 storage sync (optional)
+  [[0;32mOK[0m] aws                not installed — for S3 storage setup (optional)
+  [[0;32mOK[0m] mount-s3           not installed — for S3 FUSE mount (optional)
+  [[0;32mOK[0m] caddy              not installed — for reverse proxy (optional)
+
+[1m11 passed, 0 warnings, 0 errors[0m
+[0;90m  (exit=0)[0m
+
+[1m# C3 — clawctl policy show[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl policy show[0m
+{
+  "allowedBindModes": [
+    "loopback"
+  ],
+  "maxInstances": 8,
+  "memoryLimitMB": 2048,
+  "cpuLimit": 2,
+  "requireDmPairing": true,
+  "requireOutboundAllowlist": true,
+  "allowedImages": [
+    "openclaw:*"
+  ],
+  "auditLog": true
+}
+[0;90m  (exit=0)[0m
+
+[1m# C4 — clawctl access show[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl access show[0m
+{
+  "roles": {
+    "admin": {
+      "users": [
+        "ubuntu"
+      ],
+      "commands": [
+        "*"
+      ]
+    },
+    "operator": {
+      "users": [],
+      "commands": [
+        "start",
+        "stop",
+        "restart",
+        "logs",
+        "exec",
+        "health",
+        "status",
+        "list",
+        "dashboard",
+        "activity",
+        "stats",
+        "config show",
+        "channel status",
+        "tunnel",
+        "backup"
+      ]
+    },
+    "user": {
+      "users": [],
+      "commands": [
+        "status",
+        "health",
+        "logs",
+        "list"
+      ]
+    }
+  }
+}
+[0;90m  (exit=0)[0m
+
+[1m# C5 — clawctl status (empty system)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl status[0m
+No instances registered. Run: clawctl setup
+[0;90m  (exit=0)[0m
+
+[1m# C6 — clawctl init (idempotent)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl init[0m
+[1mclawctl init[0m — setting up environment
+
+[0;32m==> Creating /tmp/clawctl-dogfood-XzY6Kj...[0m
+  /tmp/clawctl-dogfood-XzY6Kj
+  shared/skills/
+  shared/workspace/
+  .port-registry
+
+  docker-compose.yml already present
+  policy.json already present
+  .access.json already present
+
+[0;32m==> Checking Docker...[0m
+  Docker v29.3.0 — running
+  Image openclaw:local — found
+
+[0;32m==> Init complete. Security policy and access control are configured.[0m
+
+  Next steps:
+    clawctl setup               # guided team setup (recommended)
+    clawctl create <name>       # create an instance manually
+    clawctl doctor              # diagnose any remaining issues
+    clawctl policy show          # review security policy
+[0;90m  (exit=0)[0m
+
+[1m# D1 — clawctl create alpha[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create alpha[0m
+[0;32m==> Creating instance 'alpha'...[0m
+  Index:     0
+  Gateway:   :29789
+  Bridge:    :29790
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/alpha
+
+[0;33m==> WARNING: sandbox is not enabled — agent can read/write files and run commands freely[0m
+  Enable: clawctl config set alpha agents.defaults.sandbox true
+[0;32m==> Instance 'alpha' created.[0m
+  (merged global defaults)
+
+  Next steps:
+    clawctl auth alpha codex              # add OpenAI Codex auth
+    clawctl auth alpha apikey openai <key> # or add an API key
+    clawctl start alpha                    # start the instance
+
+  SSH tunnel:
+    ssh -N -L 29789:127.0.0.1:29789 ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# D2 — clawctl create bravo[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create bravo[0m
+[0;32m==> Creating instance 'bravo'...[0m
+  Index:     1
+  Gateway:   :29889
+  Bridge:    :29890
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/bravo
+
+[0;33m==> WARNING: sandbox is not enabled — agent can read/write files and run commands freely[0m
+  Enable: clawctl config set bravo agents.defaults.sandbox true
+[0;32m==> Instance 'bravo' created.[0m
+  (merged global defaults)
+
+  Next steps:
+    clawctl auth bravo codex              # add OpenAI Codex auth
+    clawctl auth bravo apikey openai <key> # or add an API key
+    clawctl start bravo                    # start the instance
+
+  SSH tunnel:
+    ssh -N -L 29889:127.0.0.1:29889 ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# D3 — clawctl list[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl list[0m
+[1mNAME            PORT     STATUS       RAM        UPTIME[0m
+─────────────── ──────── ──────────── ────────── ──────────
+alpha           :29789   created                —          —
+bravo           :29889   created                —          —
+[0;90m  (exit=0)[0m
+
+[1m# D4 — clawctl list --json[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl list --json[0m
+[
+  {
+    "name": "alpha",
+    "port": "29789",
+    "status": "created",
+    "ram": "—",
+    "uptime": "—"
+  },
+  {
+    "name": "bravo",
+    "port": "29889",
+    "status": "created",
+    "ram": "—",
+    "uptime": "—"
+  }
+]
+[0;90m  (exit=0)[0m
+
+[1m# D5 — clawctl status alpha[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl status alpha[0m
+[1mInstance: alpha[0m
+  Created:    2026-05-20 03:45:48 UTC
+  Directory:  /tmp/clawctl-dogfood-XzY6Kj/alpha
+  Gateway:    :29789
+  Token:      d123dd5c...560531c5
+  Config:     /tmp/clawctl-dogfood-XzY6Kj/alpha/openclaw.json
+  Workspace:  /tmp/clawctl-dogfood-XzY6Kj/alpha/workspace/
+
+[1mContainer:[0m
+NAME      IMAGE     COMMAND   SERVICE   CREATED   STATUS    PORTS
+[0;90m  (exit=0)[0m
+
+[1m# D6 — clawctl status alpha --json[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl status alpha --json[0m
+{
+  "config": "/tmp/clawctl-dogfood-XzY6Kj/alpha/openclaw.json",
+  "created": "2026-05-20 03:45:48 UTC",
+  "directory": "/tmp/clawctl-dogfood-XzY6Kj/alpha",
+  "name": "alpha",
+  "port": "29789",
+  "token": "d123dd5c...560531c5",
+  "workspace": "/tmp/clawctl-dogfood-XzY6Kj/alpha/workspace"
+}
+[0;90m  (exit=0)[0m
+
+[1m# D7 — clawctl status (overview)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl status[0m
+[1mInstances (2)[0m
+
+  NAME                 PORT     HEALTH       DETAILS
+  ──────────────────── ──────── ──────────── ──────────────────
+  alpha                29789    [0;31mdown        [0m container down
+  bravo                29889    [0;31mdown        [0m container down
+
+  [0;32m0 healthy[0m, [0;31m2 down[0m
+
+[1mPolicy:[0m [0;32m✓ all instances compliant[0m
+[1mAudit:[0m  enabled
+[1mAccess:[0m configured
+
+[0;90m  (exit=0)[0m
+
+[1m# D8 — clawctl health alpha (expect down)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl health alpha[0m
+[1mNAME            PORT     VERDICT      LIVE       DETAILS[0m
+─────────────── ──────── ──────────── ────────── ──────────────────────
+alpha           :29789   [0;31mdown        [0m —                  not created or removed
+[0;90m  (exit=0)[0m
+
+[1m# D9 — clawctl health --json[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl health --json[0m
+[
+  {
+    "name": "alpha",
+    "port": "29789",
+    "verdict": "down",
+    "live": false,
+    "ready": false
+  },
+  {
+    "name": "bravo",
+    "port": "29889",
+    "verdict": "down",
+    "live": false,
+    "ready": false
+  }
+]
+[0;90m  (exit=0)[0m
+
+[1m# D10 — clawctl tunnel[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl tunnel[0m
+ssh -N \
+  -L 29789:127.0.0.1:29789 \
+  -L 29889:127.0.0.1:29889 \
+  ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# D11 — clawctl config show alpha (--no-secrets)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl config show alpha --no-secrets[0m
+{
+  "agents": {
+    "defaults": {}
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "d123***31c5"
+    },
+    "bind": "lan",
+    "mode": "local",
+    "port": 29789
+  },
+  "tools": {
+    "profile": "coding"
+  }
+}
+[0;90m  (exit=0)[0m
+
+[1m# D12 — clawctl config get alpha gateway.port[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl config get alpha gateway.port[0m
+29789
+[0;90m  (exit=0)[0m
+
+[1m# D13 — clawctl config set alpha tools.profile messaging[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl config set alpha tools.profile "messaging"[0m
+[0;32m==> Set tools.profile = messaging[0m
+  Restart to apply: clawctl restart alpha
+[0;90m  (exit=0)[0m
+
+[1m# D14 — clawctl token show alpha[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl token show alpha[0m
+d123dd5c...560531c5
+  Use --full to show the complete token
+[0;90m  (exit=0)[0m
+
+[1m# D15 — clawctl remove alpha (no purge)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl remove alpha[0m
+[0;32m==> Instance 'alpha' removed (data kept at /tmp/clawctl-dogfood-XzY6Kj/alpha).[0m
+  To delete data: rm -rf /tmp/clawctl-dogfood-XzY6Kj/alpha
+[0;90m  (exit=0)[0m
+  (data should still exist under /tmp/clawctl-dogfood-XzY6Kj/alpha)
+agents
+canvas
+credentials
+identity
+instance.env
+
+[1m# D16 — clawctl remove bravo --purge --yes[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl remove bravo --purge --yes[0m
+[0;33m==> WARNING: Purging all data for 'bravo' (config, credentials, workspace)...[0m
+[0;32m==> Instance 'bravo' purged.[0m
+[0;90m  (exit=0)[0m
+  OK: bravo dir gone
+
+[1m# D17 — port registry should be empty[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+
+[1m# E1 — clawctl team create research[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl team create research[0m
+[0;32m==> Group 'research' created.[0m
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/research
+  Shared:    /tmp/clawctl-dogfood-XzY6Kj/research/shared/
+
+  Add instances: clawctl create research/<name>
+[0;32m==> Shared resources enabled (skills, workspace, hooks, tasks)[0m
+
+  Add agents: clawctl create research/<name>
+[0;90m  (exit=0)[0m
+
+[1m# E2 — clawctl create research/sarah[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create research/sarah[0m
+[0;32m==> Creating instance 'research/sarah'...[0m
+  Index:     0
+  Gateway:   :29789
+  Bridge:    :29790
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/research/sarah
+  Group:     research
+
+[0;33m==> WARNING: sandbox is not enabled — agent can read/write files and run commands freely[0m
+  Enable: clawctl config set research/sarah agents.defaults.sandbox true
+[0;32m==> Instance 'research/sarah' created.[0m
+  (merged global defaults)
+
+  Next steps:
+    clawctl auth research/sarah codex              # add OpenAI Codex auth
+    clawctl auth research/sarah apikey openai <key> # or add an API key
+    clawctl start research/sarah                    # start the instance
+
+  SSH tunnel:
+    ssh -N -L 29789:127.0.0.1:29789 ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# E3 — clawctl create research/lead --role=manager[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create research/lead --role=manager[0m
+[0;32m==> Creating instance 'research/lead'...[0m
+  Index:     1
+  Gateway:   :29889
+  Bridge:    :29890
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/research/lead
+  Group:     research
+  Role:      manager
+
+[0;33m==> WARNING: sandbox is not enabled — agent can read/write files and run commands freely[0m
+  Enable: clawctl config set research/lead agents.defaults.sandbox true
+[0;32m==> Instance 'research/lead' created.[0m
+  (merged global defaults)
+  (role: manager)
+
+  Next steps:
+    clawctl auth research/lead codex              # add OpenAI Codex auth
+    clawctl auth research/lead apikey openai <key> # or add an API key
+    clawctl start research/lead                    # start the instance
+
+  SSH tunnel:
+    ssh -N -L 29889:127.0.0.1:29889 ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# E4 — clawctl create research/dev1 --role=worker --manager=lead[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create research/dev1 --role=worker --manager=lead[0m
+[0;32m==> Creating instance 'research/dev1'...[0m
+  Index:     2
+  Gateway:   :29989
+  Bridge:    :29990
+  Directory: /tmp/clawctl-dogfood-XzY6Kj/research/dev1
+  Group:     research
+  Role:      worker
+
+[0;33m==> WARNING: sandbox is not enabled — agent can read/write files and run commands freely[0m
+  Enable: clawctl config set research/dev1 agents.defaults.sandbox true
+[0;32m==> Instance 'research/dev1' created.[0m
+  (merged global defaults)
+  (role: worker)
+
+  Next steps:
+    clawctl auth research/dev1 codex              # add OpenAI Codex auth
+    clawctl auth research/dev1 apikey openai <key> # or add an API key
+    clawctl start research/dev1                    # start the instance
+
+  SSH tunnel:
+    ssh -N -L 29989:127.0.0.1:29989 ubuntu@<server>
+[0;90m  (exit=0)[0m
+
+[1m# E5 — re-inspect lead's override (should now mount dev1's workspace)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+# Auto-generated by clawctl — do not edit manually
+services:
+  openclaw-gateway:
+    environment:
+      OPENCLAW_BUNDLED_SKILLS_DIR: /home/node/.openclaw/bundled-skills
+    volumes:
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/skills:/home/node/.openclaw/bundled-skills:ro"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/workspace:/home/node/.openclaw/shared:rw"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/hooks:/home/node/.openclaw/shared-hooks:ro"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/tasks:/home/node/.openclaw/tasks:rw"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/output:/home/node/.openclaw/output:rw"
+  openclaw-cli:
+    volumes:
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/skills:/home/node/.openclaw/bundled-skills:ro"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/workspace:/home/node/.openclaw/shared:rw"
+      - "/tmp/clawctl-dogfood-XzY6Kj/research/shared/hooks:/home/node/.openclaw/shared-hooks:ro"
+
+[1m# E6 — clawctl group list[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl group list[0m
+[1mGROUP           MEMBERS    DIRECTORY[0m
+─────────────── ────────── ──────────────────────
+research        3          /tmp/clawctl-dogfood-XzY6Kj/research
+[0;90m  (exit=0)[0m
+
+[1m# E7 — clawctl group role research/dev1 none[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl group role research/dev1 none[0m
+[0;32m==> Role set: research/dev1 → none[0m
+[0;90m  (exit=0)[0m
+
+[1m# E8 — worker outside group should fail[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create standalone-worker --role=worker  (expect failure)[0m
+[0;31m==> ERROR: workers must be in a group — use: clawctl create <group>/standalone-worker --role=worker[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# E9 — instance in nonexistent group should fail[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create nonexistent/foo  (expect failure)[0m
+[0;31m==> ERROR: group 'nonexistent' does not exist — create it first: clawctl group create nonexistent[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# F1 — clawctl task create research[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;32m==> Task created: 349d4fc64547b504[0m
+  Group:   research
+  Title:   review the docs
+  Status:  pending
+  File:    /tmp/clawctl-dogfood-XzY6Kj/research/shared/tasks/pending/349d4fc64547b504.json
+  (parsed task id: 349d4fc64547b504)
+
+[1m# F2 — clawctl task list research[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl task list research[0m
+[1mID                 STATUS     ASSIGNED        TITLE                                   [0m
+────────────────── ────────── ─────────────── ────────────────────────────────────────
+349d4fc64547b504   [0;33mpending   [0m —               review the docs                         
+[0;90m  (exit=0)[0m
+
+[1m# F3 — clawctl task claim[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl task claim research 349d4fc64547b504 --by=dev1[0m
+[0;32m==> Task 349d4fc64547b504 claimed by dev1.[0m
+[0;90m  (exit=0)[0m
+
+[1m# F4 — clawctl task list --status=claimed[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl task list research --status=claimed[0m
+[1mID                 STATUS     ASSIGNED        TITLE                                   [0m
+────────────────── ────────── ─────────────── ────────────────────────────────────────
+349d4fc64547b504   [0;36mclaimed   [0m dev1            review the docs                         
+[0;90m  (exit=0)[0m
+
+[1m# F5 — clawctl task complete[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl task complete research 349d4fc64547b504 --result=done[0m
+[0;32m==> Task 349d4fc64547b504 completed.[0m
+[0;90m  (exit=0)[0m
+
+[1m# F6 — clawctl task status[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl task status research 349d4fc64547b504[0m
+[1mTask: 349d4fc64547b504[0m
+  Title:       review the docs
+  Status:      done
+  Created by:  cli
+  Created at:  2026-05-20T03:45:51Z
+  Claimed by:  dev1
+  Claimed at:  2026-05-20T03:45:51Z
+  Completed:   2026-05-20T03:45:51Z
+  Result:      done
+[0;90m  (exit=0)[0m
+
+[1m# G1 — clawctl channel add research/sarah telegram --token=test:abc[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel add research/sarah telegram --token=test:abc[0m
+[0;32m==> Configuring telegram on 'research/sarah'...[0m
+
+[0;32m==> Channel 'telegram' configured on 'research/sarah'.[0m
+
+  Next step:
+    1. Message the bot on telegram
+    2. It will reply with a pairing code
+    3. Run: clawctl approve research/sarah telegram <CODE>
+
+  Outbound messaging is OFF by default. To enable:
+    clawctl channel send research/sarah telegram --enable
+
+[0;90m  (exit=0)[0m
+
+[1m# G2 — clawctl channel status research/sarah[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel status research/sarah[0m
+[1mChannels for 'research/sarah':[0m
+
+  telegram        [0;32menabled[0m  (dm: pairing)
+[0;90m  (exit=0)[0m
+
+[1m# G3 — clawctl channel security research/sarah telegram[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel security research/sarah telegram[0m
+[1mSecurity posture for 'research/sarah':[0m
+
+  [1mtelegram[0m
+    dm-policy:     pairing
+    group-policy:  allowlist
+    allow-from:    [0;33m(none)[0m
+    [1mactions:[0m
+      deleteMessage      [0;31mOFF[0m
+      poll               [0;31mOFF[0m
+      reactions          [0;32mON[0m
+      sendMessage        [0;31mOFF[0m
+      sticker            [0;32mON[0m
+
+[0;90m  (exit=0)[0m
+
+[1m# G4 — clawctl channel allow research/sarah telegram 123456[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel allow research/sarah telegram 123456[0m
+[0;32m==> Added 1 contact(s) to telegram allowFrom on 'research/sarah'. Total: 1.[0m
+  Restart to apply: clawctl restart research/sarah
+[0;90m  (exit=0)[0m
+
+[1m# G5 — clawctl channel send research/sarah telegram --enable[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel send research/sarah telegram --enable[0m
+[0;32m==> Outbound messaging ENABLED for telegram on 'research/sarah'.[0m
+  Restart to apply: clawctl restart research/sarah
+[0;90m  (exit=0)[0m
+
+[1m# G6 — clawctl channel deny research/sarah telegram 123456[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel deny research/sarah telegram 123456[0m
+[0;32m==> Removed '123456' from telegram allowFrom on 'research/sarah'. Remaining: 0.[0m
+  Restart to apply: clawctl restart research/sarah
+[0;90m  (exit=0)[0m
+
+[1m# G7 — clawctl channel remove research/sarah telegram[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl channel remove research/sarah telegram[0m
+[0;32m==> Channel 'telegram' disabled on 'research/sarah'.[0m
+[0;90m  (exit=0)[0m
+
+[1m# H1 — clawctl policy validate[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl policy validate[0m
+[1mPolicy validation[0m
+
+  [1mresearch/sarah      [0m [0;32m✓[0m
+  [1mresearch/lead       [0m [0;32m✓[0m
+  [1mresearch/dev1       [0m [0;32m✓[0m
+
+[0;32m==> All instances comply with policy.[0m
+[0;90m  (exit=0)[0m
+
+[1m# H2 — bind=wan should be rejected by policy[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create exposed --bind=wan  (expect failure)[0m
+[0;31m==> ERROR: policy violation: bind mode 'wan' not allowed (allowed: loopback)[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# H3 — disallowed image should be rejected[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create badimg --image=evil/foo:latest  (expect failure)[0m
+[0;31m==> ERROR: policy violation: image 'evil/foo:latest' not allowed (allowed: openclaw:*)[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# H4 — clawctl access show[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl access show[0m
+{
+  "roles": {
+    "admin": {
+      "users": [
+        "ubuntu"
+      ],
+      "commands": [
+        "*"
+      ]
+    },
+    "operator": {
+      "users": [],
+      "commands": [
+        "start",
+        "stop",
+        "restart",
+        "logs",
+        "exec",
+        "health",
+        "status",
+        "list",
+        "dashboard",
+        "activity",
+        "stats",
+        "config show",
+        "channel status",
+        "tunnel",
+        "backup"
+      ]
+    },
+    "user": {
+      "users": [],
+      "commands": [
+        "status",
+        "health",
+        "logs",
+        "list"
+      ]
+    }
+  }
+}
+[0;90m  (exit=0)[0m
+
+[1m# H5 — clawctl access grant deploy-bot operator[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl access grant deploy-bot operator[0m
+[0;32m==> Granted 'deploy-bot' → operator[0m
+[0;90m  (exit=0)[0m
+
+[1m# H6 — clawctl access audit --since=24h (this session)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl access audit --since=24h[0m
+[1mAudit log (last 24h0m0s)[0m
+
+  2026-05-20T03:45:47Z  ubuntu      init        ok      
+  2026-05-20T03:45:48Z  ubuntu      doctor      ok      
+  2026-05-20T03:45:48Z  ubuntu      policy      ok      show
+  2026-05-20T03:45:48Z  ubuntu      access      ok      show
+  2026-05-20T03:45:48Z  ubuntu      status      ok      
+  2026-05-20T03:45:48Z  ubuntu      init        ok      
+  2026-05-20T03:45:48Z  ubuntu      create      ok      alpha
+  2026-05-20T03:45:48Z  ubuntu      create      ok      bravo
+  2026-05-20T03:45:49Z  ubuntu      list        ok      
+  2026-05-20T03:45:49Z  ubuntu      list        ok      --json
+  2026-05-20T03:45:49Z  ubuntu      status      ok      alpha
+  2026-05-20T03:45:49Z  ubuntu      status      ok      alpha --json
+  2026-05-20T03:45:50Z  ubuntu      status      ok      
+  2026-05-20T03:45:50Z  ubuntu      health      ok      alpha
+  2026-05-20T03:45:50Z  ubuntu      health      ok      --json
+  2026-05-20T03:45:50Z  ubuntu      tunnel      ok      
+  2026-05-20T03:45:50Z  ubuntu      config      ok      show alpha --no-secrets
+  2026-05-20T03:45:50Z  ubuntu      config      ok      get alpha gateway.port
+  2026-05-20T03:45:51Z  ubuntu      config      ok      set alpha tools.profile "messaging"
+  2026-05-20T03:45:51Z  ubuntu      token       ok      show alpha
+  2026-05-20T03:45:51Z  ubuntu      remove      ok      alpha
+  2026-05-20T03:45:51Z  ubuntu      remove      ok      bravo --purge --yes
+  2026-05-20T03:45:51Z  ubuntu      team        ok      create research
+  2026-05-20T03:45:51Z  ubuntu      create      ok      research/sarah
+  2026-05-20T03:45:51Z  ubuntu      create      ok      research/lead --role=manager
+  2026-05-20T03:45:51Z  ubuntu      create      ok      research/dev1 --role=worker --manager=lead
+  2026-05-20T03:45:51Z  ubuntu      group       ok      list
+  2026-05-20T03:45:51Z  ubuntu      group       ok      role research/dev1 none
+  2026-05-20T03:45:51Z  ubuntu      create      error   standalone-worker --role=worker
+  2026-05-20T03:45:51Z  ubuntu      create      error   nonexistent/foo
+  2026-05-20T03:45:51Z  ubuntu      task        ok      create research review the docs
+  2026-05-20T03:45:51Z  ubuntu      task        ok      list research
+  2026-05-20T03:45:51Z  ubuntu      task        ok      claim research 349d4fc64547b504 --by=dev1
+  2026-05-20T03:45:51Z  ubuntu      task        ok      list research --status=claimed
+  2026-05-20T03:45:51Z  ubuntu      task        ok      complete research 349d4fc64547b504 --result=done
+  2026-05-20T03:45:51Z  ubuntu      task        ok      status research 349d4fc64547b504
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      add research/sarah telegram --token=test:abc
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      status research/sarah
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      security research/sarah telegram
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      allow research/sarah telegram 123456
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      send research/sarah telegram --enable
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      deny research/sarah telegram 123456
+  2026-05-20T03:45:51Z  ubuntu      channel     ok      remove research/sarah telegram
+  2026-05-20T03:45:51Z  ubuntu      policy      ok      validate
+  2026-05-20T03:45:51Z  ubuntu      create      error   exposed --bind=wan
+  2026-05-20T03:45:51Z  ubuntu      create      error   badimg --image=evil/foo:latest
+  2026-05-20T03:45:51Z  ubuntu      access      ok      show
+  2026-05-20T03:45:51Z  ubuntu      access      ok      grant deploy-bot operator
+[0;90m  (exit=0)[0m
+
+[1m# H7 — clawctl audit (security-audit.sh fallback)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl audit[0m
+[1mclawctl security audit[0m
+Root: /tmp/clawctl-dogfood-XzY6Kj
+Date: 2026-05-20T03:45:51Z
+
+[1m1. Secret File Protection[0m
+   [0;90mYour instance.env files contain gateway tokens (passwords).[0m
+   [0;90mIf other users on this server can read them, they can control your agents.[0m
+
+  [[0;32mPASS[0m] alpha — only you can read the config
+  [[0;32mPASS[0m] research/dev1 — only you can read the config
+  [[0;32mPASS[0m] research/lead — only you can read the config
+  [[0;32mPASS[0m] research/sarah — only you can read the config
+  [[0;32mPASS[0m] Port registry protected
+  [[0;32mPASS[0m] All channel credentials protected (WhatsApp keys, Telegram tokens, etc.)
+
+[1m2. Network Exposure[0m
+   [0;90mYour agents have web interfaces. If they're accessible from the internet,[0m
+   [0;90manyone who finds the port can see the control panel.[0m
+
+  [[0;32mPASS[0m] research/sarah (:29789) only accessible locally (via SSH tunnel)
+  [[0;32mPASS[0m] research/lead (:29889) only accessible locally (via SSH tunnel)
+  [[0;32mPASS[0m] research/dev1 (:29989) only accessible locally (via SSH tunnel)
+
+[1m3. Container Isolation[0m
+   [0;90mEach agent runs in a Docker container. These checks ensure a compromised[0m
+   [0;90magent can't escape to your server or affect other agents.[0m
+
+  [1mbob[0m
+  [[0;32mPASS[0m]   Runs as regular user (not root)
+  [[0;32mPASS[0m]   No special system access
+  [[0;32mPASS[0m]   System capabilities restricted
+  [[0;32mPASS[0m]   Cannot escalate privileges
+  [[0;32mPASS[0m]   Memory limited to 2048MB
+  [[0;32mPASS[0m]   No Docker access (isolated)
+  [[0;32mPASS[0m]   Stable (0 restarts)
+  [1mteam1-ben[0m
+  [[0;32mPASS[0m]   Runs as regular user (not root)
+  [[0;32mPASS[0m]   No special system access
+  [[0;32mPASS[0m]   System capabilities restricted
+  [[0;32mPASS[0m]   Cannot escalate privileges
+  [[0;32mPASS[0m]   Memory limited to 2048MB
+  [[0;32mPASS[0m]   No Docker access (isolated)
+  [[0;32mPASS[0m]   Stable (0 restarts)
+  [1mteam-lead[0m
+  [[0;32mPASS[0m]   Runs as regular user (not root)
+  [[0;32mPASS[0m]   No special system access
+  [[0;32mPASS[0m]   System capabilities restricted
+  [[0;32mPASS[0m]   Cannot escalate privileges
+  [[0;32mPASS[0m]   Memory limited to 2048MB
+  [[0;32mPASS[0m]   No Docker access (isolated)
+  [[0;32mPASS[0m]   Stable (0 restarts)
+  [1mteam-sarah[0m
+  [[0;32mPASS[0m]   Runs as regular user (not root)
+  [[0;32mPASS[0m]   No special system access
+  [[0;32mPASS[0m]   System capabilities restricted
+  [[0;32mPASS[0m]   Cannot escalate privileges
+  [[0;32mPASS[0m]   Memory limited to 2048MB
+  [[0;32mPASS[0m]   No Docker access (isolated)
+  [[0;32mPASS[0m]   Stable (0 restarts)
+  [1mteam-john[0m
+  [[0;32mPASS[0m]   Runs as regular user (not root)
+  [[0;32mPASS[0m]   No special system access
+  [[0;32mPASS[0m]   System capabilities restricted
+  [[0;32mPASS[0m]   Cannot escalate privileges
+  [[0;32mPASS[0m]   Memory limited to 2048MB
+  [[0;32mPASS[0m]   No Docker access (isolated)
+  [[0;32mPASS[0m]   Stable (0 restarts)
+
+[1m4. Agent Authentication[0m
+   [0;90mEach agent has a web interface. These checks ensure only you can control it.[0m
+
+  [[0;32mPASS[0m] research/sarah — strong authentication token set
+  [[0;32mPASS[0m] research/lead — strong authentication token set
+  [[0;32mPASS[0m] research/dev1 — strong authentication token set
+
+[1m5. Agent Permissions[0m
+   [0;90mAgents can run tools (file access, commands, web browsing).[0m
+   [0;90mThese checks ensure agents aren't given more power than they need.[0m
+
+  [[0;33mWARN[0m] alpha — agent can run commands directly on the server
+         [0;90m→ Without sandbox mode, the agent can read/write files and run commands[0m
+         [0;90m→ as the container user. If someone tricks the agent with a bad prompt,[0m
+         [0;90m→ it could do unintended things.[0m
+         [0;90m→ Enable sandbox: clawctl config set alpha agents.defaults.sandbox true[0m
+  [[0;32mPASS[0m] alpha — tool access restricted to 'messaging' profile
+  [[0;33mWARN[0m] research/dev1 — agent can run commands directly on the server
+         [0;90m→ Without sandbox mode, the agent can read/write files and run commands[0m
+         [0;90m→ as the container user. If someone tricks the agent with a bad prompt,[0m
+         [0;90m→ it could do unintended things.[0m
+         [0;90m→ Enable sandbox: clawctl config set research/dev1 agents.defaults.sandbox true[0m
+  [[0;32mPASS[0m] research/dev1 — tool access restricted to 'coding' profile
+  [[0;33mWARN[0m] research/lead — agent can run commands directly on the server
+         [0;90m→ Without sandbox mode, the agent can read/write files and run commands[0m
+         [0;90m→ as the container user. If someone tricks the agent with a bad prompt,[0m
+         [0;90m→ it could do unintended things.[0m
+         [0;90m→ Enable sandbox: clawctl config set research/lead agents.defaults.sandbox true[0m
+  [[0;32mPASS[0m] research/lead — tool access restricted to 'coding' profile
+  [[0;33mWARN[0m] research/sarah — agent can run commands directly on the server
+         [0;90m→ Without sandbox mode, the agent can read/write files and run commands[0m
+         [0;90m→ as the container user. If someone tricks the agent with a bad prompt,[0m
+         [0;90m→ it could do unintended things.[0m
+         [0;90m→ Enable sandbox: clawctl config set research/sarah agents.defaults.sandbox true[0m
+  [[0;32mPASS[0m] research/sarah — tool access restricted to 'coding' profile
+
+[1m6. Messaging Security[0m
+   [0;90mYour agents are connected to messaging apps. These checks ensure[0m
+   [0;90mstrangers can't message your agents and get responses.[0m
+
+
+[1m7. Docker Image[0m
+   [0;90mYour agents run from a Docker image. This checks it exists and is safe.[0m
+
+  [[0;32mPASS[0m] Image 'openclaw:local' found
+  [[0;32mPASS[0m] Image runs as non-root user 'node'
+
+[1mSUMMARY[0m
+
+  [0;32m53 passed[0m, [0;33m4 warnings[0m, [0;31m0 failures[0m
+
+  [0;33m4 item(s) to review for production use.[0m
+  [0;90mMost warnings clear after restarting with the hardened compose template.[0m
+  [0;90mRun: clawctl policy enforce --restart[0m
+[0;90m  (exit=0)[0m
+
+[1m# I1 — clawctl runtime list[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime list[0m
+[1mNAME            DESCRIPTION                    IMAGE                     CAPABILITIES[0m
+─────────────── ────────────────────────────── ───────────────────────── ─────────────────────
+openclaw        OpenClaw AI agent gateway      openclaw:local            channels auth tasks shared [0;32m (built-in)[0m
+[0;90m  (exit=0)[0m
+
+[1m# I2 — clawctl runtime show openclaw[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime show openclaw[0m
+[1mRuntime: openclaw[0m
+  Description:    OpenClaw AI agent gateway
+  Default Image:  openclaw:local
+  Gateway:        openclaw-gateway (port 18789)
+  CLI:            openclaw-cli
+  Health:         /healthz
+  Ready:          /readyz
+  Config:         openclaw.json
+  Container:      /home/node
+
+  [1mCapabilities:[0m
+    ✓ Channels
+    ✓ Pairing
+    ✓ Auth
+    ✓ Config Merging
+    ✓ Tasks
+    ✓ Shared Resources
+    ✓ Bridge Port
+[0;90m  (exit=0)[0m
+
+[1m# I3 — clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest[0m
+[0;32m==> Runtime 'nemoclaw' registered.[0m
+  Image:   nemoclaw:latest
+  Health:  /healthz
+  Config:  /tmp/clawctl-dogfood-XzY6Kj/runtimes/nemoclaw.json
+
+  Use: clawctl create <name> --runtime=nemoclaw
+
+  To customize further, edit the JSON file or provide a compose template:
+    cp docker-compose.yml /tmp/clawctl-dogfood-XzY6Kj/runtimes/nemoclaw-compose.yml
+[0;90m  (exit=0)[0m
+
+[1m# I4 — clawctl runtime show nemoclaw --json[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime show nemoclaw --json[0m
+{
+  "name": "nemoclaw",
+  "description": "Based on openclaw",
+  "version": "2026.3",
+  "defaultImage": "nemoclaw:latest",
+  "gatewayService": "openclaw-gateway",
+  "cliService": "openclaw-cli",
+  "composeFile": "docker-compose.yml",
+  "internalPort": 18789,
+  "bridgePort": 1,
+  "healthEndpoint": "/healthz",
+  "readyEndpoint": "/readyz",
+  "containerHome": "/home/node",
+  "containerConfigDir": "/home/node/.openclaw",
+  "containerWorkspace": "/home/node/.openclaw/workspace",
+  "mountSkills": "/home/node/.openclaw/bundled-skills",
+  "mountWorkspace": "/home/node/.openclaw/shared",
+  "mountHooks": "/home/node/.openclaw/shared-hooks",
+  "mountTasks": "/home/node/.openclaw/tasks",
+  "mountOutput": "/home/node/.openclaw/output",
+  "mountManager": "/home/node/.openclaw/manager",
+  "mountWorkers": "/home/node/.openclaw/workers",
+  "skillsEnvVar": "OPENCLAW_BUNDLED_SKILLS_DIR",
+  "projectPrefix": "openclaw",
+  "configFileName": "openclaw.json",
+  "configFormat": "json",
+  "supportsConfig": true,
+  "composeOverride": "docker-compose.override.yml",
+  "healthCheckType": "http",
+  "healthCheckTimeout": 2,
+  "healthCheckRetries": 15,
+  "channelAddCmd": [
+    "channels",
+    "add"
+  ],
+  "channelLoginCmd": [
+    "channels",
+    "login",
+    "--channel"
+  ],
+  "pairingCmd": [
+    "pairing",
+    "approve"
+  ],
+  "authCodexCmd": [
+    "models",
+    "auth",
+    "login",
+    "--provider",
+    "openai-codex",
+    "--set-default"
+  ],
+  "authApiKeyCmd": [
+    "onboard",
+    "--mode",
+    "headless"
+  ],
+  "configGetCmd": [
+    "config",
+    "get"
+  ],
+  "configSetCmd": [
+    "config",
+    "set"
+  ],
+  "capabilities": {
+    "channels": true,
+    "pairing": true,
+    "auth": true,
+    "config": true,
+    "tasks": true,
+    "shared": true,
+    "bridge": true
+  }
+}
+[0;90m  (exit=0)[0m
+
+[1m# I5 — clawctl runtime export nemoclaw[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+{
+  "runtime": {
+    "name": "nemoclaw",
+    "description": "Based on openclaw",
+    "version": "2026.3",
+    "defaultImage": "nemoclaw:latest",
+    "gatewayService": "openclaw-gateway",
+    "cliService": "openclaw-cli",
+    "composeFile": "docker-compose.yml",
+    "internalPort": 18789,
+    "bridgePort": 1,
+    "healthEndpoint": "/healthz",
+    "readyEndpoint": "/readyz",
+    "containerHome": "/home/node",
+    "containerConfigDir": "/home/node/.openclaw",
+    "containerWorkspace": "/home/node/.openclaw/workspace",
+    "mountSkills": "/home/node/.openclaw/bundled-skills",
+    "mountWorkspace": "/home/node/.openclaw/shared",
+    "mountHooks": "/home/node/.openclaw/shared-hooks",
+    "mountTasks": "/home/node/.openclaw/tasks",
+
+[1m# I6 — clawctl runtime init demo[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime init demo[0m
+[0;32m==> Runtime 'demo' scaffolded.[0m
+
+  Runtime definition: /tmp/clawctl-dogfood-XzY6Kj/runtimes/demo.json
+  Compose template:  /tmp/clawctl-dogfood-XzY6Kj/runtimes/demo-compose.yml
+
+  Next steps:
+    1. Edit the runtime JSON to match your agent's settings
+    2. Edit the compose template with your agent's start command
+    3. Test it: clawctl runtime test demo
+    4. Create an instance: clawctl create my-agent --runtime=demo
+[0;90m  (exit=0)[0m
+
+[1m# I7 — clawctl runtime remove nemoclaw[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime remove nemoclaw[0m
+[0;32m==> Runtime 'nemoclaw' removed.[0m
+[0;90m  (exit=0)[0m
+
+[1m# I8 — cannot remove built-in[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl runtime remove openclaw  (expect failure)[0m
+[0;31m==> ERROR: cannot remove built-in runtime 'openclaw'[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# J1-J3 — invalid names[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl create MyBot  (expect failure)[0m
+[0;31m==> ERROR: invalid name 'MyBot' — use lowercase letters, numbers, hyphens; must start with a letter[0m
+[0;90m  (exit=1 — expected)[0m
+[0;90m$ clawctl create shared  (expect failure)[0m
+[0;31m==> ERROR: 'shared' is reserved for shared resources[0m
+[0;90m  (exit=1 — expected)[0m
+[0;90m$ clawctl create 1bot  (expect failure)[0m
+[0;31m==> ERROR: invalid name '1bot' — use lowercase letters, numbers, hyphens; must start with a letter[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# J4-J5 — operations on missing instance[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl status nope  (expect failure)[0m
+[0;31m==> ERROR: instance 'nope' does not exist — run: clawctl create nope[0m
+[0;90m  (exit=1 — expected)[0m
+[0;90m$ clawctl remove nope  (expect failure)[0m
+[0;31m==> ERROR: instance 'nope' does not exist — run: clawctl create nope[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# J7 — group remove with members (no --purge)[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl group remove research  (expect failure)[0m
+[0;31m==> ERROR: group 'research' has 3 instances — use --purge to delete everything, or remove instances first[0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m# J8 — proxy setup without --domain[0m
+[0;90m  OPENCLAW_ROOT=/tmp/clawctl-dogfood-XzY6Kj[0m
+[0;90m$ clawctl proxy setup  (expect failure)[0m
+[0;31m==> ERROR: usage: clawctl proxy setup --domain=<domain> [--subdomain|--path] [--dry-run] [--no-auth][0m
+[0;90m  (exit=1 — expected)[0m
+
+[1m=== smoke complete ===[0m
+test root preserved at: /tmp/clawctl-dogfood-XzY6Kj
+(remove manually if you want — this script will never delete it)

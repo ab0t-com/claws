@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -26,6 +28,7 @@ func generateToken() string {
 func cmdCreate(args []string) error {
 	paths := resolvePaths()
 	var nameArg, fromInstance, role, managerName, bindMode, runtimeName string
+	var inlineAuth, inlineTelegram, inlineDiscord, inlineSlackBot, inlineSlackApp string
 	shared := SharedFlags{}
 	noShared := false
 
@@ -43,6 +46,16 @@ func cmdCreate(args []string) error {
 			// handled below after policy check
 		case strings.HasPrefix(a, "--runtime="):
 			runtimeName = a[10:]
+		case strings.HasPrefix(a, "--auth="):
+			inlineAuth = a[7:]
+		case strings.HasPrefix(a, "--telegram="):
+			inlineTelegram = a[11:]
+		case strings.HasPrefix(a, "--discord="):
+			inlineDiscord = a[10:]
+		case strings.HasPrefix(a, "--slack-bot="):
+			inlineSlackBot = a[12:]
+		case strings.HasPrefix(a, "--slack-app="):
+			inlineSlackApp = a[12:]
 		case a == "--shared-skills" || a == "--skills":
 			shared.Skills = true
 		case a == "--shared-workspace" || a == "--workspace":
@@ -180,21 +193,23 @@ func cmdCreate(args []string) error {
 
 	token := generateToken()
 
-	info(fmt.Sprintf("Creating instance '%s'...", name))
-	fmt.Printf("  Index:     %d\n", index)
-	fmt.Printf("  Gateway:   :%d\n", gatewayPort)
-	fmt.Printf("  Bridge:    :%d\n", bridgePort)
-	fmt.Printf("  Directory: %s\n", dir)
-	if ref.Group != "" {
-		fmt.Printf("  Group:     %s\n", ref.Group)
+	if !quietCreate {
+		info(fmt.Sprintf("Creating instance '%s'...", name))
+		fmt.Printf("  Index:     %d\n", index)
+		fmt.Printf("  Gateway:   :%d\n", gatewayPort)
+		fmt.Printf("  Bridge:    :%d\n", bridgePort)
+		fmt.Printf("  Directory: %s\n", dir)
+		if ref.Group != "" {
+			fmt.Printf("  Group:     %s\n", ref.Group)
+		}
+		if role != "" {
+			fmt.Printf("  Role:      %s\n", role)
+		}
+		if fromInstance != "" {
+			fmt.Printf("  Template:  %s\n", fromInstance)
+		}
+		fmt.Println()
 	}
-	if role != "" {
-		fmt.Printf("  Role:      %s\n", role)
-	}
-	if fromInstance != "" {
-		fmt.Printf("  Template:  %s\n", fromInstance)
-	}
-	fmt.Println()
 
 	// Create dirs
 	for _, sub := range []string{"credentials", "agents", "identity", "workspace", "sessions", "canvas", "logs"} {
@@ -285,6 +300,21 @@ CLAUDE_WEB_COOKIE=
 		return err
 	}
 
+	// Default tool profile: set tools.profile = "coding" if not already set
+	// Sandbox warning: warn if sandbox is not enabled
+	if rt.SupportsConfig {
+		if cfg, err := readInstanceConfig(outputPath); err == nil {
+			if getNestedConfig(cfg, "tools.profile") == nil {
+				setNestedConfig(cfg, "tools.profile", "coding")
+				writeInstanceConfig(outputPath, cfg)
+			}
+			if getNestedConfig(cfg, "agents.defaults.sandbox") == nil && !quietCreate {
+				warn("sandbox is not enabled — agent can read/write files and run commands freely")
+				fmt.Printf("  Enable: clawctl config set %s agents.defaults.sandbox true\n", name)
+			}
+		}
+	}
+
 	// Role
 	if role != "" {
 		f, _ := os.OpenFile(envFile, os.O_APPEND|os.O_WRONLY, credentialFileMode)
@@ -318,26 +348,79 @@ CLAUDE_WEB_COOKIE=
 	}
 
 	info(fmt.Sprintf("Instance '%s' created.", name))
-	if _, err := os.Stat(defaultsPath); err == nil {
-		fmt.Println("  (merged global defaults)")
+	if !quietCreate {
+		if _, err := os.Stat(defaultsPath); err == nil {
+			fmt.Println("  (merged global defaults)")
+		}
+		if groupDefaultsPath != "" {
+			fmt.Printf("  (merged group defaults from %s)\n", ref.Group)
+		}
+		if fromInstance != "" {
+			fmt.Printf("  (config copied from %s)\n", fromInstance)
+		}
+		if role != "" {
+			fmt.Printf("  (role: %s)\n", role)
+		}
 	}
-	if groupDefaultsPath != "" {
-		fmt.Printf("  (merged group defaults from %s)\n", ref.Group)
+	// Inline auth chaining (--auth=codex or --auth=apikey)
+	if inlineAuth == "codex" {
+		fmt.Println()
+		info(fmt.Sprintf("Running auth for '%s'...", name))
+		if err := cmdAuth([]string{name, "codex"}); err != nil {
+			warn(fmt.Sprintf("Auth failed: %v — retry: clawctl auth %s codex", err, name))
+		}
+	} else if inlineAuth == "apikey" {
+		fmt.Println()
+		warn(fmt.Sprintf("API key auth requires provider and key — run: clawctl auth %s apikey <provider> <key>", name))
+	} else if inlineAuth != "" {
+		fmt.Println()
+		warn(fmt.Sprintf("unknown auth mode '%s' — use 'codex' or 'apikey'", inlineAuth))
 	}
-	if fromInstance != "" {
-		fmt.Printf("  (config copied from %s)\n", fromInstance)
+
+	// Inline channel chaining (--telegram=TOKEN, --discord=TOKEN, --slack-bot=TOKEN)
+	if inlineTelegram != "" {
+		fmt.Println()
+		info(fmt.Sprintf("Adding Telegram channel to '%s'...", name))
+		if err := cmdChannel([]string{"add", name, "telegram", "--token=" + inlineTelegram}); err != nil {
+			warn(fmt.Sprintf("Telegram failed: %v — retry: clawctl channel add %s telegram --token=...", err, name))
+		}
 	}
-	if role != "" {
-		fmt.Printf("  (role: %s)\n", role)
+	if inlineDiscord != "" {
+		fmt.Println()
+		info(fmt.Sprintf("Adding Discord channel to '%s'...", name))
+		if err := cmdChannel([]string{"add", name, "discord", "--token=" + inlineDiscord}); err != nil {
+			warn(fmt.Sprintf("Discord failed: %v — retry: clawctl channel add %s discord --token=...", err, name))
+		}
 	}
-	fmt.Println()
-	fmt.Println("  Next steps:")
-	fmt.Printf("    clawctl auth %s codex              # add OpenAI Codex auth\n", name)
-	fmt.Printf("    clawctl auth %s apikey openai <key> # or add an API key\n", name)
-	fmt.Printf("    clawctl start %s                    # start the instance\n", name)
-	fmt.Println()
-	fmt.Println("  SSH tunnel:")
-	fmt.Printf("    ssh -N -L %d:127.0.0.1:%d ubuntu@<server>\n", gatewayPort, gatewayPort)
+	if inlineSlackBot != "" {
+		fmt.Println()
+		info(fmt.Sprintf("Adding Slack channel to '%s'...", name))
+		slackArgs := []string{"add", name, "slack", "--bot-token=" + inlineSlackBot}
+		if inlineSlackApp != "" {
+			slackArgs = append(slackArgs, "--app-token="+inlineSlackApp)
+		}
+		if err := cmdChannel(slackArgs); err != nil {
+			warn(fmt.Sprintf("Slack failed: %v — retry: clawctl channel add %s slack ...", err, name))
+		}
+	}
+
+	if !quietCreate {
+		fmt.Println()
+		if inlineAuth == "" && inlineTelegram == "" && inlineDiscord == "" && inlineSlackBot == "" {
+			fmt.Println("  Next steps:")
+			fmt.Printf("    clawctl auth %s codex              # add OpenAI Codex auth\n", name)
+			fmt.Printf("    clawctl auth %s apikey openai <key> # or add an API key\n", name)
+			fmt.Printf("    clawctl start %s                    # start the instance\n", name)
+		} else {
+			fmt.Println("  Next step:")
+			fmt.Printf("    clawctl start %s                    # start the instance\n", name)
+		}
+		fmt.Println()
+		if bindMode == "loopback" {
+			fmt.Println("  SSH tunnel:")
+			fmt.Printf("    ssh -N -L %d:127.0.0.1:%d ubuntu@<server>\n", gatewayPort, gatewayPort)
+		}
+	}
 	return nil
 }
 
@@ -363,11 +446,22 @@ func portInUse(port int) bool {
 // ---------------------------------------------------------------------------
 
 func cmdStart(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl start <name>")
-	}
 	paths := resolvePaths()
-	name := args[0]
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	name := firstPositional(args)
+	if filterGroup != "" && name != "" {
+		return errorf("specify either positional instance name or --group=, not both")
+	}
+	if filterGroup != "" {
+		// Group fan-out. No confirmation: start is additive, not destructive.
+		return runOnGroup(paths, filterGroup, "Starting", cmdStart, args)
+	}
+	if name == "" {
+		return errorf("usage: clawctl start <name> | clawctl start --group=<name>")
+	}
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
@@ -406,11 +500,30 @@ func cmdStart(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdStop(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl stop <name>")
-	}
 	paths := resolvePaths()
-	name := args[0]
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	name := firstPositional(args)
+	if filterGroup != "" && name != "" {
+		return errorf("specify either positional instance name or --group=, not both")
+	}
+	if filterGroup != "" {
+		entries, _ := readRegistry(paths)
+		members := filterEntriesByGroup(entries, filterGroup)
+		if len(members) == 0 {
+			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
+			return nil
+		}
+		if !confirmGroupOp("stop", filterGroup, len(members), hasFlag(args, "--yes")) {
+			return nil
+		}
+		return runOnGroup(paths, filterGroup, "Stopping", cmdStop, args)
+	}
+	if name == "" {
+		return errorf("usage: clawctl stop <name> | clawctl stop --group=<name> [--yes]")
+	}
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
@@ -427,12 +540,31 @@ func cmdStop(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdRestart(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl restart <name> [--hard]")
-	}
 	paths := resolvePaths()
-	name := args[0]
-	hard := hasFlag(args[1:], "--hard")
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	name := firstPositional(args)
+	if filterGroup != "" && name != "" {
+		return errorf("specify either positional instance name or --group=, not both")
+	}
+	if filterGroup != "" {
+		entries, _ := readRegistry(paths)
+		members := filterEntriesByGroup(entries, filterGroup)
+		if len(members) == 0 {
+			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
+			return nil
+		}
+		if !confirmGroupOp("restart", filterGroup, len(members), hasFlag(args, "--yes")) {
+			return nil
+		}
+		return runOnGroup(paths, filterGroup, "Restarting", cmdRestart, args)
+	}
+	if name == "" {
+		return errorf("usage: clawctl restart <name> [--hard] | clawctl restart --group=<name> [--yes]")
+	}
+	hard := hasFlag(args, "--hard")
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
@@ -463,19 +595,133 @@ func cmdRestart(args []string) error {
 func cmdList(args []string) error {
 	paths := resolvePaths()
 	jsonMode := hasFlag(args, "--json")
+	rich := hasFlag(args, "--rich") || hasFlag(args, "--wide")
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
 	entries, err := readRegistry(paths)
 	if err != nil {
 		return err
 	}
+	entries = filterEntriesByGroup(entries, filterGroup)
 	if len(entries) == 0 {
 		if jsonMode {
 			fmt.Println("[]")
+		} else if filterGroup != "" {
+			fmt.Printf("No instances found in group '%s'.\n", filterGroup)
 		} else {
 			fmt.Println("No instances found.")
 		}
 		return nil
 	}
 
+	bold := "\033[1m"
+	nc := "\033[0m"
+	green := "\033[0;32m"
+	yellow := "\033[0;33m"
+	red := "\033[0;31m"
+
+	// Rich mode: model + role + channels per agent. Reads instance.env +
+	// openclaw.json for every entry. Cost: same order as the basic list
+	// (already shells docker compose ps per instance for status).
+	if rich {
+		type richEntry struct {
+			Name     string   `json:"name"`
+			Group    string   `json:"group,omitempty"`
+			Port     string   `json:"port"`
+			Status   string   `json:"status"`
+			Model    string   `json:"model"`
+			Role     string   `json:"role,omitempty"`
+			Channels []string `json:"channels,omitempty"`
+			Image    string   `json:"image"`
+			RAM      string   `json:"ram"`
+			Uptime   string   `json:"uptime"`
+		}
+		var jsonEntries []richEntry
+
+		// Column widths (visible chars). Wide enough for typical fleet shapes:
+		// NAME up to ~18 (group/name combos), MODEL up to ~26 (provider/model).
+		const (
+			wName     = 18
+			wPort     = 8
+			wStatus   = 9
+			wModel    = 26
+			wRole     = 8
+			wChannels = 18
+			wRAM      = 9
+		)
+
+		if !jsonMode {
+			fmt.Print(bold)
+			fmt.Print(padVisible("NAME", wName))
+			fmt.Print(padVisible(" PORT", wPort+1))
+			fmt.Print(padVisible(" STATUS", wStatus+1))
+			fmt.Print(padVisible(" MODEL", wModel+1))
+			fmt.Print(padVisible(" ROLE", wRole+1))
+			fmt.Print(padVisible(" CHANNELS", wChannels+1))
+			fmt.Print(padVisible(" RAM", wRAM+1))
+			fmt.Print(" UPTIME")
+			fmt.Println(nc)
+			fmt.Print(padVisible(strings.Repeat("─", wName), wName))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wPort), wPort+1))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wStatus), wStatus+1))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wModel), wModel+1))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wRole), wRole+1))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wChannels), wChannels+1))
+			fmt.Print(padVisible(" "+strings.Repeat("─", wRAM), wRAM+1))
+			fmt.Println(" " + strings.Repeat("─", 10))
+		}
+
+		for _, e := range entries {
+			info := gatherRichInfo(paths, e.Name)
+
+			if jsonMode {
+				jsonEntries = append(jsonEntries, richEntry{
+					Name: info.Name, Group: info.Group, Port: info.Port,
+					Status: info.Status, Model: info.Model, Role: info.Role,
+					Channels: info.Channels, Image: info.Image,
+					RAM: info.RAM, Uptime: info.Uptime,
+				})
+				continue
+			}
+
+			// Color the status; padVisible accounts for the invisible chars.
+			var statusColored string
+			switch info.Status {
+			case "healthy":
+				statusColored = green + info.Status + nc
+			case "starting":
+				statusColored = yellow + info.Status + nc
+			case "stopped":
+				statusColored = red + info.Status + nc
+			default:
+				statusColored = info.Status
+			}
+
+			channels := "—"
+			if len(info.Channels) > 0 {
+				channels = strings.Join(info.Channels, ",")
+			}
+
+			fmt.Print(padVisible(info.Name, wName))
+			fmt.Print(" " + padVisible(":"+info.Port, wPort))
+			fmt.Print(" " + padVisible(statusColored, wStatus))
+			fmt.Print(" " + padVisible(truncate(orDash(info.Model), wModel), wModel))
+			fmt.Print(" " + padVisible(truncate(orDash(info.Role), wRole), wRole))
+			fmt.Print(" " + padVisible(truncate(channels, wChannels), wChannels))
+			fmt.Print(" " + padVisible(truncate(orDash(info.RAM), wRAM), wRAM))
+			fmt.Println(" " + orDash(info.Uptime))
+		}
+
+		if jsonMode {
+			data, _ := json.MarshalIndent(jsonEntries, "", "  ")
+			fmt.Println(string(data))
+		}
+		return nil
+	}
+
+	// Default (non-rich) view — backward compatible with pre-A1 output.
 	type listEntry struct {
 		Name   string `json:"name"`
 		Port   string `json:"port"`
@@ -484,12 +730,6 @@ func cmdList(args []string) error {
 		Uptime string `json:"uptime"`
 	}
 	var jsonEntries []listEntry
-
-	bold := "\033[1m"
-	nc := "\033[0m"
-	green := "\033[0;32m"
-	yellow := "\033[0;33m"
-	red := "\033[0;31m"
 
 	if !jsonMode {
 		fmt.Printf("%s%-15s %-8s %-12s %-10s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", nc)
@@ -552,11 +792,14 @@ func cmdList(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdStatus(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl status <name> [--json]")
+	// Route to the system overview when no instance name is given. The overview
+	// accepts its own flags (--group=) so we test for the presence of a
+	// positional arg rather than enumerating known flag names.
+	if firstPositional(args) == "" {
+		return cmdStatusOverview(args)
 	}
 	paths := resolvePaths()
-	name := args[0]
+	name := firstPositional(args)
 	jsonMode := hasFlag(args, "--json")
 	if err := requireInstance(paths, name); err != nil {
 		return err
@@ -613,6 +856,156 @@ func cmdStatus(args []string) error {
 	return nil
 }
 
+// cmdStatusOverview shows a unified system overview: health, policy, warnings.
+// Accepts an optional --group=<name> filter to scope to a single team.
+func cmdStatusOverview(args []string) error {
+	paths := resolvePaths()
+	bold := "\033[1m"
+	nc := "\033[0m"
+	green := "\033[0;32m"
+	yellow := "\033[0;33m"
+	red := "\033[0;31m"
+
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+
+	entries, err := readRegistry(paths)
+	if err != nil {
+		return err
+	}
+	entries = filterEntriesByGroup(entries, filterGroup)
+	if len(entries) == 0 {
+		if filterGroup != "" {
+			fmt.Printf("No instances in group '%s'.\n", filterGroup)
+			return nil
+		}
+		fmt.Println("No instances registered. Run: clawctl setup")
+		return nil
+	}
+
+	// --- Health ---
+	if filterGroup != "" {
+		fmt.Printf("%sInstances in group '%s' (%d)%s\n\n", bold, filterGroup, len(entries), nc)
+	} else {
+		fmt.Printf("%sInstances (%d)%s\n\n", bold, len(entries), nc)
+	}
+	fmt.Printf("  %-20s %-8s %-12s %s\n", "NAME", "PORT", "HEALTH", "DETAILS")
+	fmt.Printf("  %-20s %-8s %-12s %s\n", "────────────────────", "────────", "────────────", "──────────────────")
+
+	healthy, degraded, down := 0, 0, 0
+	for _, e := range entries {
+		h := probeInstance(paths, e.Name)
+		var color, details string
+		switch h.Verdict {
+		case "healthy":
+			color = green
+			healthy++
+			details = "live + ready"
+		case "degraded":
+			color = yellow
+			degraded++
+			if len(h.Failing) > 0 {
+				details = "failing: " + strings.Join(h.Failing, ", ")
+			} else {
+				details = "live but not ready"
+			}
+		case "stopped":
+			color = red
+			down++
+			details = "container stopped"
+		default:
+			color = red
+			down++
+			details = "container down"
+		}
+		fmt.Printf("  %-20s %-8s %s%-12s%s %s\n", e.Name, h.Port, color, h.Verdict, nc, details)
+	}
+	fmt.Println()
+	fmt.Printf("  %s%d healthy%s", green, healthy, nc)
+	if degraded > 0 {
+		fmt.Printf(", %s%d degraded%s", yellow, degraded, nc)
+	}
+	if down > 0 {
+		fmt.Printf(", %s%d down%s", red, down, nc)
+	}
+	fmt.Println()
+
+	// --- Policy ---
+	fmt.Println()
+	if policyExists(paths) {
+		policy := readPolicy(paths)
+		violations := 0
+		for _, e := range entries {
+			ref, _ := ParseRef(e.Name)
+			dir := ref.Dir(paths)
+			envFile := filepath.Join(dir, "instance.env")
+			if _, statErr := os.Stat(envFile); statErr != nil {
+				continue
+			}
+			bind := readEnvValue(envFile, "OPENCLAW_GATEWAY_BIND")
+			image := readEnvValue(envFile, "OPENCLAW_IMAGE")
+			if policy.enforceBindPolicy(bind) != nil {
+				violations++
+			}
+			if policy.enforceImagePolicy(image) != nil {
+				violations++
+			}
+			// Check channel DM policies
+			configPath := mustResolveRuntime(paths, e.Name).ConfigPath(dir)
+			if cfg, cfgErr := readInstanceConfig(configPath); cfgErr == nil {
+				if channels, ok := cfg["channels"].(map[string]any); ok {
+					for ch, v := range channels {
+						chMap, ok := v.(map[string]any)
+						if !ok {
+							continue
+						}
+						if enabled, _ := chMap["enabled"].(bool); !enabled {
+							continue
+						}
+						if policy.enforceChannelPolicy(ch) != nil {
+							violations++
+						}
+						if dm, ok := chMap["dmPolicy"].(string); ok {
+							if policy.enforceDmPolicy(dm) != nil {
+								violations++
+							}
+						}
+						if policy.enforceOutboundAllowlist(ch, chMap) != nil {
+							violations++
+						}
+					}
+				}
+			}
+		}
+		if violations == 0 {
+			fmt.Printf("%sPolicy:%s %s✓ all instances compliant%s\n", bold, nc, green, nc)
+		} else {
+			fmt.Printf("%sPolicy:%s %s✗ %d violation(s)%s — run: clawctl policy validate\n", bold, nc, red, violations, nc)
+		}
+
+		// Audit status
+		if policy.AuditLog {
+			fmt.Printf("%sAudit:%s  enabled\n", bold, nc)
+		} else {
+			fmt.Printf("%sAudit:%s  %sdisabled%s — enable in policy.json\n", bold, nc, yellow, nc)
+		}
+	} else {
+		fmt.Printf("%sPolicy:%s %snot configured%s — run: clawctl policy init\n", bold, nc, yellow, nc)
+	}
+
+	// --- Access ---
+	if accessExists(paths) {
+		fmt.Printf("%sAccess:%s configured\n", bold, nc)
+	} else {
+		fmt.Printf("%sAccess:%s %snot configured%s — run: clawctl access init\n", bold, nc, yellow, nc)
+	}
+
+	fmt.Println()
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // remove
 // ---------------------------------------------------------------------------
@@ -665,17 +1058,116 @@ func cmdRemove(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdLogs(args []string) error {
-	if len(args) < 1 {
-		return errorf("usage: clawctl logs <name> [-f]")
-	}
 	paths := resolvePaths()
-	name := args[0]
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
+	grep := flagValue(args, "--grep=")
+	follow := hasFlag(args, "-f") || hasFlag(args, "--follow")
+	name := firstPositional(args)
+
+	if filterGroup != "" && name != "" {
+		return errorf("specify either positional instance name or --group=, not both")
+	}
+	if filterGroup != "" && follow {
+		// Interleaved multi-instance follow requires goroutine multiplexing
+		// with per-line prefix tagging. Deferred to its own ticket. For now,
+		// fail directive so operators don't think they're getting it.
+		return errorf("--group= with -f (interleaved follow) is not yet supported — run -f per instance, or omit -f for sequential tail")
+	}
+
+	// Group fan-out (non-follow only): iterate members, prefix each line.
+	if filterGroup != "" {
+		entries, _ := readRegistry(paths)
+		members := filterEntriesByGroup(entries, filterGroup)
+		if len(members) == 0 {
+			info(fmt.Sprintf("No instances in group '%s'.", filterGroup))
+			return nil
+		}
+		// Pass-through flags minus --group= and the positional (none here).
+		var passThrough []string
+		for _, a := range args {
+			if strings.HasPrefix(a, "--group=") {
+				continue
+			}
+			if strings.HasPrefix(a, "-") {
+				passThrough = append(passThrough, a)
+			}
+		}
+		for _, e := range members {
+			fmt.Printf("\033[1m=== %s ===\033[0m\n", e.Name)
+			perInstanceArgs := append([]string{e.Name}, passThrough...)
+			if err := cmdLogs(perInstanceArgs); err != nil {
+				warn(fmt.Sprintf("logs failed for '%s': %v", e.Name, err))
+			}
+			fmt.Println()
+		}
+		return nil
+	}
+
+	if name == "" {
+		return errorf("usage: clawctl logs <name> [-f] [--grep=<pattern>] [--since=<dur>] | clawctl logs --group=<name> [--grep=<pattern>]")
+	}
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
-	composeArgs := append([]string{"logs"}, args[1:]...)
+
+	// Build the docker compose logs arg list; drop our own flags that
+	// docker doesn't understand.
+	composeArgs := []string{"logs"}
+	for _, a := range args {
+		if a == name || a == "--group="+filterGroup {
+			continue
+		}
+		if strings.HasPrefix(a, "--grep=") || strings.HasPrefix(a, "--group=") {
+			continue
+		}
+		composeArgs = append(composeArgs, a)
+	}
 	composeArgs = append(composeArgs, gatewayService(paths, name))
-	return dc(paths, name, composeArgs...).Run()
+
+	if grep == "" {
+		// No filter — straight pass-through (preserves color, streaming, etc).
+		return dc(paths, name, composeArgs...).Run()
+	}
+
+	// Filter mode: build the docker compose command ourselves so we own
+	// stdout. `dc()` pre-binds cmd.Stdout = os.Stdout which conflicts with
+	// StdoutPipe(); going through exec.Command directly keeps the same
+	// project/template resolution logic that compose.go uses.
+	ref, _ := ParseRef(name)
+	rt := mustResolveRuntime(paths, name)
+	dir := ref.Dir(paths)
+	envFile := filepath.Join(dir, "instance.env")
+	override := rt.OverridePath(dir)
+	composeTemplate := rt.ComposeTemplatePath(paths)
+	allArgs := []string{"compose", "-f", composeTemplate}
+	if _, err := os.Stat(override); err == nil {
+		allArgs = append(allArgs, "-f", override)
+	}
+	allArgs = append(allArgs, "--env-file", envFile, "-p", rt.MakeProjectName(ref))
+	allArgs = append(allArgs, composeArgs...)
+
+	cmd := exec.Command("docker", allArgs...)
+	cmd.Stderr = os.Stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	pat := strings.ToLower(grep)
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // grow for long log lines
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(strings.ToLower(line), pat) {
+			fmt.Println(line)
+		}
+	}
+	return cmd.Wait()
 }
 
 // ---------------------------------------------------------------------------
@@ -700,8 +1192,18 @@ func cmdExec(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdAuth(args []string) error {
+	if len(args) < 1 {
+		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name]")
+	}
+	// `auth status` is a read-only fleet inspection that lives next to the
+	// auth verbs because operators look for "is auth working?" under the
+	// same noun they used to set it up. Mirrors how `channel status` sits
+	// next to `channel add`.
+	if args[0] == "status" {
+		return cmdAuthStatus(args[1:])
+	}
 	if len(args) < 2 {
-		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key>")
+		return errorf("usage: clawctl auth <name> codex|apikey <provider> <key> | clawctl auth status [name]")
 	}
 	paths := resolvePaths()
 	name := args[0]
@@ -1041,6 +1543,78 @@ func cmdUnshare(args []string) error {
 	return nil
 }
 
+// runOnGroup invokes perInstance for every instance in group, sequentially,
+// stripping --group=/--yes from the recursed arg list so the per-instance
+// call takes the single-instance code path. Returns nil on full success or a
+// summary error listing the failures. Used by cmdStart, cmdStop, cmdRestart,
+// cmdTokenRotate, cmdUpgrade for their --group= variants.
+//
+// Sequential (not parallel) for two reasons: (1) Docker compose operations
+// are not safe to parallelize cheaply — concurrent `up -d` on a shared
+// project namespace can race on the network creation; (2) operators want
+// predictable per-instance log output. The latency cost is bounded by group
+// size × per-instance wait, which is fine for ≤8-instance teams.
+func runOnGroup(paths Paths, group, opLabel string, perInstance func([]string) error, args []string) error {
+	entries, err := readRegistry(paths)
+	if err != nil {
+		return err
+	}
+	entries = filterEntriesByGroup(entries, group)
+	if len(entries) == 0 {
+		info(fmt.Sprintf("No instances in group '%s'.", group))
+		return nil
+	}
+
+	// Build the recursed flag list: everything that started with "-" minus
+	// --group= (which we just consumed) and --yes (which the caller has
+	// already honored at the confirmation prompt — passing it down would
+	// suppress potential per-instance prompts we may add in future).
+	var passThroughFlags []string
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		if strings.HasPrefix(a, "--group=") || a == "--yes" {
+			continue
+		}
+		passThroughFlags = append(passThroughFlags, a)
+	}
+
+	info(fmt.Sprintf("%s %d instance(s) in group '%s'...", opLabel, len(entries), group))
+	var failed []string
+	for _, e := range entries {
+		instanceArgs := append([]string{e.Name}, passThroughFlags...)
+		if err := perInstance(instanceArgs); err != nil {
+			warn(fmt.Sprintf("'%s' failed: %v", e.Name, err))
+			failed = append(failed, e.Name)
+		}
+	}
+	if len(failed) > 0 {
+		return errorf("%d instance(s) failed: %s", len(failed), strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// confirmGroupOp prompts the operator before a destructive group-scoped
+// operation. Returns true iff the operation should proceed. The autoYes
+// parameter (typically the value of `--yes`) bypasses the prompt for
+// scripted/CI use. Calling code should only invoke this for operations that
+// could affect users (stop, restart, token rotate, upgrade).
+func confirmGroupOp(verb, group string, count int, autoYes bool) bool {
+	if autoYes {
+		return true
+	}
+	warn(fmt.Sprintf("This will %s %d instance(s) in group '%s'.", verb, count, group))
+	fmt.Print("  Continue? [y/N] ")
+	var answer string
+	fmt.Scanln(&answer)
+	if answer != "y" && answer != "Y" {
+		info("Aborted.")
+		return false
+	}
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // start-all / stop-all
 // ---------------------------------------------------------------------------
@@ -1081,6 +1655,295 @@ func cmdStopAll(args []string) error {
 		return errorf("%d instance(s) failed to stop: %s", len(failed), strings.Join(failed, ", "))
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// richInstanceInfo — the per-agent identity record consumed by `list --rich`
+// and `clawctl info`. Sources are all on-disk: instance.env + openclaw.json +
+// docker compose ps. No HTTP, no model invocation — this is the cheap path.
+// ---------------------------------------------------------------------------
+
+type richInstanceInfo struct {
+	Name     string   `json:"name"`
+	Group    string   `json:"group,omitempty"`
+	Port     string   `json:"port"`
+	Status   string   `json:"status"`             // healthy|starting|stopped|created
+	Model    string   `json:"model"`              // from openclaw.json or "—"
+	Role     string   `json:"role,omitempty"`     // manager|worker|""
+	Channels []string `json:"channels,omitempty"` // names of enabled channels
+	Image    string   `json:"image"`
+	Runtime  string   `json:"runtime"` // runtime name (openclaw, nemoclaw, ...)
+	RAM      string   `json:"ram"`
+	Uptime   string   `json:"uptime"`
+}
+
+// gatherRichInfo assembles the identity record for one instance. It reads
+// from disk only: never probes /healthz, never runs `models auth status`.
+// That keeps the rich `list --rich` view cheap enough to be the default for
+// operators who want fleet identity at a glance.
+func gatherRichInfo(paths Paths, name string) richInstanceInfo {
+	ref, _ := ParseRef(name)
+	dir := ref.Dir(paths)
+	envFile := filepath.Join(dir, "instance.env")
+	rt := mustResolveRuntime(paths, name)
+
+	info := richInstanceInfo{
+		Name:    name,
+		Group:   ref.Group,
+		Port:    readEnvValue(envFile, "OPENCLAW_GATEWAY_PORT"),
+		Image:   readEnvValue(envFile, "OPENCLAW_IMAGE"),
+		Role:    readEnvValue(envFile, "INSTANCE_ROLE"),
+		Runtime: readEnvValue(envFile, "CLAWCTL_RUNTIME"),
+	}
+	if info.Runtime == "" {
+		info.Runtime = "openclaw" // default when unset (matches mustResolveRuntime fallback)
+	}
+
+	// Model + channels are read out of the runtime's config file. We use
+	// the runtime's ConfigPath so this stays correct if a future runtime
+	// uses a non-default config filename.
+	configPath := rt.ConfigPath(dir)
+	if cfg, err := readInstanceConfig(configPath); err == nil {
+		if v := getNestedConfig(cfg, "agents.defaults.model.primary"); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				info.Model = s
+			}
+		}
+		if channels, ok := cfg["channels"].(map[string]any); ok {
+			for ch, v := range channels {
+				chMap, ok := v.(map[string]any)
+				if !ok {
+					continue
+				}
+				if enabled, _ := chMap["enabled"].(bool); enabled {
+					info.Channels = append(info.Channels, ch)
+				}
+			}
+		}
+	}
+	sort.Strings(info.Channels) // deterministic output across runs
+
+	// Container status maps to the same vocabulary cmdList already uses, so
+	// `list` and `list --rich` agree on the status column.
+	cs := containerStatus(paths, name)
+	switch {
+	case strings.Contains(cs, "Up") && strings.Contains(cs, "healthy"):
+		info.Status = "healthy"
+	case strings.Contains(cs, "Up"):
+		info.Status = "starting"
+	case cs != "":
+		info.Status = "stopped"
+	default:
+		info.Status = "created"
+	}
+	if info.Status == "healthy" || info.Status == "starting" {
+		info.RAM = containerRAM(paths, name)
+		info.Uptime = strings.Replace(cs, "Up ", "", 1)
+		if idx := strings.Index(info.Uptime, " ("); idx >= 0 {
+			info.Uptime = info.Uptime[:idx]
+		}
+	}
+	return info
+}
+
+// ---------------------------------------------------------------------------
+// info — single-agent deep-info command (the inverse of `list --rich`)
+// Consolidates the data an operator most often needs at the moment they
+// pick a single instance to investigate: identity (status, model, role,
+// channels), filesystem layout (dir, config, workspace), credentials state
+// (token, channel creds), and a few recent audit-log entries scoped to
+// this instance. All reads, no probes — cheap to run during incidents.
+// ---------------------------------------------------------------------------
+
+func cmdInfo(args []string) error {
+	paths := resolvePaths()
+	jsonMode := hasFlag(args, "--json")
+	name := firstPositional(args)
+	if name == "" {
+		return errorf("usage: clawctl info <name> [--json]")
+	}
+	if err := requireInstance(paths, name); err != nil {
+		return err
+	}
+
+	rich := gatherRichInfo(paths, name)
+	ref, _ := ParseRef(name)
+	dir := ref.Dir(paths)
+	envFile := filepath.Join(dir, "instance.env")
+	rt := mustResolveRuntime(paths, name)
+
+	// Extra fields not in richInstanceInfo: created timestamp, token, paths,
+	// configured-credential providers, recent activity.
+	created := ""
+	if data, err := os.ReadFile(envFile); err == nil {
+		for _, line := range splitLines(string(data)) {
+			if strings.HasPrefix(line, "# Created:") {
+				created = strings.TrimPrefix(line, "# Created: ")
+				break
+			}
+		}
+	}
+	token := readEnvValue(envFile, "OPENCLAW_GATEWAY_TOKEN")
+	tokenDisplay := ""
+	if len(token) > 16 {
+		tokenDisplay = token[:8] + "..." + token[len(token)-8:]
+	}
+
+	credsDir := filepath.Join(dir, "credentials")
+	var credFiles []string
+	if entries, err := os.ReadDir(credsDir); err == nil {
+		for _, e := range entries {
+			credFiles = append(credFiles, e.Name())
+		}
+		sort.Strings(credFiles)
+	}
+
+	// Recent activity for THIS instance from the audit log, last 24h.
+	var recent []string
+	if data, err := os.ReadFile(filepath.Join(paths.Root, auditLogFile)); err == nil {
+		cutoff := time.Now().Add(-24 * time.Hour)
+		for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			if line == "" {
+				continue
+			}
+			var entry map[string]any
+			if json.Unmarshal([]byte(line), &entry) != nil {
+				continue
+			}
+			ts, _ := entry["ts"].(string)
+			if t, err := time.Parse(time.RFC3339, ts); err == nil && t.Before(cutoff) {
+				continue
+			}
+			argsAny, _ := entry["args"].([]any)
+			argStrs := make([]string, len(argsAny))
+			for i, a := range argsAny {
+				argStrs[i], _ = a.(string)
+			}
+			if !auditEntryInGroupOrName(argStrs, name) {
+				continue
+			}
+			cmd, _ := entry["cmd"].(string)
+			result, _ := entry["result"].(string)
+			recent = append(recent, fmt.Sprintf("%s  %s  (%s)  %s", ts, cmd, result, strings.Join(argStrs, " ")))
+		}
+	}
+	// Keep recent bounded so the screen stays readable.
+	const maxRecent = 8
+	if len(recent) > maxRecent {
+		recent = recent[len(recent)-maxRecent:]
+	}
+
+	if jsonMode {
+		obj := map[string]any{
+			"name":      rich.Name,
+			"group":     rich.Group,
+			"port":      rich.Port,
+			"status":    rich.Status,
+			"model":     rich.Model,
+			"role":      rich.Role,
+			"channels":  rich.Channels,
+			"image":     rich.Image,
+			"runtime":   rich.Runtime,
+			"ram":       rich.RAM,
+			"uptime":    rich.Uptime,
+			"created":   created,
+			"directory": dir,
+			"config":    rt.ConfigPath(dir),
+			"workspace": filepath.Join(dir, "workspace"),
+			"token":     tokenDisplay,
+			"creds":     credFiles,
+			"recent":    recent,
+		}
+		data, _ := json.MarshalIndent(obj, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	bold := "\033[1m"
+	nc := "\033[0m"
+	dim := "\033[0;90m"
+
+	fmt.Printf("%sInstance: %s%s\n", bold, rich.Name, nc)
+	fmt.Printf("  Status:     %s\n", rich.Status)
+	if rich.Group != "" {
+		fmt.Printf("  Group:      %s\n", rich.Group)
+	}
+	if rich.Role != "" {
+		fmt.Printf("  Role:       %s\n", rich.Role)
+	}
+	fmt.Printf("  Created:    %s\n", created)
+	fmt.Println()
+
+	fmt.Printf("%sIdentity%s\n", bold, nc)
+	fmt.Printf("  Model:      %s\n", orDash(rich.Model))
+	fmt.Printf("  Image:      %s\n", rich.Image)
+	fmt.Printf("  Runtime:    %s\n", rich.Runtime)
+	fmt.Println()
+
+	fmt.Printf("%sNetwork%s\n", bold, nc)
+	fmt.Printf("  Gateway:    :%s\n", rich.Port)
+	if tokenDisplay != "" {
+		fmt.Printf("  Token:      %s\n", tokenDisplay)
+		fmt.Printf("  %s(full: clawctl token show %s --full)%s\n", dim, name, nc)
+	}
+	fmt.Println()
+
+	fmt.Printf("%sChannels%s\n", bold, nc)
+	if len(rich.Channels) == 0 {
+		fmt.Printf("  (none enabled)\n")
+	} else {
+		for _, ch := range rich.Channels {
+			fmt.Printf("  %s\n", ch)
+		}
+	}
+	fmt.Println()
+
+	fmt.Printf("%sCredentials present%s\n", bold, nc)
+	if len(credFiles) == 0 {
+		fmt.Printf("  (none)\n")
+	} else {
+		for _, f := range credFiles {
+			fmt.Printf("  %s\n", f)
+		}
+	}
+	fmt.Println()
+
+	fmt.Printf("%sFilesystem%s\n", bold, nc)
+	fmt.Printf("  Directory:  %s\n", dir)
+	fmt.Printf("  Config:     %s\n", rt.ConfigPath(dir))
+	fmt.Printf("  Workspace:  %s/workspace/\n", dir)
+	fmt.Println()
+
+	if len(recent) > 0 {
+		fmt.Printf("%sRecent activity (last 24h, max %d)%s\n", bold, maxRecent, nc)
+		for _, r := range recent {
+			fmt.Printf("  %s\n", r)
+		}
+		fmt.Println()
+	}
+
+	return nil
+}
+
+// auditEntryInGroupOrName returns true when an audit entry's positional args
+// reference the exact instance name. Distinct from `auditEntryInGroup` which
+// matches the *group*. Used by cmdInfo for per-instance audit filtering.
+func auditEntryInGroupOrName(argStrs []string, name string) bool {
+	for _, a := range argStrs {
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		return a == name
+	}
+	return false
+}
+
+// orDash returns "—" for empty strings; used in human-readable rendering.
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
 }
 
 // ---------------------------------------------------------------------------
@@ -1159,6 +2022,10 @@ func probeInstance(paths Paths, name string) instanceHealth {
 func cmdHealth(args []string) error {
 	paths := resolvePaths()
 	jsonMode := hasFlag(args, "--json")
+	filterGroup := flagValue(args, "--group=")
+	if err := requireGroup(paths, filterGroup); err != nil {
+		return err
+	}
 
 	var names []string
 	for _, a := range args {
@@ -1166,14 +2033,24 @@ func cmdHealth(args []string) error {
 			names = append(names, a)
 		}
 	}
+	// Positional names and --group= are mutually exclusive: positional means
+	// "probe these exact instances" while --group= means "probe everyone in
+	// this team". Mixing them is ambiguous (intersection vs union) so we
+	// reject the combination rather than silently pick one.
+	if len(names) > 0 && filterGroup != "" {
+		return errorf("specify either positional instance names or --group=, not both")
+	}
 	if len(names) == 0 {
 		entries, err := readRegistry(paths)
 		if err != nil {
 			return err
 		}
+		entries = filterEntriesByGroup(entries, filterGroup)
 		if len(entries) == 0 {
 			if jsonMode {
 				fmt.Println("[]")
+			} else if filterGroup != "" {
+				fmt.Printf("No instances in group '%s'.\n", filterGroup)
 			} else {
 				fmt.Println("No instances found.")
 			}
