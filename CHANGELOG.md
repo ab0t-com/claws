@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.8] — 2026-05-24
+
 ### Fixed
 
 - **`claws setup` no longer hard-fails when an agent name already exists.**
