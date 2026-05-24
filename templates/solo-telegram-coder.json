@@ -1,0 +1,40 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "solo-telegram-coder",
+    "version": "1.0.0",
+    "description": "One coding-focused agent on Telegram. Codex OAuth preferred, OpenAI API key fallback.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["solo", "telegram", "coding"]
+  },
+  "runtime": {
+    "name": "openclaw",
+    "image": "openclaw:local"
+  },
+  "team": {
+    "name": "default",
+    "shared": true
+  },
+  "agents": [
+    {
+      "name": "agent-1",
+      "auth": {
+        "preferred": "codex",
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
+      },
+      "channels": [
+        {
+          "type": "telegram",
+          "tokenFrom": { "env": "TELEGRAM_BOT_TOKEN" },
+          "dmPolicy": "pairing"
+        }
+      ]
+    }
+  ],
+  "postSetup": ["audit"]
+}

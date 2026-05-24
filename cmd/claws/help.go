@@ -764,6 +764,9 @@ and the OpenClaw image, and writes default config files.
 
 Safe to run multiple times (idempotent).`,
 
+	"quickstart": quickstartHelp,
+	"apply":      applyHelp,
+
 	"version": `Usage: claws version
 
 Show claws version, Go runtime, Docker version, Compose version, and
@@ -855,8 +858,10 @@ var topicHelp = map[string]string{
 
   The fastest way to get running:
 
-    claws setup         Guided interactive onboarding (recommended)
-    claws init          Manual setup (creates dirs, policy, access)
+    claws quickstart    One-click first agent (idempotent, no flags)
+    claws setup         Guided interactive onboarding
+    claws init          Manual setup only (creates dirs, policy, access)
+    claws apply --file=<profile.json>   Apply a declarative profile
     claws doctor        Verify environment is ready
 
   After setup, manage your agents:
@@ -962,7 +967,9 @@ var topicHelp = map[string]string{
 
 	"commands": `Command Quick Reference
 
-  setup                 Guided onboarding (recommended for new users)
+  quickstart            One-click first agent (smart defaults, idempotent)
+  setup                 Guided interactive onboarding
+  apply --file=<f>      Apply a declarative profile (JSON)
   create <name>         Create an agent (supports --auth=, --telegram=, etc.)
   start/stop <name>     Start or stop an agent
   list                  List all agents

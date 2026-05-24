@@ -96,6 +96,9 @@ for target in "${TARGETS[@]}"; do
     if [ -d "$ROOT/docs" ]; then
         cp -r "$ROOT/docs" "$outdir/"
     fi
+    if [ -d "$ROOT/templates" ]; then
+        cp -r "$ROOT/templates" "$outdir/"
+    fi
 
     # ---- Generate per-target MANIFEST.txt ----
     {

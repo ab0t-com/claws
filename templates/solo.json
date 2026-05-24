@@ -1,0 +1,25 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "solo",
+    "version": "1.0.0",
+    "description": "Bare-minimum: one agent in a default team. No channel, no auth — add those as next steps.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["solo", "starter"]
+  },
+  "runtime": {
+    "name": "openclaw",
+    "image": "openclaw:local"
+  },
+  "team": {
+    "name": "default",
+    "shared": true
+  },
+  "agents": [
+    {
+      "name": "agent-1"
+    }
+  ]
+}

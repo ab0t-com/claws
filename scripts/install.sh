@@ -154,6 +154,9 @@ install_data_assets() {
     if [ -d "$src_dir/docs" ]; then
         run "cp -r \"$src_dir/docs\" \"$DATA_DIR/\""
     fi
+    if [ -d "$src_dir/templates" ]; then
+        run "cp -r \"$src_dir/templates\" \"$DATA_DIR/\""
+    fi
 }
 
 verify_on_path() {

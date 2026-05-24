@@ -108,6 +108,10 @@ func main() {
 		err = cmdSetup(args)
 	case "init":
 		err = cmdInit(args)
+	case "quickstart":
+		err = cmdQuickstart(args)
+	case "apply":
+		err = cmdApply(args)
 	case "version", "--version", "-v":
 		err = cmdVersion(args)
 	case "doctor":

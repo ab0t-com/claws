@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.1.0] — 2026-05-24
+
+### Added — One-click & declarative install
+
+- **`claws quickstart [team] [agent]`** — one-click first agent. Idempotent.
+  Smart defaults (`team=default`, `agent=agent-1`). Runs init → policy init →
+  access init → group create → agent create, skipping each step if already
+  done. Auth and channels are NOT auto-run (they need user input) — printed
+  as explicit next-step commands. Re-running is a no-op.
+- **`claws apply --file=<profile.json>`** — declarative profile loader.
+  Reads a JSON profile conforming to schema `claws.ab0t.com/v1` and
+  reconciles host state. Idempotent. Supports `--dry-run` and `--yes` (for
+  profiles that declare elevated-permission warnings).
+- **Profile schema v1** with secret resolution via `tokenFrom.env`,
+  `tokenFrom.file`, or `tokenFrom.command` — profiles contain no secrets.
+- **Bundled templates** in `templates/`:
+  - `templates/solo.json` — bare minimum (1 agent, no channel)
+  - `templates/solo-telegram-coder.json` — 1 agent on Telegram + Codex OAuth
+- **Help entries** for both new verbs (`claws quickstart --help`,
+  `claws apply --help`) and listings under "Getting Started" / "Commands".
+
+### Changed
+
+- README quickstart section now leads with `claws quickstart`.
+
 ## [v1.0.1] — 2026-05-24
 
 ### Fixed
