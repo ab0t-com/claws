@@ -199,3 +199,28 @@ command, run it, come back. With v1.6.1: one command.
   idempotent already-present case.)
 
 ## 2026-05-24 — All three tasks shipped. Ready for tests + v1.6.1 release.
+
+## 2026-05-24 — Shipped (commit 8ab9097, tag v1.6.1)
+
+- All three tasks landed (P0 of the ticket = complete).
+- Full suite green.
+- gitleaks clean.
+- release/VERSION → v1.6.1.
+- 4 new tests covering missing-env behaviour.
+- Honest CHANGELOG entry calling out what was previously a silent
+  failure.
+
+**Patch bump rule applied:** v1.6.0 → v1.6.1, not v1.7.0. Per
+`feedback_patch_bumps_only` memory.
+
+**Status: CLOSED.**
+
+### What's NOT done (would-be follow-ups)
+
+- `claws image bootstrap --yes` full build-from-source not tested
+  in this session (would consume real host time/disk; verified via
+  the idempotent-skip and dry-help paths only).
+- No `--prompt` mode for missing-env (interactive value collection
+  + `/etc/claws/secrets/` write). Deferred until concrete demand.
+- Telegram BotFather walkthrough — still deferred. Quickstart prints
+  the URL already.
