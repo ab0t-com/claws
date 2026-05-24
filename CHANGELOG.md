@@ -9,6 +9,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.2] — 2026-05-24
+
+The "say GO, have a bot on your phone" patch. Closes the gap between
+"claws install works" and "user has a responding bot in their pocket"
+to ~3 commands + 2 token pastes.
+
+See `docs/goal-instant-claw.md` for the design intent.
+
+### Added — `scripts/setup-secrets.sh`
+
+Initialises a claws secrets directory (default `/tmp/claws-secrets/`)
+with placeholder files for 9 known providers/channels (OpenAI, Anthropic,
+Google, Groq, OpenRouter, Telegram, Discord, Slack bot+app). Each
+placeholder file is `chmod 600`; the directory is `chmod 700`. Each
+placeholder explains where to get the value (with the URL) and how to
+paste it. Includes a README.md inside explaining the naming convention.
+
+Idempotent: re-runs preserve files that contain a real value (any
+non-blank, non-comment line), only create the ones still empty.
+
+### Added — `claws apply --secrets-dir=<path>`
+
+Auto-resolves any unresolved `tokenFrom.env` reference to a file under
+`<path>` keyed off the env-var name. Convention matches the setup
+script:
+
+| env var | secrets file |
+|---|---|
+| `OPENAI_API_KEY` | `openai.key` |
+| `ANTHROPIC_API_KEY` | `anthropic.key` |
+| `GOOGLE_API_KEY` / `GEMINI_API_KEY` | `google.key` |
+| `GROQ_API_KEY` | `groq.key` |
+| `OPENROUTER_API_KEY` | `openrouter.key` |
+| `TELEGRAM_BOT_TOKEN` | `telegram.token` |
+| `DISCORD_BOT_TOKEN` | `discord.token` |
+| `SLACK_BOT_TOKEN` | `slack.bot-token` |
+| `SLACK_APP_TOKEN` | `slack.app-token` |
+
+Anything not in the curated map falls through to a derivation rule:
+`*_API_KEY` / `*_KEY` → `.key`, `*_TOKEN` → `.token`, `*_SECRET` →
+`.secret`, with underscores normalised to dashes.
+
+Files may contain comments (lines starting with `#`) and blank lines —
+both are stripped at read time. The remaining content is the value.
+
+Order of precedence at resolve time: **env var first, secrets-dir
+file second.** Lets operators override per-shell without editing the
+file.
+
+### Added — `templates/demo/instant-bot.json`
+
+New bundled template: minimum-input — one agent on Telegram with
+OpenAI auth, sandbox enabled, conservative DM/policy defaults. Designed
+to pair with `setup-secrets.sh`:
+
+```bash
+./scripts/setup-secrets.sh
+$EDITOR /tmp/claws-secrets/openai.key
+$EDITOR /tmp/claws-secrets/telegram.token
+claws apply --template=demo/instant-bot --secrets-dir=/tmp/claws-secrets
+claws start default/instant
+# → DM your bot. It replies.
+```
+
+Three commands + two token pastes from a working install to a
+responding bot on your phone.
+
+### Added — `docs/goal-instant-claw.md`
+
+Documents the design intent of the "GO" path: why this matters, the
+exact acceptance criteria, what's in scope for v1.6.2 vs deferred, why
+`/tmp/claws-secrets/` is the default location (no sudo, easy to wipe,
+operator can override anywhere), and what other tasks are still
+claimable after this lands.
+
+### Added — `templates/demo/` namespace
+
+New top-level namespace alongside `solo/`, `teams/`, `specialty/`.
+Signals "for trying things out, not for production." Future:
+`demo/instant-team` (group chat), `demo/local-only` (no channel), etc.
+
+### Tests
+
+- 7 new tests for `--secrets-dir`: curated map lookup, derivation
+  fallback, no-dir-active short-circuit, comment-and-blank stripping,
+  comments-only = effectively empty, end-to-end apply with secrets
+  resolving from files, empty-file-still-missing case.
+- Full suite green.
+
+### Not in this release
+
+- `templates/demo/instant-team.json` — group-chat variant. Deferred;
+  solo bot is the MVP.
+- Auto-detection of `~/.config/claws/secrets/` — operator can pass
+  `--secrets-dir=~/.config/claws/secrets` explicitly.
+- Interactive `--prompt` mode for missing values — still deferred.
+
 ## [v1.6.1] — 2026-05-24
 
 Patch release — three day-one friction fixes for new users. Each one

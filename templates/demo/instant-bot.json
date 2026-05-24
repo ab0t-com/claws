@@ -1,0 +1,45 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "instant-bot",
+    "version": "1.0.0",
+    "description": "Minimum-input demo: one agent on Telegram with OpenAI auth. Designed for `claws apply --secrets-dir=/tmp/claws-secrets` — paste two tokens, run two commands, get a bot on your phone.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["demo", "instant", "telegram", "openai"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": {
+    "loopbackOnly": true,
+    "dmDefault": "pairing",
+    "outboundDefault": "off"
+  },
+  "team": { "name": "default", "shared": true },
+  "agents": [
+    {
+      "name": "instant",
+      "sandbox": true,
+      "tools": { "profile": "assistant" },
+      "config": {
+        "agents.defaults.maxTokens": 4096,
+        "agents.defaults.persona": "friendly-assistant"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
+      },
+      "channels": [
+        {
+          "type": "telegram",
+          "tokenFrom": { "env": "TELEGRAM_BOT_TOKEN" },
+          "dmPolicy": "pairing"
+        }
+      ]
+    }
+  ],
+  "postSetup": ["audit"]
+}

@@ -252,20 +252,103 @@ type SecretRef struct {
 	Command []string `json:"command,omitempty"`
 }
 
+// activeSecretsDir is set by cmdApply when --secrets-dir is passed. When set,
+// SecretRef.resolve and checkSecretsResolvable fall back to a file under it
+// keyed off the env-var name (e.g. OPENAI_API_KEY → <dir>/openai.key).
+var activeSecretsDir string
+
+// envToSecretFile is the curated mapping from well-known env-var names to
+// filenames under activeSecretsDir. Matches what scripts/setup-secrets.sh
+// creates so the two stay in lockstep. Anything not in this table falls
+// through to the derivation rule below.
+var envToSecretFile = map[string]string{
+	"OPENAI_API_KEY":     "openai.key",
+	"ANTHROPIC_API_KEY":  "anthropic.key",
+	"GOOGLE_API_KEY":     "google.key",
+	"GEMINI_API_KEY":     "google.key",
+	"GROQ_API_KEY":       "groq.key",
+	"OPENROUTER_API_KEY": "openrouter.key",
+	"TELEGRAM_BOT_TOKEN": "telegram.token",
+	"DISCORD_BOT_TOKEN":  "discord.token",
+	"SLACK_BOT_TOKEN":    "slack.bot-token",
+	"SLACK_APP_TOKEN":    "slack.app-token",
+}
+
+// secretsDirFallback returns the file path corresponding to an env-var name
+// under activeSecretsDir, or "" if no secrets dir is active.
+//
+// Lookup order:
+//   1. Curated map (envToSecretFile) — matches setup-secrets.sh exactly.
+//   2. Derivation rule: lowercased, _KEY→.key, _TOKEN→.token, _SECRET→.secret;
+//      underscores → dashes.
+func secretsDirFallback(envName string) string {
+	if activeSecretsDir == "" || envName == "" {
+		return ""
+	}
+	if name, ok := envToSecretFile[envName]; ok {
+		return filepath.Join(activeSecretsDir, name)
+	}
+	low := strings.ToLower(envName)
+	var base, ext string
+	switch {
+	case strings.HasSuffix(low, "_api_key"):
+		base = strings.TrimSuffix(low, "_api_key")
+		ext = ".key"
+	case strings.HasSuffix(low, "_key"):
+		base = strings.TrimSuffix(low, "_key")
+		ext = ".key"
+	case strings.HasSuffix(low, "_token"):
+		base = strings.TrimSuffix(low, "_token")
+		ext = ".token"
+	case strings.HasSuffix(low, "_secret"):
+		base = strings.TrimSuffix(low, "_secret")
+		ext = ".secret"
+	default:
+		base = low
+		ext = ".value"
+	}
+	base = strings.ReplaceAll(base, "_", "-")
+	return filepath.Join(activeSecretsDir, base+ext)
+}
+
+// readSecretFile reads a file, strips comment (#) and blank lines, returns
+// the remaining content trimmed. Used by both resolve() and the secrets-dir
+// fallback so the file format is consistent.
+func readSecretFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var keep []string
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		keep = append(keep, trimmed)
+	}
+	return strings.Join(keep, "\n")
+}
+
 // resolve returns the secret value or "" if unresolvable (caller decides how to handle).
 func (s *SecretRef) resolve() string {
 	if s == nil {
 		return ""
 	}
 	if s.Env != "" {
-		return os.Getenv(s.Env)
+		if v := os.Getenv(s.Env); v != "" {
+			return v
+		}
+		// v1.6.2: fall back to --secrets-dir/<derived-filename>
+		if fall := secretsDirFallback(s.Env); fall != "" {
+			if v := readSecretFile(fall); v != "" {
+				return v
+			}
+		}
+		return ""
 	}
 	if s.File != "" {
-		data, err := os.ReadFile(s.File)
-		if err != nil {
-			return ""
-		}
-		return strings.TrimSpace(string(data))
+		return readSecretFile(s.File)
 	}
 	if len(s.Command) > 0 {
 		out, err := exec.Command(s.Command[0], s.Command[1:]...).Output()
@@ -293,7 +376,7 @@ func (s *SecretRef) describe() string {
 }
 
 func cmdApply(args []string) error {
-	var file, templateName string
+	var file, templateName, secretsDir string
 	var yes, dryRun, skipAudit, allowMissing bool
 	for _, a := range args {
 		switch {
@@ -304,6 +387,8 @@ func cmdApply(args []string) error {
 			file = strings.TrimPrefix(a, "--file=")
 		case strings.HasPrefix(a, "--template="):
 			templateName = strings.TrimPrefix(a, "--template=")
+		case strings.HasPrefix(a, "--secrets-dir="):
+			secretsDir = strings.TrimPrefix(a, "--secrets-dir=")
 		case a == "--yes" || a == "-y":
 			yes = true
 		case a == "--dry-run":
@@ -313,6 +398,13 @@ func cmdApply(args []string) error {
 		case a == "--allow-missing":
 			allowMissing = true
 		}
+	}
+	// v1.6.2: if --secrets-dir is set, expose to fetchEnv so SecretRef.Env
+	// falls back to <secrets-dir>/<lowercased-env-var>.{key,token,secret}
+	// when the env var is unset. Drives the "say GO, bot appears" UX.
+	if secretsDir != "" {
+		activeSecretsDir = secretsDir
+		defer func() { activeSecretsDir = "" }()
 	}
 	_ = skipAudit // wired in E2 below
 	if file == "" && templateName == "" {
@@ -712,9 +804,19 @@ func checkSecretsResolvable(p Profile) error {
 		}
 		switch {
 		case ref.Env != "":
-			if os.Getenv(ref.Env) == "" {
-				miss = append(miss, missing{field, "env:" + ref.Env, hint})
+			if os.Getenv(ref.Env) != "" {
+				return
 			}
+			// v1.6.2: try the --secrets-dir fallback before declaring missing.
+			if fall := secretsDirFallback(ref.Env); fall != "" {
+				if readSecretFile(fall) != "" {
+					return
+				}
+				// File exists under secrets-dir but is empty? Note both paths.
+				miss = append(miss, missing{field, "env:" + ref.Env + " (or file:" + fall + ")", hint})
+				return
+			}
+			miss = append(miss, missing{field, "env:" + ref.Env, hint})
 		case ref.File != "":
 			if _, err := os.Stat(ref.File); err != nil {
 				miss = append(miss, missing{field, "file:" + ref.File, hint})
