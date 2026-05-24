@@ -11,7 +11,73 @@ _(nothing yet)_
 
 ## [v1.6.15] — 2026-05-24
 
-_(no changes documented)_
+### Fixed — `claws agent ping`, `claws health`, and auth verify (`readyz` strategy) all probed the gateway from the wrong place
+
+User hit it: `claws agent ping team/john` reported gateway + readyz
+unreachable for every agent whose host port wasn't 18789. Same root
+cause as v1.6.12, two more sites.
+
+### Root cause
+
+Two layers stacked:
+
+1. **Host-side HTTP probe of a container-internal-only port.** Same
+   v1.6.12 finding: the openclaw gateway binds to container-internal
+   `127.0.0.1:18789`, which the host port mapping can't reach.
+   v1.6.12 fixed `cmdStart`; `cmdAgentPing`, `cmdHealth`, and
+   `tryReadyzAuth` were still calling
+   `http.Get("http://127.0.0.1:<host-port>/healthz")` and getting
+   connection reset.
+2. **Wrong port even from inside the container.** The runtime always
+   binds **internal** port 18789. The host port varies per agent
+   (18789 for index 0, 18889 for index 1, 19089 for index 3). Probing
+   `127.0.0.1:<host-port>` from inside the container is also wrong —
+   that port isn't bound in the container's namespace.
+
+### Fix
+
+New helper `containerProbe(paths, name, endpoint)` in
+`cmd/claws/compose.go`:
+
+- Runs the HTTP probe **inside the container** via `docker exec`
+  using node's built-in `fetch` (always present in the runtime
+  image — same mechanism the Docker HEALTHCHECK uses).
+- Uses `Runtime.InternalPort` (always 18789 for openclaw) — NOT
+  `OPENCLAW_GATEWAY_PORT` (the host-side mapping).
+- Returns `probeResult { Reachable, Status, Body }` so callers can
+  distinguish "couldn't reach" from "got 503".
+
+Three callers refactored:
+
+- **`cmdAgentPing`** — gateway uses `containerHealth()`
+  (HEALTHCHECK verdict); readyz uses `containerProbe()`. Treats
+  `/readyz` 404 as "not implemented in this runtime" (optional
+  endpoint), not failure.
+- **`cmdHealth`** — same pattern.
+- **`tryReadyzAuth`** (auth verify's strategy B) — was effectively
+  dead (probe never succeeded); now most agents verify via readyz
+  in ~1s instead of falling through to 5-minute log scan.
+
+### JavaScript-side gotcha
+
+Node v22 evaluates `-e` scripts in TypeScript-aware mode, which
+mis-parses single-quoted JS strings containing `'\n'` (interprets
+the `\n` as a literal newline and errors). `containerProbe` uses
+`console.log(status); process.stdout.write(body)` instead.
+
+### Live verification
+
+Before:
+```
+✗ gateway:   /healthz unreachable on :18889
+✗ readyz:    /readyz unreachable
+```
+
+After:
+```
+✓ gateway:   container reports healthy on :18889
+✓ readyz:    /readyz 200 — agent ready to receive
+```
 
 ## [v1.6.14] — 2026-05-24
 
