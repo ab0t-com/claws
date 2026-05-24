@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.10] — 2026-05-24
+
 ### Added
 
 - **`claws start <team>` Just Works.** Previously you had to type
