@@ -48,9 +48,26 @@ echo -e "${BOLD}claws release — ${VERSION}${NC}"
 echo -e "${DIM}go: $(go version | awk '{print $3}')${NC}"
 echo ""
 
-# Clean previous release
-rm -rf "$RELEASE_DIR"
+# Make sure the release dir exists. We DON'T wipe it — older versions
+# need to remain reachable from main so `claws update --version=vX.Y.Z`
+# and `install.sh --version=vX.Y.Z` work for users who want to pin or
+# downgrade. Prior versions wiped this dir on every cut, which deleted
+# v1.6.4 binaries when v1.6.7 shipped — broke updates for anyone on
+# v1.6.5 / v1.6.6 until restored. Each new build overwrites only its
+# own per-target output dirs / tarballs and rebuilds SHA256SUMS to
+# cover everything in the dir.
 mkdir -p "$RELEASE_DIR"
+
+# Remove just this version's stale outputs (in case of a rebuild),
+# leaving older versions alone. Per-target dirs follow the pattern
+# claws-<VERSION>-<os>-<arch>/ and tarballs claws-<VERSION>-<os>-<arch>.tar.gz.
+# Uses find -delete (no rm -rf — banned per project rules) so the
+# blast radius is bounded to the named pattern.
+for dir in "$RELEASE_DIR/claws-${VERSION}-"*/; do
+    [ -d "$dir" ] || continue
+    find "$dir" -depth -delete
+done
+find "$RELEASE_DIR" -maxdepth 1 -name "claws-${VERSION}-*.tar.gz" -delete 2>/dev/null || true
 
 # Build targets (Unix-only — see header note about Windows)
 TARGETS=(
