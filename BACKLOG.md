@@ -98,3 +98,5 @@ unlocks a small patch:
 | `docs/one-click-pathway.md` | v1.6.3 (post-tag) |
 | `claws paste-secret` | v1.6.4 |
 | `claws setup` hand-hold enhancements (image bootstrap + phone-paste) | v1.6.4 |
+| `install.sh` dash-safe (`curl … \| sh` re-execs under bash) | v1.6.5 |
+| `claws setup` auth pre-flight detection (env, ~/.codex, ~/.claude, existing agents) | v1.6.6 |

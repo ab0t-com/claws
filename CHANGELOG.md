@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.6] — 2026-05-24
+
+`claws setup` now scans the host for existing credentials before
+prompting. Non-technical users on a box that already has
+`$ANTHROPIC_API_KEY` exported, a sibling Codex/Claude Code OAuth, or a
+previous claws/openclaw agent no longer have to find and paste a key
+they already have.
+
+### Added
+
+- **`detectExistingAuth()`** in `cmd/claws/setup_detect.go` —
+  read-only pre-flight scan covering:
+  - Process env: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`.
+  - Sibling-CLI OAuth/session files:
+    `~/.codex/auth.json` (or `config.json`), `~/.claude/.credentials.json`.
+  - Existing claws/openclaw agents: `~/.claws-workspace/*/*/instance.env`
+    and `~/.openclaw/*/*/instance.env` — enumerates which credential-style
+    env var NAMES are set (values never read or copied).
+- **`claws setup` step [5/6] auth menu now dynamic.** Detected env keys
+  appear as menu options ahead of the manual ones, so picking them
+  takes one keypress instead of a paste:
+
+      Detected on this system:
+        • Existing agent team/alice (~/.openclaw) — already has: OPENAI_API_KEY
+        • Claude Code OAuth (~/.claude/.credentials.json) — not auto-reused
+
+        1. Use $ANTHROPIC_API_KEY from your environment
+        2. Codex (OAuth — recommended)
+        3. API key (paste manually)
+        4. Skip for now
+        Choice [1]:
+
+### Design notes
+
+- **OAuth tokens are surfaced but not auto-reused.** A Claude Code or
+  Codex CLI OAuth token is tied to the identity of the CLI it was
+  issued for; copying it into a freshly-onboarded agent would create
+  a fragile second user of that token. We show the path so the operator
+  knows it's there, but the actual choice to re-auth is theirs.
+- **Existing-agent session keys are surfaced but not auto-copied.**
+  Per-instance session keys (`CLAUDE_AI_SESSION_KEY`) often break the
+  source instance when reused — we only print which agents already
+  have credentials so the operator can decide whether to start fresh
+  or keep using the existing one.
+- **Skip-list for non-credential env vars** (`OPENCLAW_GATEWAY_TOKEN`)
+  — looks auth-shaped but is a per-instance gateway/host secret, not a
+  user credential. Surfacing it would be misleading.
+
+### Tests
+
+- `setup_detect_test.go` covers: name-classifier accuracy, env-file
+  parsing (including comments + empty-value skip), JSON validation of
+  Claude Code credentials block, `$HOME` shortening, and end-to-end
+  detection in a sandboxed `HOME` (sets `t.Setenv("HOME", ...)` so the
+  real `~/.openclaw` and `~/.claude` are not touched).
+
 ## [v1.6.5] — 2026-05-24
 
 Install path hotfix — `curl install.sh | sh` was failing on Ubuntu

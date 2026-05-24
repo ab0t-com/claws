@@ -302,31 +302,106 @@ func cmdSetup(args []string) error {
 			fmt.Printf("  %sAuthentication for %s%s\n", bold, currentAgent, nc)
 		}
 		currentAuth := authMode
+		var detectedProvider, detectedKey string // populated if user picks a detected env key
+
 		if currentAuth == "" {
 			if nonInteractive {
 				fmt.Println("    Skipping auth (not specified)")
 			} else {
-				fmt.Println("    1. Codex (OAuth — recommended)")
-				fmt.Println("    2. API key (Anthropic, OpenAI, etc.)")
-				fmt.Println("    3. Skip for now")
+				// v1.6.6: pre-flight scan for credentials already on this
+				// host. Non-technical users often have ANTHROPIC_API_KEY
+				// in env, an existing claws agent, or sibling-CLI OAuth.
+				// Surfacing those first means we don't re-ask for what
+				// they already have.
+				det := detectExistingAuth()
+
+				// Build the menu dynamically. Detected options come first
+				// (lowest friction), then the manual choices.
+				type menuItem struct {
+					label string
+					auth  string // "codex", "apikey", or "skip"
+					prov  string // for apikey-from-env: which provider
+					key   string // for apikey-from-env: the actual key
+				}
+				var items []menuItem
+
+				if det.EnvAnthropicKey != "" {
+					items = append(items, menuItem{
+						label: "Use $ANTHROPIC_API_KEY from your environment",
+						auth:  "apikey-env", prov: "anthropic", key: det.EnvAnthropicKey,
+					})
+				}
+				if det.EnvOpenAIKey != "" {
+					items = append(items, menuItem{
+						label: "Use $OPENAI_API_KEY from your environment",
+						auth:  "apikey-env", prov: "openai", key: det.EnvOpenAIKey,
+					})
+				}
+				if det.EnvOpenRouterKey != "" {
+					items = append(items, menuItem{
+						label: "Use $OPENROUTER_API_KEY from your environment",
+						auth:  "apikey-env", prov: "openrouter", key: det.EnvOpenRouterKey,
+					})
+				}
+				// Standard options always present.
+				items = append(items,
+					menuItem{label: "Codex (OAuth — recommended)", auth: "codex"},
+					menuItem{label: "API key (paste manually)", auth: "apikey"},
+					menuItem{label: "Skip for now", auth: "skip"},
+				)
+
+				// Informational hints (not selectable items) — surface
+				// OAuth tokens and existing-agent presence so the
+				// operator knows what's already done.
+				if det.ClaudeCodeOAuth != "" || det.CodexOAuth != "" || len(det.ExistingAgents) > 0 {
+					fmt.Println("    Detected on this system:")
+					if det.ClaudeCodeOAuth != "" {
+						fmt.Printf("      • Claude Code OAuth (%s) — not auto-reused (tied to your CLI identity)\n", shortenHome(det.ClaudeCodeOAuth))
+					}
+					if det.CodexOAuth != "" {
+						fmt.Printf("      • Codex CLI OAuth (%s) — pick option for fresh agent OAuth if you want the same\n", shortenHome(det.CodexOAuth))
+					}
+					if len(det.ExistingAgents) > 0 {
+						for _, a := range det.ExistingAgents {
+							fmt.Printf("      • Existing agent %s/%s (%s) — already has: %s\n",
+								a.Team, a.Name, shortenHome(a.Workspace), strings.Join(a.HasKeys, ", "))
+						}
+					}
+					fmt.Println()
+				}
+
+				for i, it := range items {
+					fmt.Printf("    %d. %s\n", i+1, it.label)
+				}
 				choice := prompt("Choice", "1")
-				switch choice {
-				case "1":
-					currentAuth = "codex"
-				case "2":
-					currentAuth = "apikey"
+				idx := 0
+				if _, perr := fmt.Sscanf(choice, "%d", &idx); perr != nil || idx < 1 || idx > len(items) {
+					idx = 1
+				}
+				picked := items[idx-1]
+				currentAuth = picked.auth
+				if picked.auth == "apikey-env" {
+					detectedProvider, detectedKey = picked.prov, picked.key
 				}
 			}
 		}
 
-		if currentAuth == "codex" {
+		switch currentAuth {
+		case "codex":
 			fmt.Println("    Starting OAuth flow...")
 			if err := cmdAuth([]string{fullName, "codex"}); err != nil {
 				warn(fmt.Sprintf("Auth failed: %v — you can retry later: claws auth %s codex", err, fullName))
 			} else {
 				fmt.Printf("    %s✓%s Auth complete.\n", green, nc)
 			}
-		} else if currentAuth == "apikey" {
+		case "apikey-env":
+			fmt.Printf("    Using detected %s key from environment...\n", detectedProvider)
+			if err := cmdAuth([]string{fullName, "apikey", detectedProvider, detectedKey}); err != nil {
+				warn(fmt.Sprintf("Auth failed: %v", err))
+			} else {
+				fmt.Printf("    %s✓%s API key configured.\n", green, nc)
+			}
+		case "apikey":
 			if nonInteractive {
 				// Look for provider key in remaining args
 				for i := 0; i < len(args); i++ {
