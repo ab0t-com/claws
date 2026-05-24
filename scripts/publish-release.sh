@@ -180,26 +180,46 @@ else
     if grep -q "^## \[Unreleased\]" "$CHANGELOG"; then
         info "promoting [Unreleased] → [$VERSION] — $TODAY"
         if [ "$DRY_RUN" -eq 0 ]; then
-            # Insert new Unreleased section above the old one, then rename old.
+            # Preserve the body that was authored under [Unreleased] and
+            # move it under the new [vX.Y.Z] heading. Reset [Unreleased]
+            # to the empty marker so the next release starts fresh.
+            #
+            # Bug history: prior version of this block lost the body
+            # because the regex match was replaced WITHOUT including the
+            # captured body — releases ended up with empty changelogs.
             python3 - "$CHANGELOG" "$VERSION" "$TODAY" <<'PYEOF'
 import sys, re
 path, version, today = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path) as f:
     body = f.read()
-new = re.sub(
-    r"^## \[Unreleased\].*?(?=^## \[)",
-    f"## [Unreleased]\n\n_(nothing yet)_\n\n## [{version}] — {today}\n\n",
+
+# Capture EVERYTHING between "## [Unreleased]" and the next "## [..." (or EOF).
+m = re.search(
+    r"^## \[Unreleased\][^\n]*\n(?P<body>.*?)(?=^## \[|\Z)",
     body,
-    count=1,
     flags=re.MULTILINE | re.DOTALL,
 )
-# If the file ends with the Unreleased section (no later release yet), handle that case:
-if new == body and "## [Unreleased]" in body:
-    new = body.replace(
-        "## [Unreleased]\n\n_(nothing yet)_",
-        f"## [Unreleased]\n\n_(nothing yet)_\n\n## [{version}] — {today}",
-        1,
-    )
+if not m:
+    print("WARNING: [Unreleased] section not found — leaving file untouched", file=sys.stderr)
+    sys.exit(0)
+
+captured = m.group("body").strip("\n")
+# An effectively-empty Unreleased section: just the "_(nothing yet)_" marker
+# (or completely empty). Don't bother creating a stub release entry — but
+# the script's caller already decided to publish, so produce a heading
+# with an explicit "(no changes documented)" placeholder rather than an
+# eerily blank section.
+placeholder = "_(no changes documented)_"
+if not captured or captured.strip() in {placeholder, "_(nothing yet)_"}:
+    captured_block = placeholder
+else:
+    captured_block = captured
+
+replacement = (
+    f"## [Unreleased]\n\n_(nothing yet)_\n\n"
+    f"## [{version}] — {today}\n\n{captured_block}\n\n"
+)
+new = body[:m.start()] + replacement + body[m.end():]
 with open(path, "w") as f:
     f.write(new)
 PYEOF
