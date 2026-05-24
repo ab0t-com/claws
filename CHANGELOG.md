@@ -7,7 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — `claws start` no longer falsely warns "health check didn't pass"
+
+User hit it: `claws start team` reported all 3 agents as failing the
+30s health check, but `docker inspect` showed every container as
+`health=healthy` and the agents were actually running fine. The
+warning was false — a misdiagnosis of a working system.
+
+### Root cause
+
+`cmdStart` waited for health by polling `http.Get(http://127.0.0.1:<port>/healthz)`
+from the host. Modern openclaw runtimes bind the gateway to
+**container-internal** `127.0.0.1:18789`, not `0.0.0.0`. Docker's
+port mapping (`127.0.0.1:18789 → 18789/tcp`) only forwards to whatever
+the container is actually listening on, and container-internal
+loopback isn't reachable across the namespace boundary. Result: the
+host probe got `connection reset by peer` every retry; meanwhile the
+container's OWN Docker HEALTHCHECK (which runs INSIDE the container)
+fetched the same `/healthz` over real loopback and succeeded.
+
+### Fix
+
+`cmdStart` now polls `docker inspect --format '{{.State.Health.Status}}'`
+and trusts the container's own healthcheck verdict:
+
+- **`healthy`** → success.
+- **`unhealthy`** → abort the wait early with a clear pointer.
+- **`starting`** / **""** → keep waiting (HEALTHCHECK still in start-period
+  or container just `up`'d).
+- **`none`** (no HEALTHCHECK defined in the image) → fall back to the
+  legacy host HTTP probe for backwards-compatibility with custom
+  runtimes that don't ship one.
+
+### New helper
+
+`containerHealth(paths, name) string` in `cmd/claws/compose.go` — reads
+Docker's health verdict. Returns `"healthy"`, `"starting"`,
+`"unhealthy"`, `"none"`, or `""` (couldn't inspect).
+
+### Not changed (yet)
+
+`cmdHealth` (the `claws health <name>` command) still uses the
+host HTTP probe at line ~2199 of `commands.go`. Same diagnosis would
+apply, but the user hit it via `claws start`, so that's what shipped.
+Filed as a follow-up.
 
 ## [v1.6.11] — 2026-05-24
 

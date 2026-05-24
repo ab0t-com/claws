@@ -565,25 +565,57 @@ func cmdStart(args []string) error {
 		return err
 	}
 
-	// Wait for health
+	// Wait for health. We poll Docker's healthcheck status rather than
+	// probing the gateway port from the host because modern openclaw
+	// runtimes bind to container-internal 127.0.0.1 — the host can't
+	// reach the gateway directly. Docker's HEALTHCHECK runs inside the
+	// container where the loopback works, so it's authoritative.
+	//
+	// Fall back to host HTTP probe if the container declares no
+	// HEALTHCHECK (older runtimes / custom images).
 	rt := mustResolveRuntime(paths, name)
-	url := fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint)
-
 	fmt.Println()
 	info("Waiting for health...")
 	healthy := false
+	useHTTPFallback := false
 	for i := 0; i < 15; i++ {
-		resp, err := http.Get(url)
-		if err == nil && resp.StatusCode == 200 {
-			resp.Body.Close()
+		h := containerHealth(paths, name)
+		switch h {
+		case "healthy":
 			info(fmt.Sprintf("Instance '%s' is healthy on :%s", name, port))
 			healthy = true
+		case "unhealthy":
+			warn(fmt.Sprintf("Container reports unhealthy — check: claws logs %s", name))
+			// Don't break; an unhealthy verdict means HEALTHCHECK has been
+			// failing. No point waiting longer.
+			i = 99
+		case "none":
+			// No HEALTHCHECK in the image — use the legacy HTTP probe path.
+			useHTTPFallback = true
+		case "starting", "":
+			// "starting" → keep waiting. "" → docker not reachable yet
+			// (container only just `docker compose up`'d) → also wait.
+		}
+		if healthy || useHTTPFallback {
 			break
 		}
-		if resp != nil {
-			resp.Body.Close()
-		}
 		time.Sleep(2 * time.Second)
+	}
+	if !healthy && useHTTPFallback {
+		url := fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint)
+		for i := 0; i < 15; i++ {
+			resp, err := http.Get(url)
+			if err == nil && resp.StatusCode == 200 {
+				resp.Body.Close()
+				info(fmt.Sprintf("Instance '%s' is healthy on :%s", name, port))
+				healthy = true
+				break
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+			time.Sleep(2 * time.Second)
+		}
 	}
 	if !healthy {
 		warn("Health check didn't pass in 30s — check: claws logs " + name)

@@ -110,6 +110,34 @@ func containerStatus(paths Paths, name string) string {
 	return trimSpace(out)
 }
 
+// containerHealth returns Docker's healthcheck verdict for an instance's
+// gateway container, as reported by `docker inspect`. One of:
+//
+//   "healthy"    — HEALTHCHECK succeeded and the container is up.
+//   "starting"   — HEALTHCHECK still in start-period or not yet run.
+//   "unhealthy"  — HEALTHCHECK has failed enough times to flip.
+//   "none"       — no HEALTHCHECK defined for this container.
+//   ""           — couldn't inspect (container missing, docker unreachable, etc.).
+//
+// We use this rather than probing the gateway from the host because
+// modern openclaw runtimes bind to container-internal 127.0.0.1, which
+// the host port mapping can't reach. The HEALTHCHECK runs INSIDE the
+// container where the loopback is real, so it's authoritative.
+func containerHealth(paths Paths, name string) string {
+	container := resolveContainerName(paths, name)
+	if container == "" {
+		return ""
+	}
+	cmd := exec.Command("docker", "inspect",
+		"--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+		container)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return trimSpace(string(out))
+}
+
 func trimSpace(s string) string {
 	i, j := 0, len(s)
 	for i < j && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r' || s[i] == '\t') {
