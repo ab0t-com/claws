@@ -1,4 +1,4 @@
-# clawctl Product Marketing & User Experience Review
+# claws Product Marketing & User Experience Review
 
 **Date:** 2026-03-17
 **Reviewer Perspective:** Product Marketing Manager — user understanding, market positioning, experience gaps
@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-clawctl solves a real, emerging problem: **managing a fleet of personal AI agent instances on a single server**. The core lifecycle commands (create/start/stop/list/status/remove) form a tight, intuitive loop. The group and shared-resource system hints at a powerful coordination layer. However, the product has significant gaps in onboarding, discoverability, and the completeness of its most differentiated feature (manager/worker roles). This report identifies what's working, what's missing, and where to focus before putting this in front of users.
+claws solves a real, emerging problem: **managing a fleet of personal AI agent instances on a single server**. The core lifecycle commands (create/start/stop/list/status/remove) form a tight, intuitive loop. The group and shared-resource system hints at a powerful coordination layer. However, the product has significant gaps in onboarding, discoverability, and the completeness of its most differentiated feature (manager/worker roles). This report identifies what's working, what's missing, and where to focus before putting this in front of users.
 
 ---
 
 ## 1. Value Proposition
 
-### What clawctl is
+### What claws is
 
 A CLI that lets a single operator run **multiple isolated OpenClaw AI agent instances** on one machine, each with:
 - Its own identity, credentials, and messaging channels
@@ -45,15 +45,15 @@ The messaging should lean into: **"Your agents, your server, your rules."**
 ### Happy Path (Strong)
 
 ```
-clawctl create alice
+claws create alice
   -> Prints port, directory, next steps
-clawctl auth alice codex
+claws auth alice codex
   -> OAuth flow
-clawctl start alice
+claws start alice
   -> Health-checked startup with wait loop
-clawctl list
+claws list
   -> Table with NAME, PORT, STATUS, RAM, UPTIME
-clawctl tunnel
+claws tunnel
   -> Prints ready-to-paste SSH command
 ```
 
@@ -68,17 +68,17 @@ There is no first-run experience. A brand-new user must:
 3. Know that `docker-compose.yml` must be in a specific location
 4. Trust that port 18789+ won't conflict with existing services
 
-**There is no `clawctl init`, no `clawctl doctor`, no `clawctl version`.** The first command a new user runs will be `clawctl create foo` and it will fail with an opaque Docker error if prerequisites aren't met.
+**There is no `claws init`, no `claws doctor`, no `claws version`.** The first command a new user runs will be `claws create foo` and it will fail with an opaque Docker error if prerequisites aren't met.
 
-**Recommendation:** Add `clawctl init` (creates root dir, validates Docker, pulls image) and `clawctl doctor` (checks Docker, image, disk, ports, AWS CLI, rclone).
+**Recommendation:** Add `claws init` (creates root dir, validates Docker, pulls image) and `claws doctor` (checks Docker, image, disk, ports, AWS CLI, rclone).
 
 ### Discovery Path (Weak)
 
 The `--help` output is well-organized into sections (Lifecycle, Info, Auth & Channels, etc.) but:
 
-- No man page, no `--help` per subcommand (e.g., `clawctl create --help`)
+- No man page, no `--help` per subcommand (e.g., `claws create --help`)
 - No way to discover what `--from=` templates are available
-- No way to see what a group contains without `clawctl group list` + `clawctl list`
+- No way to see what a group contains without `claws group list` + `claws list`
 - The manager/worker role system is listed in help but has no explanation of what it does
 
 ### Advanced Path (Incomplete)
@@ -86,7 +86,7 @@ The `--help` output is well-organized into sections (Lifecycle, Info, Auth & Cha
 Groups and roles are the most differentiated feature. But:
 
 - Creating a worker sets up volume mounts for a task queue... that has no CLI
-- There's no `clawctl task dispatch`, `clawctl task list`, or `clawctl task claim`
+- There's no `claws task dispatch`, `claws task list`, or `claws task claim`
 - The shared workspace and skills mounts work, but there's no way to inspect what's shared
 - A user who creates `backend/manager` and `backend/worker-1` gets directories and nothing else
 
@@ -120,16 +120,16 @@ Groups and roles are the most differentiated feature. But:
 
 | Command | Purpose | Priority |
 |---------|---------|----------|
-| `clawctl init` | First-run setup: create root dir, validate Docker, pull image | P0 |
-| `clawctl doctor` | Diagnose: Docker, image, ports, disk, tools | P0 |
-| `clawctl version` | Show clawctl version, Go version, Docker version, image tag | P0 |
-| `clawctl create --help` | Per-command help with examples | P1 |
-| `clawctl config show <name>` | Show merged config for an instance | P1 |
-| `clawctl config edit <name>` | Open config in $EDITOR | P2 |
-| `clawctl template list` | List instances that can be used with `--from=` | P2 |
-| `clawctl task dispatch` | Send task from manager to worker queue | P1 (if roles ship) |
-| `clawctl task list` | Show pending/claimed/done tasks | P1 (if roles ship) |
-| `clawctl upgrade <name>` | Pull new image and restart | P2 |
+| `claws init` | First-run setup: create root dir, validate Docker, pull image | P0 |
+| `claws doctor` | Diagnose: Docker, image, ports, disk, tools | P0 |
+| `claws version` | Show claws version, Go version, Docker version, image tag | P0 |
+| `claws create --help` | Per-command help with examples | P1 |
+| `claws config show <name>` | Show merged config for an instance | P1 |
+| `claws config edit <name>` | Open config in $EDITOR | P2 |
+| `claws template list` | List instances that can be used with `--from=` | P2 |
+| `claws task dispatch` | Send task from manager to worker queue | P1 (if roles ship) |
+| `claws task list` | Show pending/claimed/done tasks | P1 (if roles ship) |
+| `claws upgrade <name>` | Pull new image and restart | P2 |
 
 ---
 
@@ -141,9 +141,9 @@ Groups and roles are the most differentiated feature. But:
 - The `group/instance` reference format mirrors filesystem paths — familiar
 
 ### Concerns
-- **"clawctl" vs "openclaw"** — the naming relationship is unclear. Is clawctl part of OpenClaw? A companion tool? The `openclaw-` prefix on Docker projects and compose files suggests tight coupling, but the CLI name suggests independence.
+- **"clawctl" vs "openclaw"** — the naming relationship is unclear. Is claws part of OpenClaw? A companion tool? The `openclaw-` prefix on Docker projects and compose files suggests tight coupling, but the CLI name suggests independence.
 - **"Manager" and "Worker"** — these terms imply an active coordination protocol that doesn't exist yet. Consider "coordinator" and "member" until the task dispatch system is built.
-- **"Shared"** — overloaded. `--shared-skills`, `--shared-workspace`, and `clawctl group shared` all mean different things (instance-level vs group-level sharing).
+- **"Shared"** — overloaded. `--shared-skills`, `--shared-workspace`, and `claws group shared` all mean different things (instance-level vs group-level sharing).
 
 ---
 
@@ -152,9 +152,9 @@ Groups and roles are the most differentiated feature. But:
 The 8-instance hard cap (`maxInstances`) and 6-instance warning threshold (`warnInstances`) are set in code but:
 
 - Not documented in `--help`
-- Not shown in `clawctl list` or `clawctl status`
+- Not shown in `claws list` or `claws status`
 - The RAM model (230MB base per instance on Node 22) is implicit
-- No `clawctl capacity` or similar command to show headroom
+- No `claws capacity` or similar command to show headroom
 
 **Recommendation:** Add instance count and estimated RAM to the dashboard. Surface the cap in the error message with guidance: "Maximum 8 instances reached. Each instance uses ~230MB RAM. Current server: 4GB total."
 
@@ -183,7 +183,7 @@ The 8-instance hard cap (`maxInstances`) and 6-instance warning threshold (`warn
 
 ## 8. Key Recommendations
 
-1. **Add `clawctl init` + `clawctl doctor` + `clawctl version`** — these are table stakes for any CLI tool
+1. **Add `claws init` + `claws doctor` + `claws version`** — these are table stakes for any CLI tool
 2. **Write a README.md** with a 5-minute quickstart: init, create, auth, start, tunnel
 3. **Scope down roles** — remove `--role=manager|worker` from `create` until the task dispatch system exists, or clearly label it as experimental
 4. **Add `--json` output** to `list`, `status`, `health` — enables scripting and CI/CD

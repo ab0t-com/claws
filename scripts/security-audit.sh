@@ -1,5 +1,5 @@
 #!/bin/bash
-# clawctl security audit — checks your deployment against best practices
+# claws security audit — checks your deployment against best practices
 # Usage: ./scripts/security-audit.sh [OPENCLAW_ROOT]
 #
 # Each check explains WHAT it found and WHY it matters in plain language.
@@ -20,7 +20,7 @@ warn() { echo -e "  [${YELLOW}WARN${NC}] $1"; ((WARN++)); }
 fail() { echo -e "  [${RED}FAIL${NC}] $1"; ((FAIL++)); }
 hint() { echo -e "         ${DIM}→ $1${NC}"; }
 
-echo -e "${BOLD}clawctl security audit${NC}"
+echo -e "${BOLD}claws security audit${NC}"
 echo -e "Root: $ROOT"
 echo -e "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo ""
@@ -41,7 +41,7 @@ for f in "$ROOT"/*/instance.env "$ROOT"/*/*/instance.env; do
     else
         fail "$inst — other users on this server can read your gateway token"
         hint "Fix: chmod 600 $f"
-        hint "Or run: clawctl doctor --fix"
+        hint "Or run: claws doctor --fix"
     fi
 done
 
@@ -65,7 +65,7 @@ else
     fail "$cred_bad credential files can be read by other users on this server"
     hint "These include WhatsApp session keys, Telegram auth, etc."
     hint "Fix: find $ROOT -path '*/credentials/*' -type f -exec chmod 600 {} +"
-    hint "Or run: clawctl doctor --fix"
+    hint "Or run: claws doctor --fix"
 fi
 
 echo ""
@@ -96,12 +96,12 @@ while IFS=: read -r idx name; do
         if [ "$bind" = "loopback" ] || [ "$bind" = "127.0.0.1" ]; then
             fail "$name (:$port) is accessible from the network even though it's configured for local-only"
             hint "The container is still running with the old config. Restart it:"
-            hint "clawctl restart $name"
+            hint "claws restart $name"
         else
             warn "$name (:$port) is accessible from your network (and possibly the internet)"
             hint "Anyone on your network (or the internet if no firewall) can reach this agent."
-            hint "For local-only access: clawctl policy enforce --restart"
-            hint "For SSH tunnel access: clawctl tunnel $name"
+            hint "For local-only access: claws policy enforce --restart"
+            hint "For SSH tunnel access: claws tunnel $name"
         fi
         ((public_ports++))
     else
@@ -204,7 +204,7 @@ for container in $(docker ps --format '{{.Names}}' 2>/dev/null | grep openclaw);
     if [ "$oom" = "true" ]; then
         fail "  Was killed by out-of-memory (OOM) — needs more memory"
         hint "Increase the limit: set OPENCLAW_MEMORY_LIMIT=2G in instance.env"
-        hint "Then recreate: clawctl restart $friendly --hard"
+        hint "Then recreate: claws restart $friendly --hard"
     fi
 
     # Check memory usage vs limit
@@ -263,7 +263,7 @@ except:
         if [ "$code" = "200" ]; then
             warn "$name (:$port) web interface loads without entering a password"
             hint "The HTML page is served to anyone. WebSocket commands require the token,"
-            hint "but the UI is visible. This is an OpenClaw default, not a clawctl issue."
+            hint "but the UI is visible. This is an OpenClaw default, not a claws issue."
         elif [ "$code" = "401" ] || [ "$code" = "403" ]; then
             pass "$name (:$port) requires authentication"
         fi
@@ -303,13 +303,13 @@ print(c.get('tools',{}).get('profile','not set'))
         hint "Without sandbox mode, the agent can read/write files and run commands"
         hint "as the container user. If someone tricks the agent with a bad prompt,"
         hint "it could do unintended things."
-        hint "Enable sandbox: clawctl config set $inst agents.defaults.sandbox true"
+        hint "Enable sandbox: claws config set $inst agents.defaults.sandbox true"
     fi
 
     if [ "$profile" = "not set" ]; then
         warn "$inst — no tool restrictions (agent can use all available tools)"
         hint "Consider setting a tool profile to limit what the agent can do."
-        hint "Example: clawctl config set $inst tools.profile '\"coding\"'"
+        hint "Example: claws config set $inst tools.profile '\"coding\"'"
     else
         pass "$inst — tool access restricted to '$profile' profile"
     fi
@@ -339,7 +339,7 @@ for ch_name, ch_cfg in channels.items():
     if dm == 'open':
         print(f'FAIL|{ch_name} on $inst — ANYONE can message this agent and get responses')
         print(f'HINT|This means random strangers can use your AI agent (and your API credits).')
-        print(f'HINT|Fix: clawctl config set $inst channels.{ch_name}.dmPolicy \"pairing\"')
+        print(f'HINT|Fix: claws config set $inst channels.{ch_name}.dmPolicy \"pairing\"')
     elif dm == 'pairing':
         print(f'PASS|{ch_name} on $inst — new senders must be approved with a code')
     elif dm == 'allowlist':
@@ -396,14 +396,14 @@ echo ""
 
 if [ "$FAIL" -gt 0 ]; then
     echo -e "  ${RED}$FAIL issue(s) need immediate attention.${NC}"
-    echo -e "  ${DIM}Run: clawctl doctor --fix     (fixes file permissions)${NC}"
-    echo -e "  ${DIM}Run: clawctl policy enforce    (fixes config violations)${NC}"
-    echo -e "  ${DIM}Run: clawctl policy enforce --restart  (fixes + restarts containers)${NC}"
+    echo -e "  ${DIM}Run: claws doctor --fix     (fixes file permissions)${NC}"
+    echo -e "  ${DIM}Run: claws policy enforce    (fixes config violations)${NC}"
+    echo -e "  ${DIM}Run: claws policy enforce --restart  (fixes + restarts containers)${NC}"
     exit 1
 elif [ "$WARN" -gt 0 ]; then
     echo -e "  ${YELLOW}$WARN item(s) to review for production use.${NC}"
     echo -e "  ${DIM}Most warnings clear after restarting with the hardened compose template.${NC}"
-    echo -e "  ${DIM}Run: clawctl policy enforce --restart${NC}"
+    echo -e "  ${DIM}Run: claws policy enforce --restart${NC}"
     exit 0
 else
     echo -e "  ${GREEN}All checks passed. Your deployment follows best practices.${NC}"

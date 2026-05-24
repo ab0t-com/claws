@@ -7,7 +7,7 @@
 
 ## Problem
 
-clawctl currently has a single trust level — whoever can run the binary has full access to all instances, credentials, and configuration. There is:
+claws currently has a single trust level — whoever can run the binary has full access to all instances, credentials, and configuration. There is:
 
 - No concept of "admin" vs "user"
 - No way to give a user access to their instance but not others
@@ -77,7 +77,7 @@ func enforceAccess(cmd string, args []string) error {
 
 ### Audit Log: `~/.openclaw/.audit.log`
 
-When `policy.json` has `"auditLog": true`, every clawctl command is logged:
+When `policy.json` has `"auditLog": true`, every claws command is logged:
 
 ```jsonl
 {"ts":"2026-03-25T10:30:00Z","user":"ubuntu","cmd":"create","args":["team/alice"],"result":"ok"}
@@ -88,8 +88,8 @@ When `policy.json` has `"auditLog": true`, every clawctl command is logged:
 ### Token Rotation
 
 ```bash
-clawctl token rotate <instance>    # generate new token, update env, restart
-clawctl token show <instance>      # show current token (admin only)
+claws token rotate <instance>    # generate new token, update env, restart
+claws token show <instance>      # show current token (admin only)
 ```
 
 **File:** New `token.go`
@@ -97,12 +97,12 @@ clawctl token show <instance>      # show current token (admin only)
 ### Commands
 
 ```
-clawctl access show                 # show current access config
-clawctl access grant <user> <role>  # add user to role
-clawctl access revoke <user>        # remove user access
-clawctl access audit [--since=24h]  # show audit log
-clawctl token rotate <instance>     # rotate gateway token
-clawctl token show <instance>       # show token (admin only)
+claws access show                 # show current access config
+claws access grant <user> <role>  # add user to role
+claws access revoke <user>        # remove user access
+claws access audit [--since=24h]  # show audit log
+claws token rotate <instance>     # rotate gateway token
+claws token show <instance>       # show token (admin only)
 ```
 
 ## Implementation Order
@@ -111,7 +111,7 @@ clawctl token show <instance>       # show token (admin only)
 2. Wire `enforceAccess()` into `main.go` before command dispatch
 3. `audit.go` — JSONL audit logging
 4. `token.go` — token rotation
-5. `clawctl access` subcommands
+5. `claws access` subcommands
 6. Integration with policy (ticket 2) — `policy.json` enables audit log
 
 ## Testing

@@ -16,12 +16,12 @@
 | Docker socket permissions | 0660 docker group | Restricted | Only admin users in docker group |
 | Automatic security updates | Varies | Enabled | `apt install unattended-upgrades` |
 
-### Layer 2: clawctl Control Plane
+### Layer 2: claws Control Plane
 
 | Check | Default | Secure | How to Fix |
 |-------|---------|--------|------------|
-| instance.env permissions | 0600 (new), 0664 (old) | 0600 | `clawctl doctor --fix` |
-| .port-registry permissions | 0600 (new), 0664 (old) | 0600 | `clawctl doctor --fix` |
+| instance.env permissions | 0600 (new), 0664 (old) | 0600 | `claws doctor --fix` |
+| .port-registry permissions | 0600 (new), 0664 (old) | 0600 | `claws doctor --fix` |
 | credential file permissions | Mixed | 0600 | `find ~/.openclaw -path '*/credentials/*' -exec chmod 600 {} +` |
 | Gateway bind mode | `lan` (0.0.0.0) | `loopback` (127.0.0.1) | Ticket 1: change default |
 | File locking | Enabled | Enabled | Already implemented (flock.go) |
@@ -29,7 +29,7 @@
 | Admin policy | None | Enforced | Ticket 2: policy.json |
 | Access control | None (any user) | Role-based | Ticket 4: .access.json |
 | Audit logging | None | Enabled | Ticket 4: .audit.log |
-| Token rotation | Manual | CLI command | Ticket 4: `clawctl token rotate` |
+| Token rotation | Manual | CLI command | Ticket 4: `claws token rotate` |
 
 ### Layer 3: Docker Container
 
@@ -64,9 +64,9 @@
 
 | Check | Default | Secure | How to Fix |
 |-------|---------|--------|------------|
-| HTTPS (Caddy proxy) | Not set up | Configured with auth | `clawctl proxy setup --domain=...` |
+| HTTPS (Caddy proxy) | Not set up | Configured with auth | `claws proxy setup --domain=...` |
 | Proxy auth headers | Injected by default | Injected ✓ | Already correct |
-| SSH tunnel for dev | Manual | `clawctl tunnel` ✓ | Already correct |
+| SSH tunnel for dev | Manual | `claws tunnel` ✓ | Already correct |
 | Internal TLS | None (loopback OK) | Not needed for loopback | Document this assumption |
 
 ## Audit Script
@@ -91,7 +91,7 @@ Already implemented. Checks:
 
 ## Integration
 
-### `clawctl doctor` should include security summary
-### `clawctl create` should warn on insecure defaults
-### `clawctl start` should validate against policy before starting
+### `claws doctor` should include security summary
+### `claws create` should warn on insecure defaults
+### `claws start` should validate against policy before starting
 ### CI/CD: `scripts/security-audit.sh` as a gate before deployment

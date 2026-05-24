@@ -1,12 +1,14 @@
 # =====================================================================
-# clawctl — repository ignore rules
+# claws — repository ignore rules
 # =====================================================================
 # Conservative by design: when in doubt, ignore. Many of these globs
 # are also (defense-in-depth) covered by gitleaks hooks.
 # =====================================================================
 
 # --- Built binaries (Go) ---
-# Anchored to repo root so they don't shadow cmd/clawctl/ source directory.
+# Anchored to repo root so they don't shadow cmd/claws/ source directory.
+/claws
+# Legacy binaries from before the clawctl→claws rename:
 /clawctl
 /clawctl-v1
 /clawctl-v2-mar27-backup

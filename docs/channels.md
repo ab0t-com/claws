@@ -1,13 +1,13 @@
 # Channel Setup Guide
 
-Connect your clawctl instances to messaging platforms. Each OpenClaw instance can run **multiple channels simultaneously** — one agent reachable on WhatsApp, Telegram, Discord, Slack, and more, with unified conversation history.
+Connect your claws instances to messaging platforms. Each OpenClaw instance can run **multiple channels simultaneously** — one agent reachable on WhatsApp, Telegram, Discord, Slack, and more, with unified conversation history.
 
 ## How It Works
 
 ```
 You (laptop)
-  └─ SSH tunnel → clawctl server
-                    └─ clawctl manages instances (Docker containers)
+  └─ SSH tunnel → claws server
+                    └─ claws manages instances (Docker containers)
                          └─ Each container runs an OpenClaw gateway
                               └─ Gateway connects to channels
                                    ├─ WhatsApp (Baileys)
@@ -18,14 +18,14 @@ You (laptop)
                                    └─ ...30+ more
 ```
 
-clawctl doesn't talk to channels directly. It manages the containers; OpenClaw inside the container handles channel connections.
+claws doesn't talk to channels directly. It manages the containers; OpenClaw inside the container handles channel connections.
 
 ## Two Ways to Configure Channels
 
 ### Option A: Interactive Wizard
 
 ```bash
-clawctl channel <instance> <channel-type>
+claws channel <instance> <channel-type>
 ```
 
 This runs OpenClaw's interactive setup wizard inside the container. It prompts for tokens, policies, and options.
@@ -33,8 +33,8 @@ This runs OpenClaw's interactive setup wizard inside the container. It prompts f
 ### Option B: Direct Config
 
 ```bash
-clawctl exec <instance> config set channels.<channel>.<key> <value> --json
-clawctl restart <instance>
+claws exec <instance> config set channels.<channel>.<key> <value> --json
+claws restart <instance>
 ```
 
 Set config values directly and restart. Better for scripting and automation.
@@ -55,14 +55,14 @@ The simplest channel to set up. Takes about 2 minutes.
 # Copy the token (looks like: 123456789:ABCdefGhIJKlmNOPQRSTuvwxyz)
 
 # Configure
-clawctl exec alice config set channels.telegram.enabled true --json
-clawctl exec alice config set channels.telegram.botToken '"YOUR_TOKEN"' --json
-clawctl exec alice config set channels.telegram.dmPolicy '"pairing"' --json
-clawctl restart alice
+claws exec alice config set channels.telegram.enabled true --json
+claws exec alice config set channels.telegram.botToken '"YOUR_TOKEN"' --json
+claws exec alice config set channels.telegram.dmPolicy '"pairing"' --json
+claws restart alice
 
 # Message your bot on Telegram — it replies with a pairing code
 # Approve it:
-clawctl exec alice pairing approve telegram <CODE>
+claws exec alice pairing approve telegram <CODE>
 ```
 
 ### Config Reference
@@ -113,13 +113,13 @@ Uses the Baileys library (Web API). Requires QR code scanning from a phone.
 
 ```bash
 # Add WhatsApp (starts QR login, sets safe defaults)
-clawctl channel add alice whatsapp
+claws channel add alice whatsapp
 
 # Add your phone number to the allowlist
-clawctl channel allow alice whatsapp +15551234567
+claws channel allow alice whatsapp +15551234567
 
 # Restart to apply
-clawctl restart alice
+claws restart alice
 ```
 
 Safe defaults applied: `dmPolicy: allowlist`, `sendMessage: false`, `groupPolicy: allowlist`.
@@ -172,13 +172,13 @@ Uses the Discord Bot API with Gateway (WebSocket).
 ### Setup
 
 ```bash
-clawctl exec alice config set channels.discord.enabled true --json
-clawctl exec alice config set channels.discord.token '"YOUR_BOT_TOKEN"' --json
-clawctl exec alice config set channels.discord.dmPolicy '"pairing"' --json
-clawctl restart alice
+claws exec alice config set channels.discord.enabled true --json
+claws exec alice config set channels.discord.token '"YOUR_BOT_TOKEN"' --json
+claws exec alice config set channels.discord.dmPolicy '"pairing"' --json
+claws restart alice
 
 # DM the bot on Discord, approve pairing
-clawctl exec alice pairing approve discord <CODE>
+claws exec alice pairing approve discord <CODE>
 ```
 
 ### Config Reference
@@ -229,11 +229,11 @@ Uses Slack's Bolt SDK. Supports Socket Mode (recommended) or HTTP Events API.
 ### Setup
 
 ```bash
-clawctl exec alice config set channels.slack.enabled true --json
-clawctl exec alice config set channels.slack.mode '"socket"' --json
-clawctl exec alice config set channels.slack.appToken '"xapp-..."' --json
-clawctl exec alice config set channels.slack.botToken '"xoxb-..."' --json
-clawctl restart alice
+claws exec alice config set channels.slack.enabled true --json
+claws exec alice config set channels.slack.mode '"socket"' --json
+claws exec alice config set channels.slack.appToken '"xapp-..."' --json
+claws exec alice config set channels.slack.botToken '"xoxb-..."' --json
+claws restart alice
 ```
 
 Slack doesn't use pairing codes — access is controlled by workspace membership and channel invitation.
@@ -279,14 +279,14 @@ signal-cli -u +15551234567 register
 signal-cli -u +15551234567 verify <SMS_CODE>
 
 # Configure
-clawctl exec alice config set channels.signal.enabled true --json
-clawctl exec alice config set channels.signal.account '"+15551234567"' --json
-clawctl exec alice config set channels.signal.cliPath '"signal-cli"' --json
-clawctl exec alice config set channels.signal.dmPolicy '"pairing"' --json
-clawctl restart alice
+claws exec alice config set channels.signal.enabled true --json
+claws exec alice config set channels.signal.account '"+15551234567"' --json
+claws exec alice config set channels.signal.cliPath '"signal-cli"' --json
+claws exec alice config set channels.signal.dmPolicy '"pairing"' --json
+claws restart alice
 
 # Message the Signal number, approve pairing
-clawctl exec alice pairing approve signal <CODE>
+claws exec alice pairing approve signal <CODE>
 ```
 
 ### Config Reference
@@ -333,23 +333,23 @@ One agent identity, reachable everywhere, with shared conversation memory.
 Give each team member their own agent with different channels:
 
 ```bash
-clawctl group create team
+claws group create team
 
 # Alice: WhatsApp + Telegram
-clawctl create team/alice
-clawctl channel team/alice whatsapp
-clawctl channel team/alice telegram
+claws create team/alice
+claws channel team/alice whatsapp
+claws channel team/alice telegram
 
 # Bob: Slack + Discord
-clawctl create team/bob
-clawctl channel team/bob slack
-clawctl channel team/bob discord
+claws create team/bob
+claws channel team/bob slack
+claws channel team/bob discord
 
 # Start all
-clawctl start-all
+claws start-all
 
 # Share skills and workspace across the group
-clawctl group shared team --all
+claws group shared team --all
 ```
 
 ---
@@ -358,7 +358,7 @@ clawctl group shared team --all
 
 ### Safe Defaults
 
-When you add a channel with `clawctl channel add`, safe defaults are applied automatically:
+When you add a channel with `claws channel add`, safe defaults are applied automatically:
 
 - **Outbound messaging is OFF** — the agent can respond to messages but cannot initiate contact with new people
 - **Reactions and read-only lookups are ON** — harmless, useful for UX
@@ -372,20 +372,20 @@ Use `--allow-send` when adding a channel to enable outbound messaging if you nee
 
 ```bash
 # View full security posture (policies, actions, contacts)
-clawctl channel security alice
-clawctl channel security alice whatsapp
+claws channel security alice
+claws channel security alice whatsapp
 
 # Enable/disable outbound messaging
-clawctl channel send alice whatsapp --enable
-clawctl channel send alice whatsapp --disable
+claws channel send alice whatsapp --enable
+claws channel send alice whatsapp --disable
 
 # Manage approved contacts
-clawctl channel allow alice whatsapp +15551234567
-clawctl channel allow alice whatsapp +15559876543 +15551112222
-clawctl channel deny alice whatsapp +15551234567
+claws channel allow alice whatsapp +15551234567
+claws channel allow alice whatsapp +15559876543 +15551112222
+claws channel deny alice whatsapp +15551234567
 
 # After changes, restart to apply
-clawctl restart alice
+claws restart alice
 ```
 
 ### DM Pairing
@@ -394,13 +394,13 @@ For channels using `dmPolicy: pairing`, unknown senders get a one-time approval 
 
 ```bash
 # Check pending pairing requests
-clawctl exec alice pairing list
+claws exec alice pairing list
 
 # Approve a request
-clawctl exec alice pairing approve <channel> <CODE>
+claws exec alice pairing approve <channel> <CODE>
 
 # Check who's approved
-clawctl exec alice channels status --probe
+claws exec alice channels status --probe
 ```
 
 ### DM Policies
@@ -438,14 +438,14 @@ Each channel has actions that can be individually toggled. Safe defaults set dan
 
 ### Policy Enforcement
 
-Admin policy (`clawctl policy init`) includes `requireOutboundAllowlist`: if outbound messaging is enabled on a channel, that channel must have an `allowFrom` list. This prevents agents from messaging arbitrary contacts.
+Admin policy (`claws policy init`) includes `requireOutboundAllowlist`: if outbound messaging is enabled on a channel, that channel must have an `allowFrom` list. This prevents agents from messaging arbitrary contacts.
 
 ```bash
 # Check all instances against policy
-clawctl policy validate
+claws policy validate
 
 # Auto-fix violations (disables sendMessage where no allowFrom exists)
-clawctl policy enforce --restart
+claws policy enforce --restart
 ```
 
 ---
@@ -454,26 +454,26 @@ clawctl policy enforce --restart
 
 ```bash
 # Check channel connectivity
-clawctl exec alice channels status --probe
+claws exec alice channels status --probe
 
 # View channel-specific logs
-clawctl exec alice channels logs --channel telegram
+claws exec alice channels logs --channel telegram
 
 # Full gateway logs
-clawctl logs alice -f
+claws logs alice -f
 
 # Re-login (e.g., WhatsApp session expired)
-clawctl exec alice channels login --channel whatsapp
+claws exec alice channels login --channel whatsapp
 
 # Health check
-clawctl health alice
+claws health alice
 ```
 
 ### Common Issues
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Bot doesn't respond to DMs | DM pairing required | `clawctl exec <name> pairing approve <channel> <CODE>` |
+| Bot doesn't respond to DMs | DM pairing required | `claws exec <name> pairing approve <channel> <CODE>` |
 | Bot doesn't respond in groups | Mention required | `@mention` the bot, or set `requireMention: false` |
 | WhatsApp QR expired | Session timeout | Re-run `channels login --channel whatsapp` |
 | "Token invalid" on Telegram | Bot token changed/revoked | Get new token from @BotFather, update config |
@@ -497,6 +497,6 @@ OpenClaw supports 30+ channels including:
 - Line
 - Zalo
 
-These are available as extensions. Install via `clawctl exec <name> plugins install <channel>` and configure similarly to the core channels above.
+These are available as extensions. Install via `claws exec <name> plugins install <channel>` and configure similarly to the core channels above.
 
 For full per-channel documentation, see the OpenClaw docs at `docs/channels/` in the OpenClaw repository.

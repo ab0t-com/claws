@@ -1,5 +1,5 @@
 #!/bin/bash
-# clawctl publish-release — tag, build, and ship a release
+# claws publish-release — tag, build, and ship a release
 #
 # Usage:
 #   ./scripts/publish-release.sh <version> [flags]
@@ -98,7 +98,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
-echo -e "${BOLD}clawctl publish-release${NC}"
+echo -e "${BOLD}claws publish-release${NC}"
 info "version:   $VERSION"
 info "repo:      $REPO"
 info "remote:    $REMOTE"

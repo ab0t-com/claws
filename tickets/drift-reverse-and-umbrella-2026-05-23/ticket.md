@@ -2,14 +2,14 @@
 
 **Created:** 2026-05-23
 **Status:** Open
-**Priority:** P3 — Low (forward direction `clawctl orphans` already shipped covers the common case)
+**Priority:** P3 — Low (forward direction `claws orphans` already shipped covers the common case)
 **Owner:** unassigned
 
 ---
 
 ## Problem
 
-`clawctl orphans` (ticket 10, Task E1) detects **forward drift**: Docker containers that exist but aren't in the port registry. That's the `bob` case.
+`claws orphans` (ticket 10, Task E1) detects **forward drift**: Docker containers that exist but aren't in the port registry. That's the `bob` case.
 
 Two related drift cases are not yet detected:
 
@@ -19,11 +19,11 @@ The registry says `team/sarah` exists at port 18789 but `docker ps -a` shows no 
 
 - The operator ran `docker rm -f openclaw-team-sarah-openclaw-gateway-1` directly.
 - A `docker system prune -a` blew away the container.
-- The container failed to start originally and clawctl's create rollback was incomplete.
+- The container failed to start originally and claws's create rollback was incomplete.
 
-Today: `clawctl list` shows the instance with status "created" or "missing"; `clawctl health` says down. Neither says "the container that should exist for this entry is gone." Operator has to compose the diagnosis.
+Today: `claws list` shows the instance with status "created" or "missing"; `claws health` says down. Neither says "the container that should exist for this entry is gone." Operator has to compose the diagnosis.
 
-Expected: `clawctl orphans --reverse` lists registry entries whose project has no corresponding container.
+Expected: `claws orphans --reverse` lists registry entries whose project has no corresponding container.
 
 ### E3. Filesystem drift (the umbrella)
 
@@ -34,15 +34,15 @@ Two more inconsistencies:
 
 Plus the existing forward orphans (E1) and reverse orphans (E2), this is the full picture.
 
-`clawctl drift` should run all four checks and produce a single screen:
+`claws drift` should run all four checks and produce a single screen:
 
 ```
-$ clawctl drift
+$ claws drift
 ==> Forward orphans (containers not in registry) — 0
 ==> Reverse orphans (registry entries without containers) — 0
 ==> Disk drift (instance dirs not in registry) — 1
    /home/ubuntu/.openclaw/oldname/   (last modified 2026-04-01)
-   Action: clawctl <add this instance> | rm the dir
+   Action: claws <add this instance> | rm the dir
 ==> Registry drift (entries pointing nowhere) — 0
 
 ✓ Mostly clean.
@@ -52,8 +52,8 @@ JSON parity. Per-finding "fix path" hint.
 
 ## Acceptance criteria
 
-- [ ] `clawctl orphans --reverse` lists registry entries with no matching container.
-- [ ] `clawctl drift` runs forward + reverse orphan checks plus filesystem inconsistency checks and renders a single-screen summary.
+- [ ] `claws orphans --reverse` lists registry entries with no matching container.
+- [ ] `claws drift` runs forward + reverse orphan checks plus filesystem inconsistency checks and renders a single-screen summary.
 - [ ] `--json` parity for both.
 - [ ] No false positives for instances that are intentionally stopped (Container `Exited` is still "matching" — they have a container; it's just not running).
 
@@ -66,7 +66,7 @@ JSON parity. Per-finding "fix path" hint.
 ## Related
 
 - `tickets/fleet-team-control-surface-2026-05-23/` Task E1 worklog: documents why E2/E3 were deferred.
-- `clawctl errors` (separate ticket) should include the drift summary in its umbrella output.
+- `claws errors` (separate ticket) should include the drift summary in its umbrella output.
 
 ## Effort
 

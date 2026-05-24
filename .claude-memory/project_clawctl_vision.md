@@ -1,12 +1,12 @@
 ---
 name: clawctl-vision
-description: clawctl is evolving from an OpenClaw-specific manager into a generic agent control plane with admin policy, multi-runtime support, and multi-tenant access
+description: claws is evolving from an OpenClaw-specific manager into a generic agent control plane with admin policy, multi-runtime support, and multi-tenant access
 type: project
 ---
 
-clawctl is not just an OpenClaw manager — it's being designed as a **generic control plane for AI agent teams**.
+claws is not just an OpenClaw manager — it's being designed as a **generic control plane for AI agent teams**.
 
-**Why:** Multiple "claw-like" agent runtimes exist. The control plane pattern (port management, groups, shared resources, task queue, proxy, storage) is runtime-agnostic. clawctl should be the orchestration layer that works with any containerized agent gateway.
+**Why:** Multiple "claw-like" agent runtimes exist. The control plane pattern (port management, groups, shared resources, task queue, proxy, storage) is runtime-agnostic. claws should be the orchestration layer that works with any containerized agent gateway.
 
 **Key decisions:**
 - Adapter pattern for runtimes (not hardcoded to OpenClaw)

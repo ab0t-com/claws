@@ -11,7 +11,7 @@
 
 ## 1. What this is, in one paragraph
 
-`clawctl` is a single-binary Go CLI (~9.4k LOC, **zero external dependencies** — only the Go standard library) that operates a small fleet (1-8 by default cap) of containerized AI-agent **instances** on **one host**. It owns four concerns: (1) **lifecycle** — create/start/stop/remove containers via Docker Compose; (2) **state** — port allocation, instance config, multi-tenant overlays, all as plain files under `OPENCLAW_ROOT` (default `~/.openclaw/`); (3) **policy** — admin-set guardrails on bind modes, images, channels, and outbound messaging, plus role-based access control over which OS user can run which subcommand; (4) **coordination** — optional group/manager/worker topology with a filesystem-based task queue and shared workspace mounts. The native runtime is OpenClaw (a Node.js gateway image), but a **runtime-adapter** layer lets clawctl drive any container that exposes a health endpoint.
+`clawctl` is a single-binary Go CLI (~9.4k LOC, **zero external dependencies** — only the Go standard library) that operates a small fleet (1-8 by default cap) of containerized AI-agent **instances** on **one host**. It owns four concerns: (1) **lifecycle** — create/start/stop/remove containers via Docker Compose; (2) **state** — port allocation, instance config, multi-tenant overlays, all as plain files under `OPENCLAW_ROOT` (default `~/.openclaw/`); (3) **policy** — admin-set guardrails on bind modes, images, channels, and outbound messaging, plus role-based access control over which OS user can run which subcommand; (4) **coordination** — optional group/manager/worker topology with a filesystem-based task queue and shared workspace mounts. The native runtime is OpenClaw (a Node.js gateway image), but a **runtime-adapter** layer lets claws drive any container that exposes a health endpoint.
 
 It is **not** Kubernetes, not Nomad, not a multi-host orchestrator. The competitive analogy is `multipass`, `lxc/lxd`, or `docker compose --profile` — first-class instance identity on one box for an operator with SSH.
 
@@ -51,7 +51,7 @@ policy.go            473  Policy struct, enforcement helpers (bind/image/channel
 activity.go          251  recentFiles (mtime scan), recentLogErrors (parse docker logs)
 image.go             230  image list/pull/pin, upgrade with health-check rollback
 init.go              189  First-run setup: dirs, policy, access, compose-template copy, doctor
-setup.go             491  Guided interactive `clawctl setup` (6-step flow, --non-interactive)
+setup.go             491  Guided interactive `claws setup` (6-step flow, --non-interactive)
 help.go              771  printSubcommandHelp + topic help (setup/security/channels/groups/commands)
 doctor.go            193  doctor (env checks) + version (build info + tool versions)
 audit.go              46  Wraps scripts/security-audit.sh; falls back to doctor + policy validate
@@ -142,7 +142,7 @@ The atomicity invariant only holds on local POSIX filesystems. `isFuseMount()` (
 
 ### 3.4 Runtime
 
-`runtime.go:19` — a 40-field struct that captures every configurable thing about how clawctl talks to a containerized agent: image, compose service name(s), internal port, health/ready endpoints, container home, mount points, env-var names, CLI commands for channel/auth/config operations, and a capability flags struct (`Channels`, `Pairing`, `Auth`, `Config`, `Tasks`, `Shared`, `Bridge`). Built-in `openclawRuntime()` is hardcoded; user-defined runtimes are JSON files under `runtimes/`. Per-instance binding via `CLAWCTL_RUNTIME` in `instance.env`; `resolveRuntime()` (`runtime.go:217`) looks it up.
+`runtime.go:19` — a 40-field struct that captures every configurable thing about how claws talks to a containerized agent: image, compose service name(s), internal port, health/ready endpoints, container home, mount points, env-var names, CLI commands for channel/auth/config operations, and a capability flags struct (`Channels`, `Pairing`, `Auth`, `Config`, `Tasks`, `Shared`, `Bridge`). Built-in `openclawRuntime()` is hardcoded; user-defined runtimes are JSON files under `runtimes/`. Per-instance binding via `CLAWS_RUNTIME` in `instance.env`; `resolveRuntime()` (`runtime.go:217`) looks it up.
 
 ### 3.5 Policy
 
@@ -169,7 +169,7 @@ The atomicity invariant only holds on local POSIX filesystems. `isFuseMount()` (
 
 ## 4. Data flow (the four canonical paths)
 
-### 4.1 Operator types `clawctl create alpha`
+### 4.1 Operator types `claws create alpha`
 
 ```
 main.go:14 cmd=create, args=[alpha]
@@ -194,12 +194,12 @@ main.go:14 cmd=create, args=[alpha]
        ├─ rebuildGroupOverride OR rebuildOverride (if shared/grouped)
        │    → docker-compose.override.yml (auto-generated)
        └─ validate compose: `docker compose -f tmpl -f override config`
-                              (skipped if CLAWCTL_SKIP_VALIDATE set)
+                              (skipped if CLAWS_SKIP_VALIDATE set)
   └─ writeAuditLog(paths, "create", ["alpha"], "ok")     access.go:128
        (appends a JSON line to .audit.log iff policy.AuditLog)
 ```
 
-### 4.2 `clawctl start alpha` → healthy
+### 4.2 `claws start alpha` → healthy
 
 ```
 main.go:32 cmd=start
@@ -219,24 +219,24 @@ main.go:32 cmd=start
 ### 4.3 Manager dispatches a task to a worker
 
 ```
-clawctl task create team "review PR #42"
+claws task create team "review PR #42"
   └─ cmdTaskCreate → write team/shared/tasks/pending/<id>.json
                      (Task{ID, Title, CreatedBy, CreatedAt, Status:"pending"})
 
 (out-of-band: worker container's gateway watches the mount; or operator runs:)
-clawctl task claim team <id> --by=dev1
+claws task claim team <id> --by=dev1
   └─ isFuseMount guard
   └─ os.Rename pending/<id>.json → claimed/<id>.json     ← atomic on local FS
   └─ rewrite file with Status:"claimed", ClaimedBy/At
 
-clawctl task complete team <id> --result="approved"
+claws task complete team <id> --result="approved"
   └─ os.Rename claimed/<id>.json → done/<id>.json
   └─ rewrite file with Status:"done", CompletedAt, Result
 ```
 
-Volume mounts (set up at `create --role=...` time) give the manager rw to `/home/node/.openclaw/tasks` and the worker ro to the same path, plus rw to `/home/node/.openclaw/output`. The agent inside the container interacts with these via its own runtime; clawctl provides the queue, not the consumer.
+Volume mounts (set up at `create --role=...` time) give the manager rw to `/home/node/.openclaw/tasks` and the worker ro to the same path, plus rw to `/home/node/.openclaw/output`. The agent inside the container interacts with these via its own runtime; claws provides the queue, not the consumer.
 
-### 4.4 Operator runs `clawctl status` (overview)
+### 4.4 Operator runs `claws status` (overview)
 
 ```
 cmdStatusOverview                                        commands.go:697
@@ -273,14 +273,14 @@ A single screen shows: instance count, per-instance health line, policy violatio
 |---|---|---|
 | `task list --json`, `channel status --json`, `channel security --json`, `task status --json` | Trivial flag in each | Blocks scripting/CI use cases |
 | `policy validate --json` | Same | Same |
-| `clawctl config diff <name>` (effective config vs defaults) | new in `configcmd.go` | Hard to debug merge order issues |
+| `claws config diff <name>` (effective config vs defaults) | new in `configcmd.go` | Hard to debug merge order issues |
 | OpenClaw config schema validation post-merge | `merge.go` / new validator | Today: malformed merge ships to the container, fails at startup |
 | Cross-instance event/callback firing | new "bus" file or transport | The 2026-03-17 INTEGRATION_ANALYSIS lists this as P3 future work |
 | Webhook routing per instance through proxy | `proxy.go` extension | Same doc, P1 future work |
-| Cross-host coordination | (out of scope by design) | If clawctl ever wants to be a generic agent control plane on N hosts, you're rewriting the registry layer |
+| Cross-host coordination | (out of scope by design) | If claws ever wants to be a generic agent control plane on N hosts, you're rewriting the registry layer |
 | Structured release artifacts: binary distribution, package manager | `scripts/release.sh` exists, no CI yet | Today, "install" = clone + go build |
-| `clawctl init --force` is not in help text | `help.go` `subcommandHelp["init"]` | LOW; works but undocumented |
-| `clawctl audit` scopes to **all** host containers, not `$OPENCLAW_ROOT` | `scripts/security-audit.sh` step 3 | MEDIUM; informative but conceptually wrong (see dogfood log S2) |
+| `claws init --force` is not in help text | `help.go` `subcommandHelp["init"]` | LOW; works but undocumented |
+| `claws audit` scopes to **all** host containers, not `$OPENCLAW_ROOT` | `scripts/security-audit.sh` step 3 | MEDIUM; informative but conceptually wrong (see dogfood log S2) |
 
 ### 5.3 The "second name" problem
 
@@ -298,17 +298,17 @@ The biggest *latent* cost is that two different conceptual axes share the name "
 
 ### 6.1 Public surface
 
-- **CLI surface (~50 subcommands)** organized into 16 help sections. Top-level dispatch is a single `switch` in `main.go:30` — no flag library, no command framework. Adding a command is one switch case + one function. **Strength:** very low ceremony; new contributors can ship a command in 30 lines. **Weakness:** every command parses its own flags by manual `strings.HasPrefix` (typoed offsets are silent bugs); no introspection (no `clawctl <cmd> --json-schema`).
-- **Go API surface (within `package main`):** there is none — everything is internal. **Implication for "opening it up":** if anyone outside this repo wants to *embed* clawctl as a library (e.g., another tool that wants to drive instances programmatically), they have to fork. Splitting into `cmd/clawctl` (main) + `pkg/clawctl` (library) is the precondition for any embeddability story.
+- **CLI surface (~50 subcommands)** organized into 16 help sections. Top-level dispatch is a single `switch` in `main.go:30` — no flag library, no command framework. Adding a command is one switch case + one function. **Strength:** very low ceremony; new contributors can ship a command in 30 lines. **Weakness:** every command parses its own flags by manual `strings.HasPrefix` (typoed offsets are silent bugs); no introspection (no `claws <cmd> --json-schema`).
+- **Go API surface (within `package main`):** there is none — everything is internal. **Implication for "opening it up":** if anyone outside this repo wants to *embed* claws as a library (e.g., another tool that wants to drive instances programmatically), they have to fork. Splitting into `cmd/clawctl` (main) + `pkg/clawctl` (library) is the precondition for any embeddability story.
 - **Filesystem-as-API:** because state is files, anyone can write a parallel reader (e.g., a web UI that watches `.port-registry`, `.audit.log`, `tasks/`). This is a real interface and worth promoting. The README hints at it ("inspectable: every piece of state is a file you can cat, grep, or back up"), but there is no documented spec — schemas live in code.
 
 ### 6.2 What's good
 
 - **`Runtime` adapter pattern.** 40-field JSON schema with capability flags lets users drive a Python or Rust agent with no Go changes. `runtime add --from=openclaw` for compatible forks, `runtime init <name>` for ground-up agents, `runtime detect <image>` to auto-fill from an image. This is the single best architectural decision in the codebase.
 - **File-based state at this scale.** No DB, no etcd, no Redis. Atomic operations via `syscall.Flock()`; atomic queue transitions via `os.Rename()` with an explicit FUSE-mount guard. The March P0 ("no file locking") is fully addressed by `flock.go` + `lockedAllocatePort`/`lockedUnregisterPort`/`withGroupLock`/`withInstanceLock`.
-- **Two-layer compose model.** Shared `docker-compose.yml` template + per-instance `docker-compose.override.yml` for shared mounts and role-aware volumes. The override is *generated* by clawctl (`rebuildGroupOverride` is the most subtle file in the repo); template is immutable.
+- **Two-layer compose model.** Shared `docker-compose.yml` template + per-instance `docker-compose.override.yml` for shared mounts and role-aware volumes. The override is *generated* by claws (`rebuildGroupOverride` is the most subtle file in the repo); template is immutable.
 - **4-layer config merge.** global defaults → group defaults → `--from` template → instance skeleton (skeleton always wins for port/auth). The merge correctly strips per-instance fields (`allowFrom`, `groups`, `actions`) when copying from a template (`merge.go:54`).
-- **Security defaults that match the threat model.** Loopback by default; `cap_drop: ALL` and `no-new-privileges`; instance.env 0600; outbound messaging off by default; DM pairing required by default; `policy init` and `access init` run automatically inside `clawctl init`; audit log on by default. The PMM audit's "safe defaults" matrix is now entirely green.
+- **Security defaults that match the threat model.** Loopback by default; `cap_drop: ALL` and `no-new-privileges`; instance.env 0600; outbound messaging off by default; DM pairing required by default; `policy init` and `access init` run automatically inside `claws init`; audit log on by default. The PMM audit's "safe defaults" matrix is now entirely green.
 - **Doctor + setup + tiered help.** A new operator gets a welcome screen, can run `setup` for one-command zero-to-running, and has topic help under `help setup|security|channels|groups|commands`. The March PMM gap ("no first-run experience, no doctor") is closed.
 
 ### 6.3 What's mediocre
@@ -321,7 +321,7 @@ The biggest *latent* cost is that two different conceptual axes share the name "
 
 ### 6.4 What's risky
 
-- **`proxy setup` still touches `/etc/caddy/`** (sudo install, sudo write, sudo systemctl reload). It now writes to `conf.d/clawctl.conf` and backs up existing — improvement on March's "overwrites system Caddyfile". But it remains a privileged op with side-effects beyond `OPENCLAW_ROOT`. Acceptable for self-hosted operators; surprising for a "personal AI agents" tool.
+- **`proxy setup` still touches `/etc/caddy/`** (sudo install, sudo write, sudo systemctl reload). It now writes to `conf.d/claws.conf` and backs up existing — improvement on March's "overwrites system Caddyfile". But it remains a privileged op with side-effects beyond `OPENCLAW_ROOT`. Acceptable for self-hosted operators; surprising for a "personal AI agents" tool.
 - **`storage cron --enable` modifies the operator's user crontab** with a `# clawctl-storage-sync` marker. Easy to undo, but again a host-scope mutation that is not contained in `OPENCLAW_ROOT`.
 - **`policy enforce --restart`** rewrites instance configs *and* runs `dcRun "down"` + `up -d` against every affected instance. There is no `--dry-run`. Destructive by intent, but operators should be able to preview.
 
@@ -332,7 +332,7 @@ The biggest *latent* cost is that two different conceptual axes share the name "
 | Area | State |
 |---|---|
 | Build / vet / tests | **Green.** `go build` clean. `go vet` clean. `go test ./...` → 232 tests, ~40s, all pass. |
-| Test coverage shape | 22 integration tests (build & invoke binary against `t.TempDir()` root); ~210 unit tests covering parsing, merging, policy, access, runtime, registry, locking, channels, tasks, storage, doctor, help. Integration tests intentionally avoid Docker via `CLAWCTL_SKIP_VALIDATE`. |
+| Test coverage shape | 22 integration tests (build & invoke binary against `t.TempDir()` root); ~210 unit tests covering parsing, merging, policy, access, runtime, registry, locking, channels, tasks, storage, doctor, help. Integration tests intentionally avoid Docker via `CLAWS_SKIP_VALIDATE`. |
 | Dependencies | **Zero** (stdlib only). Supply-chain risk = none. |
 | Branch | `feature/runtime-adapter` is ahead of `main` with adapter pattern, admin policy, access control, image management, security matrix, runtime UX, and onboarding. Two recent commits with placeholder messages (`.`); needs a clean history before publishing. |
 | Modified working tree | 7 modified, 7 untracked. Untracked include `setup.go` (491 LOC, used by tests + main), `setup_test.go`, `scripts/install.sh`, `scripts/release.sh`, three HTML mockups (`channels-guide.html`, `team-guide.html`, `landing*.html`), and the new `reports/tasklist_2026-03-27_onboarding.md`. `setup.go` is on disk and compiled into the binary I just tested — it's untracked, not unmade. |
@@ -353,13 +353,13 @@ Scored 1-5 where 1 = absent/broken and 5 = production-grade. Total: **127 / 150*
 | 2 | **Architectural coherence** — does one design philosophy run through it? | 5 | "Files for state, Compose for execution, generated overrides for differentiation" is consistent everywhere. |
 | 3 | **Code quality** — readable, conventional, idiomatic? | 4 | Idiomatic Go, low ceremony. Manual flag parsing and string-built YAML are the two style smells. |
 | 4 | **Modularity** — can pieces be replaced without rewriting neighbors? | 4 | Runtime adapter is the standout (40-field JSON contract). Compose substrate is swappable in principle. Storage backend is hard-coded to rclone/S3. |
-| 5 | **Test coverage + harness** | 5 | 232 tests, full lifecycle covered, integration tests use `CLAWCTL_SKIP_VALIDATE` cleanly so the harness runs without Docker. |
+| 5 | **Test coverage + harness** | 5 | 232 tests, full lifecycle covered, integration tests use `CLAWS_SKIP_VALIDATE` cleanly so the harness runs without Docker. |
 | 6 | **Failure modes — destructive ops are gated** | 4 | `--purge` and `--mirror` prompt without `--yes`. `policy enforce --restart` lacks `--dry-run`. Crontab/Caddy mutations are user-implicated. |
 | 7 | **Concurrency safety** | 4 | `flock()` on registry, group, and instance writes. Atomic `os.Rename` for tasks with FUSE guard. Health probes are serialized (not parallelized — slight scalability cost at high refresh rates). |
 | 8 | **Security defaults** | 5 | Loopback default, no Docker socket, cap_drop ALL, no-new-privileges, 0600 secrets, DM pairing required, outbound off, audit on. Policy + access auto-created on `init`. |
 | 9 | **Observability** | 4 | Health (live+ready+failing), dashboard, activity (file mtime + log error parsing), audit log, security audit. Lacks per-instance metrics export and structured event stream. |
 | 10 | **Operator DX (CLI + help + errors)** | 4.5 | First-run welcome, tiered help, error→fix hints, JSON output on the most common commands. JSON-parity gap and naming inconsistency drop it from 5. |
-| 11 | **Discoverability** — would a new operator find what they need? | 4.5 | `clawctl` (no args), `clawctl setup`, `clawctl help <topic>`, `clawctl <cmd> --help` all exist. README is concise and accurate. No man page. |
+| 11 | **Discoverability** — would a new operator find what they need? | 4.5 | `clawctl` (no args), `claws setup`, `claws help <topic>`, `claws <cmd> --help` all exist. README is concise and accurate. No man page. |
 | 12 | **Documentation completeness** | 4 | `README.md`, `docs/channels.md` (~500 lines), `docs/runtimes.md` (~150 lines), tickets/, reports/. No file-format reference (operators have to read source to know what `instance.env`/`openclaw.json` keys mean). |
 | 13 | **Extensibility** — can a third party add a runtime/channel/storage backend without touching core? | 4 | Runtimes: yes, `runtime add --from=...` or `runtime init` covers it. Channels: harder — adding a new channel requires editing `channelProfiles` + `channelSafeDefaults` + (likely) the OpenClaw image. Storage backend: hardcoded. |
 | 14 | **Release readiness** | 3.5 | `scripts/install.sh` and `scripts/release.sh` exist for binary distribution; no CI pipeline yet; placeholder commit messages on the active branch; untracked `setup.go` makes `git status` noisy. |

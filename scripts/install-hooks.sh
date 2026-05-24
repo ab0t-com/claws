@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install git hooks and gitleaks for clawctl development
+# Install git hooks and gitleaks for claws development
 set -e
 
 HOOKS_DIR="$(git rev-parse --show-toplevel)/.git/hooks"

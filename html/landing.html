@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>clawctl — Multi-Agent Fleet Orchestration for OpenClaw</title>
+  <title>claws — Multi-Agent Fleet Orchestration for OpenClaw</title>
   <meta name="description" content="Run, group, and orchestrate autonomous AI agent fleets on your own infrastructure. One binary. Zero dependencies. Total control.">
   <meta name="theme-color" content="#fafafa">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
@@ -1657,7 +1657,7 @@
       </p>
 
       <div class="hero__actions">
-        <a href="#cta" class="btn btn--primary">Install clawctl &rarr;</a>
+        <a href="#cta" class="btn btn--primary">Install claws &rarr;</a>
         <a href="#workflow" class="btn btn--secondary">See how it works</a>
       </div>
 
@@ -1737,7 +1737,7 @@
       </div>
       <div class="problem__side reveal reveal-delay-2">
         <span class="problem__tag problem__tag--solution">The Solution</span>
-        <h2 class="problem__heading t-heading">clawctl makes multi-agent orchestration feel like managing one.</h2>
+        <h2 class="problem__heading t-heading">claws makes multi-agent orchestration feel like managing one.</h2>
         <ul class="problem__list">
           <li>
             <span class="problem__icon problem__icon--check">&#10003;</span>
@@ -1835,7 +1835,7 @@
           </button>
           <div class="feature-card__detail" id="detail-4">
             <div class="feature-card__detail-inner">
-              Groups provide a namespace: <code>clawctl create backend/sarah</code>. Config inherits through 4 layers: global defaults → group defaults → template → instance skeleton. Grouped instances share resources by default — opt out with <code>--no-shared-workspace</code>.
+              Groups provide a namespace: <code>claws create backend/sarah</code>. Config inherits through 4 layers: global defaults → group defaults → template → instance skeleton. Grouped instances share resources by default — opt out with <code>--no-shared-workspace</code>.
             </div>
           </div>
         </div>
@@ -1891,7 +1891,7 @@
           <div class="arch-layer__header">
             <span class="arch-layer__name">
               <span class="arch-layer__badge arch-layer__badge--cli">CLI</span>
-              clawctl binary
+              claws binary
             </span>
             <span class="arch-layer__chevron">▼</span>
           </div>
@@ -1929,7 +1929,7 @@
           </div>
           <div class="arch-layer__body">
             <div class="arch-layer__content">
-              <p>Each instance runs a single long-lived OpenClaw gateway process inside its container. The gateway owns session state, channel integrations (WhatsApp, Telegram, Slack, Discord, and 30+ more), agent runtime, and the embedded workspace. It exposes <code>/healthz</code> and <code>/readyz</code> endpoints for clawctl to probe.</p>
+              <p>Each instance runs a single long-lived OpenClaw gateway process inside its container. The gateway owns session state, channel integrations (WhatsApp, Telegram, Slack, Discord, and 30+ more), agent runtime, and the embedded workspace. It exposes <code>/healthz</code> and <code>/readyz</code> endpoints for claws to probe.</p>
             </div>
           </div>
         </div>
@@ -1956,7 +1956,7 @@
           </div>
           <div class="workflow__step-content">
             <h3 class="workflow__step-title">Create an instance</h3>
-            <p class="workflow__step-desc">Name it, and clawctl handles the rest — ports, tokens, config, directory structure.</p>
+            <p class="workflow__step-desc">Name it, and claws handles the rest — ports, tokens, config, directory structure.</p>
             <div class="terminal terminal--light">
               <div class="terminal__bar">
                 <span class="terminal__dot terminal__dot--red"></span>
@@ -1965,7 +1965,7 @@
                 <span class="terminal__title">terminal</span>
               </div>
               <div class="terminal__body">
-                <div><span class="terminal__prompt">$ </span>clawctl create sarah</div>
+                <div><span class="terminal__prompt">$ </span>claws create sarah</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Creating instance 'sarah'...</div>
                 <div class="terminal__output">&nbsp;&nbsp;Index:&nbsp;&nbsp;&nbsp;&nbsp; 0</div>
                 <div class="terminal__output">&nbsp;&nbsp;Gateway:&nbsp;&nbsp; :18789</div>
@@ -1993,7 +1993,7 @@
                 <span class="terminal__title">terminal</span>
               </div>
               <div class="terminal__body">
-                <div><span class="terminal__prompt">$ </span>clawctl auth sarah apikey anthropic sk-ant-...</div>
+                <div><span class="terminal__prompt">$ </span>claws auth sarah apikey anthropic sk-ant-...</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Adding anthropic API key to 'sarah'...</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Restarting gateway...</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Auth complete for 'sarah'.</div>
@@ -2010,7 +2010,7 @@
           </div>
           <div class="workflow__step-content">
             <h3 class="workflow__step-title">Start the instance</h3>
-            <p class="workflow__step-desc">The gateway boots, clawctl waits for the health check, and reports readiness.</p>
+            <p class="workflow__step-desc">The gateway boots, claws waits for the health check, and reports readiness.</p>
             <div class="terminal terminal--light">
               <div class="terminal__bar">
                 <span class="terminal__dot terminal__dot--red"></span>
@@ -2019,7 +2019,7 @@
                 <span class="terminal__title">terminal</span>
               </div>
               <div class="terminal__body">
-                <div><span class="terminal__prompt">$ </span>clawctl start sarah</div>
+                <div><span class="terminal__prompt">$ </span>claws start sarah</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Starting instance 'sarah'...</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Waiting for health...</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Instance 'sarah' is healthy on :18789</div>
@@ -2044,12 +2044,12 @@
                 <span class="terminal__title">terminal</span>
               </div>
               <div class="terminal__body">
-                <div><span class="terminal__prompt">$ </span>clawctl group create backend</div>
+                <div><span class="terminal__prompt">$ </span>claws group create backend</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Group 'backend' created.</div>
-                <div><span class="terminal__prompt">$ </span>clawctl create backend/bob --from=sarah</div>
+                <div><span class="terminal__prompt">$ </span>claws create backend/bob --from=sarah</div>
                 <div class="terminal__output"><span class="terminal__success">==> </span>Instance 'backend/bob' created.</div>
                 <div class="terminal__output">&nbsp;&nbsp;(config copied from sarah)</div>
-                <div><span class="terminal__prompt">$ </span>clawctl dashboard</div>
+                <div><span class="terminal__prompt">$ </span>claws dashboard</div>
               </div>
             </div>
           </div>
@@ -2264,7 +2264,7 @@
         <div class="storage-feature reveal reveal-delay-2">
           <div class="storage-feature__icon">🔀</div>
           <h3 class="storage-feature__title">Live Migration</h3>
-          <p class="storage-feature__desc">Move a running instance's workspace from local disk to S3. clawctl stops, copies, re-points, and restarts — cleanly and atomically.</p>
+          <p class="storage-feature__desc">Move a running instance's workspace from local disk to S3. claws stops, copies, re-points, and restarts — cleanly and atomically.</p>
         </div>
       </div>
     </div>
@@ -2295,7 +2295,7 @@
               <span class="terminal__dot terminal__dot--red"></span>
               <span class="terminal__dot terminal__dot--yellow"></span>
               <span class="terminal__dot terminal__dot--green"></span>
-              <span class="terminal__title">clawctl dashboard — 14:32:08</span>
+              <span class="terminal__title">claws dashboard — 14:32:08</span>
             </div>
             <div class="terminal__body" style="font-size: 13px; line-height: 2;">
               <div style="font-weight: bold; color: var(--dark-text);">NAME&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PORT&nbsp;&nbsp;&nbsp;&nbsp; HEALTH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; RAM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UPTIME</div>
@@ -2321,7 +2321,7 @@
       <div class="quote-section__inner reveal">
         <div class="quote-section__mark">&ldquo;</div>
         <p class="quote-section__text">
-          I went from manually managing Docker containers and praying nothing conflicted, to spinning up a five-agent team with shared skills in under a minute. clawctl is what I kept wishing existed.
+          I went from manually managing Docker containers and praying nothing conflicted, to spinning up a five-agent team with shared skills in under a minute. claws is what I kept wishing existed.
         </p>
         <p class="quote-section__attribution">
           <strong>The kind of thing our users tell us</strong> &mdash; Self-hosted AI operators
@@ -2340,7 +2340,7 @@
         <p class="cta-section__desc">One binary. Drop it in your PATH. Start building your agent fleet.</p>
 
         <div class="cta-section__install" id="installCmd" title="Click to copy">
-          <span>go build -o clawctl . && sudo mv clawctl /usr/local/bin/</span>
+          <span>go build -o claws . && sudo mv claws /usr/local/bin/</span>
           <span class="cta-section__install-hint">click to copy</span>
         </div>
 
@@ -2376,7 +2376,7 @@
           <li><a href="#" class="footer__link">OpenClaw</a></li>
         </ul>
         <div class="footer__copy">
-          &copy; 2026 OpenClaw Project. clawctl is open source software.
+          &copy; 2026 OpenClaw Project. claws is open source software.
         </div>
       </div>
     </div>
@@ -2430,7 +2430,7 @@
        │ LAYER 1 (base): Transparent background (for dark section)      │
        │ LAYER 2 (containers): Three stacked isometric rectangles       │
        │   representing the three architecture layers:                  │
-       │   - Top: Coral (#e8634a) outlined box labeled "clawctl CLI"    │
+       │   - Top: Coral (#e8634a) outlined box labeled "claws CLI"    │
        │     with a terminal icon, 3px stroke                           │
        │   - Middle: Gold (#c8a86e) outlined box labeled "Docker        │
        │     Compose" with a container/whale silhouette, 3px stroke     │
@@ -2471,7 +2471,7 @@
        │ LAYER 5 (subtitle): Below title, 24px sans-serif in mid-gray   │
        │   (#8a8580): "Multi-Agent Fleet Orchestration"                 │
        │ LAYER 6 (terminal): Right side, a small terminal mockup        │
-       │   (320x180px) with dark background showing "clawctl list"      │
+       │   (320x180px) with dark background showing "claws list"      │
        │   output with colored status dots, rotated -3 degrees for      │
        │   visual interest, with a subtle drop shadow                   │
        │                                                                │
@@ -2555,12 +2555,12 @@
 
       // ── Hero terminal typing animation ────────────────────────────
       var heroCommands = [
-        { cmd: 'clawctl create sarah', delay: 60 },
-        { cmd: 'clawctl auth sarah apikey anthropic sk-ant-...', delay: 50 },
-        { cmd: 'clawctl start sarah', delay: 60 },
-        { cmd: 'clawctl group create backend', delay: 55 },
-        { cmd: 'clawctl create backend/bob --from=sarah', delay: 45 },
-        { cmd: 'clawctl dashboard', delay: 70 },
+        { cmd: 'claws create sarah', delay: 60 },
+        { cmd: 'claws auth sarah apikey anthropic sk-ant-...', delay: 50 },
+        { cmd: 'claws start sarah', delay: 60 },
+        { cmd: 'claws group create backend', delay: 55 },
+        { cmd: 'claws create backend/bob --from=sarah', delay: 45 },
+        { cmd: 'claws dashboard', delay: 70 },
       ];
 
       var heroCmdEl = document.getElementById('heroCmd');
@@ -2700,7 +2700,7 @@
       var installCmd = document.getElementById('installCmd');
 
       installCmd.addEventListener('click', function() {
-        var text = 'go build -o clawctl . && sudo mv clawctl /usr/local/bin/';
+        var text = 'go build -o claws . && sudo mv claws /usr/local/bin/';
         var hint = this.querySelector('.cta-section__install-hint');
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2845,7 +2845,7 @@
       function handleReducedMotion() {
         if (prefersReducedMotion.matches) {
           // Disable typing animation
-          heroCmdEl.textContent = 'clawctl dashboard';
+          heroCmdEl.textContent = 'claws dashboard';
           heroCursorEl.style.animation = 'none';
           // Show all reveals immediately
           for (var w = 0; w < revealElements.length; w++) {

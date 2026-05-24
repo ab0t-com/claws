@@ -4,7 +4,7 @@ Append-only. Each session adds a dated section at the bottom.
 
 ---
 
-## 2026-05-23 — Task 11.1: `clawctl auth verify <name>` primitive (claude)
+## 2026-05-23 — Task 11.1: `claws auth verify <name>` primitive (claude)
 
 **Goal.** Ship the missing primitive: a per-instance command that proves the agent's model auth actually works, with honest confidence levels and a directive fix command on failure. No bulk operation, no aggregation — just the cheap, reliable single-instance verb that the rest of the ticket composes on.
 
@@ -33,7 +33,7 @@ Append-only. Each session adds a dated section at the bottom.
    - strategy=logs: `✓ no auth errors observed in last 5m` *plus* a dim follow-up line: `(lower confidence — log scan can't prove the next call will succeed)` (low — absence of failure ≠ presence of success)
    This is the Cloudflare-style honesty principle from the ticket: don't conflate "no signal of failure" with "actively verified." A scripted consumer can read `strategy` from JSON; a human reading the terminal sees the confidence level inline.
 
-4. **"Inconclusive" is its own exit state, with the right fix message.** When all strategies skip (gateway down, or gateway up but no recent activity), exit non-zero with a directive that matches the actual state — `clawctl start <name>` if container is down, `send a test message to <name>` if it's up but quiet. Doesn't claim verified; doesn't claim failed; tells the operator what to do next.
+4. **"Inconclusive" is its own exit state, with the right fix message.** When all strategies skip (gateway down, or gateway up but no recent activity), exit non-zero with a directive that matches the actual state — `claws start <name>` if container is down, `send a test message to <name>` if it's up but quiet. Doesn't claim verified; doesn't claim failed; tells the operator what to do next.
 
 5. **`tryAuthCheckEndpoint` returns an error (not nil) on 404.** This forces strategy B to be tried explicitly. If strategy A ever changes from "endpoint not implemented" to "endpoint implemented and returns conclusive result," the chain falls naturally to the highest-confidence available strategy.
 
@@ -49,9 +49,9 @@ Append-only. Each session adds a dated section at the bottom.
 |---|---|---|
 | Baileys WhatsApp 401 false-positive | Live smoke against `team/sarah` (which had real WhatsApp 401s) | Regex tuned to require auth-provider context (`openai|codex|anthropic|claude` near the 401), not bare 401. Added Baileys log line to `shouldNotMatch` test cases |
 | Container running but quiet (no model activity in window) | Live smoke against `team/lead`, `team/john`, `team1/ben` — all running but silent | Strategy C returns nil; chain falls to "inconclusive". Fix message correctly says "send a test message" not "start the agent" |
-| Container not running | Code review | `containerIsRunning` distinguishes; inconclusive message says "clawctl start <name>" |
+| Container not running | Code review | `containerIsRunning` distinguishes; inconclusive message says "claws start <name>" |
 | Per-provider fix command (codex vs apikey) | Code review | `suggestReauthCommand` maps known providers; unknown providers get the generic both-options message |
-| Empty / missing port in instance.env | Code review | Early return with "instance has no gateway port (not yet started?)" + `clawctl start` fix command |
+| Empty / missing port in instance.env | Code review | Early return with "instance has no gateway port (not yet started?)" + `claws start` fix command |
 | `/readyz` returning `ready=false` for a non-auth subsystem (e.g., a transport that's down) | Code review | Strategy B falls through to C rather than mis-attributing the failure to auth |
 | Result of "verified via logs" being misinterpreted as "actively working" | Live smoke produced a "✓ auth ok" line for team/sarah seconds before the JSON run caught a real 401 — same agent, different windows | Tightened human-readable success message to be confidence-explicit per strategy |
 
@@ -61,27 +61,27 @@ Append-only. Each session adds a dated section at the bottom.
 - Build clean, vet clean.
 - **Live verification on the production fleet caught a real OpenAI Codex token refresh failure on `team/sarah`** — `[openai-codex] Token refresh failed: 401`. This was the actual original incident the operator reported. The CLI now detects it:
   ```
-  $ clawctl auth verify team/sarah
+  $ claws auth verify team/sarah
   ✗ auth error in last 5m: ... Token refresh failed: 401
-  Fix: clawctl auth team/sarah codex
+  Fix: claws auth team/sarah codex
   (exit=1)
   ```
 - The three quiet agents (`team/lead`, `team/john`, `team1/ben`) correctly report inconclusive with the right fix message ("send a test message"), without falsely claiming verified.
 
 ### Acceptance criteria from ticket §V1 — status (verify primitive)
 
-- [x] `clawctl auth verify <name>` returns 0 on verified, non-zero on failure or inconclusive.
+- [x] `claws auth verify <name>` returns 0 on verified, non-zero on failure or inconclusive.
 - [x] Per-failure directive fix command.
 - [x] JSON output with `verified`, `strategy`, `provider`, `model`, `error`, `fix_command`, `latency_ms`.
 - [x] Strategy chain with reserved upstream-endpoint slot, readyz fallback, log-scan fallback.
 - [x] Honest about confidence — log-scan success is labeled as such.
 - [x] Audit log records verify attempts (free — main.go's writeAuditLog covers every command).
-- [x] Help text under `clawctl auth --help` documents `verify` with examples.
+- [x] Help text under `claws auth --help` documents `verify` with examples.
 
 ### Live verification of the original incident
 
 ```
-$ clawctl auth verify team/sarah --json
+$ claws auth verify team/sarah --json
 {
   "name": "team/sarah",
   "provider": "openai-codex",
@@ -89,35 +89,35 @@ $ clawctl auth verify team/sarah --json
   "verified": false,
   "strategy": "logs",
   "error": "auth error in last 5m: openclaw-gateway-1  | 2026-05-23T04:27:19.473+00:00 [openai-codex] Token refresh failed: 401 {",
-  "fix_command": "clawctl auth team/sarah codex"
+  "fix_command": "claws auth team/sarah codex"
 }
 ```
 
-The error from the gateway log line tells us this is *specifically* a refresh-token failure — the underlying OAuth refresh exchange returned 401, meaning the refresh token itself is expired/revoked. The fix (`clawctl auth team/sarah codex` → full re-OAuth dance) is correct. **This is exactly what the operator originally needed.**
+The error from the gateway log line tells us this is *specifically* a refresh-token failure — the underlying OAuth refresh exchange returned 401, meaning the refresh token itself is expired/revoked. The fix (`claws auth team/sarah codex` → full re-OAuth dance) is correct. **This is exactly what the operator originally needed.**
 
 ### Safety
 
 - All live invocations were read-only (`auth verify` makes one HTTP probe + one `docker compose logs --since=5m` read).
-- The `team/sarah` token refresh failure surfaced by this run is the *real* production issue the operator originally reported. I have not run `clawctl auth team/sarah codex` — that's the operator's interactive OAuth dance and needs a browser. Recommended next step belongs to the operator.
+- The `team/sarah` token refresh failure surfaced by this run is the *real* production issue the operator originally reported. I have not run `claws auth team/sarah codex` — that's the operator's interactive OAuth dance and needs a browser. Recommended next step belongs to the operator.
 
 ### What the operator gets
 
 ```bash
-clawctl auth verify team/sarah               # is this one currently broken?
-clawctl auth verify team/sarah --json        # for CI / alerts / scripts
+claws auth verify team/sarah               # is this one currently broken?
+claws auth verify team/sarah --json        # for CI / alerts / scripts
 # (verify is the only new verb in this task. status --probe and idempotent
 # reauth come in 11.2 and 11.3.)
 ```
 
 ### Next
 
-Task 11.2: make `clawctl auth <name> codex/apikey` idempotent (no-op when verify already passes) and auto-run `auth verify` after install to surface real success/failure rather than the aspirational "Auth complete" message. Pure clawctl-side work — no runtime dependency. Picking up.
+Task 11.2: make `claws auth <name> codex/apikey` idempotent (no-op when verify already passes) and auto-run `auth verify` after install to surface real success/failure rather than the aspirational "Auth complete" message. Pure clawctl-side work — no runtime dependency. Picking up.
 
 ---
 
 ## 2026-05-23 — Task 11.2: idempotence + post-install verify on auth verbs (claude)
 
-**Goal.** Stop the control plane from lying. Today's `clawctl auth <name> codex` prints "==> Auth complete" after the CLI flow completes regardless of whether the credential it just installed actually works. Replace that with a post-install `auth verify` call so the operator-facing success/failure matches reality. Also: make the verb idempotent so retrying is safe and doesn't trigger an unnecessary OAuth dance against an already-working agent.
+**Goal.** Stop the control plane from lying. Today's `claws auth <name> codex` prints "==> Auth complete" after the CLI flow completes regardless of whether the credential it just installed actually works. Replace that with a post-install `auth verify` call so the operator-facing success/failure matches reality. Also: make the verb idempotent so retrying is safe and doesn't trigger an unnecessary OAuth dance against an already-working agent.
 
 ### What changed
 
@@ -158,7 +158,7 @@ Task 11.2: make `clawctl auth <name> codex/apikey` idempotent (no-op when verify
 
 ### Acceptance criteria from ticket §V1 — status (idempotence + auto-verify)
 
-- [x] `clawctl auth <name> codex` and `apikey <provider> <key>` are idempotent: verified=true short-circuits, with "no action needed" + `--force` hint.
+- [x] `claws auth <name> codex` and `apikey <provider> <key>` are idempotent: verified=true short-circuits, with "no action needed" + `--force` hint.
 - [x] After install + restart, the verb runs `auth verify` and either confirms success or reports the verify failure and exits non-zero.
 - [x] No more aspirational "Auth complete" message — every success path is evidence-backed.
 - [x] `--force` flag for explicit rotation.
@@ -168,20 +168,20 @@ Task 11.2: make `clawctl auth <name> codex/apikey` idempotent (no-op when verify
 
 ```bash
 # First-time auth: pre-flight inconclusive → OAuth dance → post-install verify
-clawctl auth team/sarah codex
+claws auth team/sarah codex
 
 # Retry-safe: if it's already working, no-op
-clawctl auth team/sarah codex
+claws auth team/sarah codex
 # ==> 'team/sarah' is already authed and verified (strategy: logs) — no action needed
 #     Pass --force to re-run anyway (e.g., to rotate to a fresh credential).
 
 # Forced rotation
-clawctl auth team/sarah codex --force
+claws auth team/sarah codex --force
 ```
 
 ### Next
 
-Task 11.3: `clawctl auth status --probe` — fleet read that composes the per-instance verify. Reuses `verifyOneInstance` directly; should be the smallest of the three tasks (~1 hour).
+Task 11.3: `claws auth status --probe` — fleet read that composes the per-instance verify. Reuses `verifyOneInstance` directly; should be the smallest of the three tasks (~1 hour).
 
 ---
 
@@ -237,7 +237,7 @@ Task 11.3: `clawctl auth status --probe` — fleet read that composes the per-in
 
 ### Acceptance criteria from ticket §V1 — status (auth status --probe)
 
-- [x] `clawctl auth status --probe` runs `verifyOneInstance` for every instance and adds VERIFIED column.
+- [x] `claws auth status --probe` runs `verifyOneInstance` for every instance and adds VERIFIED column.
 - [x] `--group=<name>` composes with `--probe` (inherits from existing status).
 - [x] JSON parity (`probe` field per record).
 - [x] Per-failure directive fix commands listed in trailer block.
@@ -249,28 +249,28 @@ After tasks 11.1, 11.2, and 11.3:
 
 ```bash
 # Detect — per instance or fleet
-clawctl auth verify team/sarah               # one
-clawctl auth status --probe                  # all (composes verify across fleet)
-clawctl auth status --probe --group=team     # one team
-clawctl auth status --probe --json           # for CI / monitoring
+claws auth verify team/sarah               # one
+claws auth status --probe                  # all (composes verify across fleet)
+claws auth status --probe --group=team     # one team
+claws auth status --probe --json           # for CI / monitoring
 
 # Fix — per instance, idempotent + verifying
-clawctl auth team/sarah codex                # OAuth dance; no-op if already verified; auto-verify after install
-clawctl auth team/sarah codex --force        # explicit rotation, skip idempotence check
-clawctl auth team/sarah apikey openai sk-... # headless; same idempotence + auto-verify
+claws auth team/sarah codex                # OAuth dance; no-op if already verified; auto-verify after install
+claws auth team/sarah codex --force        # explicit rotation, skip idempotence check
+claws auth team/sarah apikey openai sk-... # headless; same idempotence + auto-verify
 ```
 
 The operator workflow from the original incident now looks like:
 
 ```bash
-$ clawctl auth status --probe
+$ claws auth status --probe
 # 1 instance(s) need attention:
-#   clawctl auth team/sarah codex
+#   claws auth team/sarah codex
 
-$ clawctl auth team/sarah codex
+$ claws auth team/sarah codex
 # (OAuth dance, then auto-verify reports the truth)
 
-$ clawctl auth status --probe
+$ claws auth status --probe
 # (re-verifies, confirms fix)
 ```
 
@@ -280,7 +280,7 @@ Three commands. Each composes. None is bulk. The original incident is closed wit
 
 | Item from ticket §V1 | Status |
 |---|---|
-| `clawctl auth verify <name>` | ✅ (task 11.1) |
+| `claws auth verify <name>` | ✅ (task 11.1) |
 | Returns 0 on verified, non-zero on failure/inconclusive | ✅ |
 | Per-failure directive fix command | ✅ |
 | JSON output | ✅ |
@@ -300,8 +300,8 @@ Three commands. Each composes. None is bulk. The original incident is closed wit
 
 - All live invocations were read-only (verify, auth status --probe, channel/log inspection).
 - No live agent restarts. No interactive OAuth flows initiated. No credentials installed.
-- The 2026-05-23 production OpenAI Codex token-refresh issue on `team/sarah` is now detectable by the CLI but the actual fix (`clawctl auth team/sarah codex`) remains an operator decision because it requires a browser session.
-- Deployed `./clawctl` (Mar 27) unchanged. `/tmp/clawctl-current` rebuilt from source for inspection.
+- The 2026-05-23 production OpenAI Codex token-refresh issue on `team/sarah` is now detectable by the CLI but the actual fix (`claws auth team/sarah codex`) remains an operator decision because it requires a browser session.
+- Deployed `./claws` (Mar 27) unchanged. `/tmp/clawctl-current` rebuilt from source for inspection.
 
 ### What's next (out of this ticket)
 

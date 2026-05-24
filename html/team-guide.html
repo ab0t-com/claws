@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>clawctl — Team Setup Guide</title>
+  <title>claws — Team Setup Guide</title>
   <meta name="description" content="How to design and deploy AI agent teams for your organization. Complete examples for startups, agencies, research labs, and enterprises.">
   <meta name="theme-color" content="#fafafa">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
@@ -298,7 +298,7 @@
   <header>
     <h1>Team Setup Guide</h1>
     <p class="lead">
-      How to design and deploy AI agent teams with clawctl.
+      How to design and deploy AI agent teams with claws.
       Real examples for different team sizes, industries, and use cases &mdash;
       from a solo founder's first bot to an enterprise fleet.
     </p>
@@ -362,17 +362,17 @@
       <tbody>
         <tr>
           <td><strong>Team</strong></td>
-          <td>A group of agents that share a workspace, skills, and task queue. Created with <code>clawctl team create</code>.</td>
+          <td>A group of agents that share a workspace, skills, and task queue. Created with <code>claws team create</code>.</td>
           <td><code>research</code>, <code>support</code>, <code>acme-corp</code></td>
         </tr>
         <tr>
           <td><strong>Agent</strong></td>
-          <td>An individual AI running in a Docker container. Has its own auth, config, and port. Created with <code>clawctl create team/name</code>.</td>
+          <td>An individual AI running in a Docker container. Has its own auth, config, and port. Created with <code>claws create team/name</code>.</td>
           <td><code>research/sarah</code>, <code>support/triage</code></td>
         </tr>
         <tr>
           <td><strong>Channel</strong></td>
-          <td>A messaging platform connection. People talk to agents through channels. Added with <code>clawctl channel add</code>.</td>
+          <td>A messaging platform connection. People talk to agents through channels. Added with <code>claws channel add</code>.</td>
           <td>Telegram, Discord, Slack, WhatsApp</td>
         </tr>
       </tbody>
@@ -456,7 +456,7 @@
 
     <h3>Setup</h3>
     <div class="cmd"><span class="c"># One command does everything</span>
-clawctl setup</div>
+claws setup</div>
 
     <p>Follow the prompts:</p>
     <div class="cmd"><span class="c"># Team name</span>
@@ -488,7 +488,7 @@ n</div>
     </table>
 
     <div class="tip">
-      <strong>Tip:</strong> Put your project files in the agent's workspace directory and it can reference them in conversations. Find the path with <code>clawctl status my-team/assistant</code>.
+      <strong>Tip:</strong> Put your project files in the agent's workspace directory and it can reference them in conversations. Find the path with <code>claws status my-team/assistant</code>.
     </div>
   </section>
 
@@ -511,33 +511,33 @@ n</div>
 
     <h3>Setup</h3>
     <div class="cmd"><span class="c"># Create the team</span>
-clawctl team create eng
+claws team create eng
 
 <span class="c"># Create three specialized agents</span>
-clawctl create eng/frontend --auth=codex
-clawctl create eng/backend --auth=codex
-clawctl create eng/infra --auth=codex
+claws create eng/frontend --auth=codex
+claws create eng/backend --auth=codex
+claws create eng/infra --auth=codex
 
 <span class="c"># Connect each to your Slack workspace</span>
 <span class="c"># (You need one Slack app per agent — see channels-guide.html)</span>
-clawctl channel add eng/frontend slack --bot-token=xoxb-FE... --app-token=xapp-FE...
-clawctl channel add eng/backend slack --bot-token=xoxb-BE... --app-token=xapp-BE...
-clawctl channel add eng/infra slack --bot-token=xoxb-IF... --app-token=xapp-IF...
+claws channel add eng/frontend slack --bot-token=xoxb-FE... --app-token=xapp-FE...
+claws channel add eng/backend slack --bot-token=xoxb-BE... --app-token=xapp-BE...
+claws channel add eng/infra slack --bot-token=xoxb-IF... --app-token=xapp-IF...
 
 <span class="c"># Start all three</span>
-clawctl start eng/frontend
-clawctl start eng/backend
-clawctl start eng/infra</div>
+claws start eng/frontend
+claws start eng/backend
+claws start eng/infra</div>
 
     <h3>Customize each agent</h3>
     <p>Give each agent different instructions by editing their config:</p>
     <div class="cmd"><span class="c"># Make the frontend agent focus on React/TypeScript</span>
-clawctl config edit eng/frontend
+claws config edit eng/frontend
 <span class="c"># Add to agents.defaults.instructions:</span>
 <span class="c"># "You are a frontend specialist. Focus on React, TypeScript, CSS..."</span>
 
 <span class="c"># Make infra focus on AWS/Terraform/Docker</span>
-clawctl config edit eng/infra
+claws config edit eng/infra
 <span class="c"># "You are an infrastructure specialist. Focus on AWS, Terraform, Docker..."</span></div>
 
     <h3>Team workspace</h3>
@@ -576,18 +576,18 @@ git clone git@github.com:your-org/your-repo.git</div>
 
     <h3>Setup</h3>
     <div class="cmd"><span class="c"># Create the team</span>
-clawctl team create support
+claws team create support
 
 <span class="c"># One agent per platform</span>
-clawctl create support/telegram-bot --auth=codex --telegram=7123456789:AAH...
-clawctl create support/discord-bot --auth=codex --discord=MTIz...
-clawctl create support/whatsapp-bot --auth=codex
+claws create support/telegram-bot --auth=codex --telegram=7123456789:AAH...
+claws create support/discord-bot --auth=codex --discord=MTIz...
+claws create support/whatsapp-bot --auth=codex
 
 <span class="c"># WhatsApp needs interactive QR setup</span>
-clawctl channel add support/whatsapp-bot whatsapp
+claws channel add support/whatsapp-bot whatsapp
 
 <span class="c"># Start all</span>
-clawctl start-all</div>
+claws start-all</div>
 
     <h3>Add your knowledge base</h3>
     <div class="cmd"><span class="c"># Put docs in the shared workspace</span>
@@ -606,8 +606,8 @@ EOF</div>
     <h3>Enable outbound messaging (carefully)</h3>
     <p>By default, agents can only reply &mdash; they cannot initiate conversations. If you want an agent to proactively message approved contacts:</p>
     <div class="cmd"><span class="c"># Enable outbound on Telegram, but only to approved contacts</span>
-clawctl channel send support/telegram-bot telegram --enable
-clawctl channel allow support/telegram-bot telegram 123456789</div>
+claws channel send support/telegram-bot telegram --enable
+claws channel allow support/telegram-bot telegram 123456789</div>
 
     <div class="warning">
       <strong>Security note:</strong> Outbound messaging requires an <code>allowFrom</code> list. The agent can only message contacts you explicitly approve. This is enforced by policy.
@@ -615,13 +615,13 @@ clawctl channel allow support/telegram-bot telegram 123456789</div>
 
     <h3>Monitor</h3>
     <div class="cmd"><span class="c"># System overview</span>
-clawctl status
+claws status
 
 <span class="c"># Live dashboard (auto-refreshing)</span>
-clawctl dashboard
+claws dashboard
 
 <span class="c"># Recent activity across all agents</span>
-clawctl activity --since=4h</div>
+claws activity --since=4h</div>
   </section>
 
   <!-- ================================================================ -->
@@ -643,18 +643,18 @@ clawctl activity --since=4h</div>
 
     <h3>Setup</h3>
     <div class="cmd"><span class="c"># Create the team</span>
-clawctl team create research
+claws team create research
 
 <span class="c"># Create the manager (you talk to this one)</span>
-clawctl create research/lead --role=manager --auth=codex --telegram=BOT_TOKEN
+claws create research/lead --role=manager --auth=codex --telegram=BOT_TOKEN
 
 <span class="c"># Create specialist workers</span>
-clawctl create research/papers --role=worker --manager=lead --auth=codex
-clawctl create research/data --role=worker --manager=lead --auth=codex
-clawctl create research/code --role=worker --manager=lead --auth=codex
+claws create research/papers --role=worker --manager=lead --auth=codex
+claws create research/data --role=worker --manager=lead --auth=codex
+claws create research/code --role=worker --manager=lead --auth=codex
 
 <span class="c"># Start all</span>
-clawctl start-all</div>
+claws start-all</div>
 
     <h3>How it works</h3>
     <div class="diagram">  You  ──&gt;  [Telegram]  ──&gt;  research/lead  (manager)
@@ -675,16 +675,16 @@ clawctl start-all</div>
     <h3>Using the task queue</h3>
     <p>The manager dispatches work. Workers claim and complete tasks.</p>
     <div class="cmd"><span class="c"># Manager creates a task (or you can create manually)</span>
-clawctl task create research "Review papers on transformer efficiency"
+claws task create research "Review papers on transformer efficiency"
 
 <span class="c"># See the queue</span>
-clawctl task list research
+claws task list research
 
 <span class="c"># A worker claims it</span>
-clawctl task claim research TASK_ID --by=papers
+claws task claim research TASK_ID --by=papers
 
 <span class="c"># When done</span>
-clawctl task complete research TASK_ID</div>
+claws task complete research TASK_ID</div>
 
     <div class="tip">
       <strong>Tip:</strong> Workers write their results to the shared workspace. The manager can read those files when summarizing findings for you.
@@ -710,23 +710,23 @@ clawctl task complete research TASK_ID</div>
 
     <h3>Setup</h3>
     <div class="cmd"><span class="c"># Client A: e-commerce company</span>
-clawctl team create acme
-clawctl create acme/support --auth=codex --telegram=ACME_BOT_TOKEN
-clawctl create acme/analytics --auth=codex
-clawctl start acme/support
-clawctl start acme/analytics
+claws team create acme
+claws create acme/support --auth=codex --telegram=ACME_BOT_TOKEN
+claws create acme/analytics --auth=codex
+claws start acme/support
+claws start acme/analytics
 
 <span class="c"># Client B: SaaS startup</span>
-clawctl team create widgetco
-clawctl create widgetco/assistant --auth=codex --discord=WIDGET_BOT_TOKEN
-clawctl create widgetco/developer --auth=codex --slack-bot=xoxb-WC... --slack-app=xapp-WC...
-clawctl start widgetco/assistant
-clawctl start widgetco/developer
+claws team create widgetco
+claws create widgetco/assistant --auth=codex --discord=WIDGET_BOT_TOKEN
+claws create widgetco/developer --auth=codex --slack-bot=xoxb-WC... --slack-app=xapp-WC...
+claws start widgetco/assistant
+claws start widgetco/developer
 
 <span class="c"># Client C: law firm</span>
-clawctl team create lawfirm
-clawctl create lawfirm/research --auth=codex
-clawctl start lawfirm/research</div>
+claws team create lawfirm
+claws create lawfirm/research --auth=codex
+claws start lawfirm/research</div>
 
     <h3>Isolation guarantees</h3>
     <table>
@@ -744,11 +744,11 @@ clawctl start lawfirm/research</div>
 
     <h3>Manage per-client with access control</h3>
     <div class="cmd"><span class="c"># Grant your client liaison operator access to their agents only</span>
-clawctl access grant alice operator
+claws access grant alice operator
 <span class="c"># Then edit .access.json to scope alice to "acme/*" instances</span></div>
 
     <div class="warning">
-      <strong>Important:</strong> For true multi-tenant production, consider running separate clawctl instances (separate <code>OPENCLAW_ROOT</code> dirs) per client. This gives you OS-level isolation on top of container isolation.
+      <strong>Important:</strong> For true multi-tenant production, consider running separate claws instances (separate <code>OPENCLAW_ROOT</code> dirs) per client. This gives you OS-level isolation on top of container isolation.
     </div>
   </section>
 
@@ -771,63 +771,63 @@ clawctl access grant alice operator
 
     <h3>Phase 1: Secure foundation</h3>
     <div class="cmd"><span class="c"># Initialize with secure defaults</span>
-clawctl init
+claws init
 
 <span class="c"># Tighten the policy</span>
-clawctl config set policy requireSandbox true
-clawctl config set policy allowedImages '["openclaw:v2026.3.*"]'
-clawctl config set policy maxInstances 12
-clawctl config set policy blockedChannels '["signal"]'
+claws config set policy requireSandbox true
+claws config set policy allowedImages '["openclaw:v2026.3.*"]'
+claws config set policy maxInstances 12
+claws config set policy blockedChannels '["signal"]'
 
 <span class="c"># Set up access control</span>
-clawctl access grant devops-lead admin
-clawctl access grant eng-team operator
-clawctl access grant interns user</div>
+claws access grant devops-lead admin
+claws access grant eng-team operator
+claws access grant interns user</div>
 
     <h3>Phase 2: Pin a tested image</h3>
     <div class="cmd"><span class="c"># Pull a specific version</span>
-clawctl image pull openclaw:v2026.3.25
+claws image pull openclaw:v2026.3.25
 
 <span class="c"># All new agents will use this image (enforced by policy)</span></div>
 
     <h3>Phase 3: Deploy teams</h3>
     <div class="cmd"><span class="c"># Engineering team (manager + workers)</span>
-clawctl team create eng
-clawctl create eng/lead --role=manager --image=openclaw:v2026.3.25 --auth=codex
-clawctl create eng/frontend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
-clawctl create eng/backend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
-clawctl create eng/qa --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+claws team create eng
+claws create eng/lead --role=manager --image=openclaw:v2026.3.25 --auth=codex
+claws create eng/frontend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+claws create eng/backend --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
+claws create eng/qa --role=worker --manager=lead --image=openclaw:v2026.3.25 --auth=codex
 
 <span class="c"># Data team (flat)</span>
-clawctl team create data
-clawctl create data/analyst --image=openclaw:v2026.3.25 --auth=codex
-clawctl create data/pipeline --image=openclaw:v2026.3.25 --auth=codex
+claws team create data
+claws create data/analyst --image=openclaw:v2026.3.25 --auth=codex
+claws create data/pipeline --image=openclaw:v2026.3.25 --auth=codex
 
 <span class="c"># Connect channels</span>
-clawctl channel add eng/lead slack --bot-token=xoxb-ENG... --app-token=xapp-ENG...
-clawctl channel add data/analyst slack --bot-token=xoxb-DATA... --app-token=xapp-DATA...
+claws channel add eng/lead slack --bot-token=xoxb-ENG... --app-token=xapp-ENG...
+claws channel add data/analyst slack --bot-token=xoxb-DATA... --app-token=xapp-DATA...
 
 <span class="c"># Start everything</span>
-clawctl start-all</div>
+claws start-all</div>
 
     <h3>Phase 4: Ongoing operations</h3>
     <div class="cmd"><span class="c"># Daily status check</span>
-clawctl status
+claws status
 
 <span class="c"># Compliance validation</span>
-clawctl policy validate
+claws policy validate
 
 <span class="c"># Review who did what</span>
-clawctl access audit --since=24h
+claws access audit --since=24h
 
 <span class="c"># Full security audit</span>
-clawctl audit
+claws audit
 
 <span class="c"># Upgrade all agents to a new image (with health-check rollback)</span>
-clawctl upgrade --all --image=openclaw:v2026.4.1
+claws upgrade --all --image=openclaw:v2026.4.1
 
 <span class="c"># Back up critical agents</span>
-clawctl backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
+claws backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
 
     <h3>Enterprise checklist</h3>
     <table>
@@ -835,16 +835,16 @@ clawctl backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
         <tr><th></th><th>Item</th><th>Command</th></tr>
       </thead>
       <tbody>
-        <tr><td>&#9745;</td><td>Secure policy created</td><td><code>clawctl policy show</code></td></tr>
-        <tr><td>&#9745;</td><td>Access control with RBAC</td><td><code>clawctl access show</code></td></tr>
-        <tr><td>&#9745;</td><td>Audit logging enabled</td><td><code>clawctl access audit</code></td></tr>
-        <tr><td>&#9745;</td><td>Images pinned to tested versions</td><td><code>clawctl image list</code></td></tr>
-        <tr><td>&#9745;</td><td>All agents loopback-only</td><td><code>clawctl policy validate</code></td></tr>
-        <tr><td>&#9745;</td><td>DM pairing on all channels</td><td><code>clawctl channel security &lt;name&gt;</code></td></tr>
-        <tr><td>&#9745;</td><td>Outbound messaging OFF or allowlisted</td><td><code>clawctl channel security &lt;name&gt;</code></td></tr>
-        <tr><td>&#9745;</td><td>Regular backups</td><td><code>clawctl backup &lt;name&gt;</code></td></tr>
-        <tr><td>&#9745;</td><td>Health monitoring</td><td><code>clawctl dashboard</code></td></tr>
-        <tr><td>&#9745;</td><td>Security audit passing</td><td><code>clawctl audit</code></td></tr>
+        <tr><td>&#9745;</td><td>Secure policy created</td><td><code>claws policy show</code></td></tr>
+        <tr><td>&#9745;</td><td>Access control with RBAC</td><td><code>claws access show</code></td></tr>
+        <tr><td>&#9745;</td><td>Audit logging enabled</td><td><code>claws access audit</code></td></tr>
+        <tr><td>&#9745;</td><td>Images pinned to tested versions</td><td><code>claws image list</code></td></tr>
+        <tr><td>&#9745;</td><td>All agents loopback-only</td><td><code>claws policy validate</code></td></tr>
+        <tr><td>&#9745;</td><td>DM pairing on all channels</td><td><code>claws channel security &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Outbound messaging OFF or allowlisted</td><td><code>claws channel security &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Regular backups</td><td><code>claws backup &lt;name&gt;</code></td></tr>
+        <tr><td>&#9745;</td><td>Health monitoring</td><td><code>claws dashboard</code></td></tr>
+        <tr><td>&#9745;</td><td>Security audit passing</td><td><code>claws audit</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -871,29 +871,29 @@ clawctl backup eng/lead ~/backups/eng-lead-$(date +%Y%m%d).tar.gz</div>
       <code>policy validate</code>.
     </p>
 
-    <h3>1. <code>clawctl errors</code> — incident-triage umbrella</h3>
+    <h3>1. <code>claws errors</code> — incident-triage umbrella</h3>
     <p>
       First command to run when something feels off. One screen, four sources:
     </p>
     <ul>
       <li>Container state (running / restarting / exited + restart count)</li>
       <li>Recent log errors per instance</li>
-      <li>Recent <code>clawctl</code> operations that returned error</li>
+      <li>Recent <code>claws</code> operations that returned error</li>
       <li>Orphan Docker containers</li>
     </ul>
     <p>Plus a <strong>Fix paths</strong> trailer with directive commands to address each finding.</p>
     <div class="cmd"><span class="c"># Default: 2-hour window</span>
-clawctl errors
+claws errors
 
 <span class="c"># Wider window, JSON for dashboards</span>
-clawctl errors --since=24h --json
+claws errors --since=24h --json
 
 <span class="c"># Scope to one team</span>
-clawctl errors --group=backend</div>
+claws errors --group=backend</div>
 
-    <h3>2. <code>clawctl drift</code> — state consistency check</h3>
+    <h3>2. <code>claws drift</code> — state consistency check</h3>
     <p>
-      Detect any divergence between Docker reality and clawctl's view.
+      Detect any divergence between Docker reality and claws's view.
       Four dimensions in one pass:
     </p>
     <table>
@@ -907,30 +907,30 @@ clawctl errors --group=backend</div>
         <tr><td><strong>Registry drift</strong></td><td>Registry entry whose instance directory is gone.</td></tr>
       </tbody>
     </table>
-    <div class="cmd">clawctl drift
-clawctl drift --json | jq '.forward,.reverse'</div>
+    <div class="cmd">claws drift
+claws drift --json | jq '.forward,.reverse'</div>
 
-    <h3>3. <code>clawctl orphans</code> — find and clean stray containers</h3>
+    <h3>3. <code>claws orphans</code> — find and clean stray containers</h3>
     <p>
       Where <code>drift</code> shows you everything, <code>orphans</code> is
       the focused tool for the most common drift class &mdash; a Docker
       container with the <code>openclaw-</code> prefix that's not in
-      clawctl's registry. A restart-looping orphan can burn CPU and confuse
+      claws's registry. A restart-looping orphan can burn CPU and confuse
       incident triage.
     </p>
     <div class="cmd"><span class="c"># See what's orphaned</span>
-clawctl orphans
+claws orphans
 
 <span class="c"># Reverse view: registry entries with missing containers</span>
-clawctl orphans --reverse
+claws orphans --reverse
 
 <span class="c"># Remove a single orphan (asks for confirmation)</span>
-clawctl orphans clean openclaw-stray-1
+claws orphans clean openclaw-stray-1
 
 <span class="c"># Remove every orphan (asks once, then deletes)</span>
-clawctl orphans clean --all --yes</div>
+claws orphans clean --all --yes</div>
 
-    <h3>4. <code>clawctl logs --group -f</code> — interleaved live tail</h3>
+    <h3>4. <code>claws logs --group -f</code> — interleaved live tail</h3>
     <p>
       Tail every member of a group in one terminal with a per-member ANSI
       colour prefix. Ctrl-C exits cleanly. Without <code>-f</code>, a
@@ -938,18 +938,18 @@ clawctl orphans clean --all --yes</div>
       in-process and preserves order across members.
     </p>
     <div class="cmd"><span class="c"># Live multiplex tail of every backend agent</span>
-clawctl logs --group=backend -f
+claws logs --group=backend -f
 
 <span class="c"># Filtered live tail: only lines matching "401"</span>
-clawctl logs --group=backend -f --grep=401
+claws logs --group=backend -f --grep=401
 
 <span class="c"># Last 24h of errors, sequential dump</span>
-clawctl logs --group=backend --since=24h --grep=error
+claws logs --group=backend --since=24h --grep=error
 
 <span class="c"># Per-agent (same flags work)</span>
-clawctl logs sarah -f --since=1h</div>
+claws logs sarah -f --since=1h</div>
 
-    <h3>5. <code>clawctl auth verify</code> + <code>auth status --probe</code></h3>
+    <h3>5. <code>claws auth verify</code> + <code>auth status --probe</code></h3>
     <p>
       Per-instance auth liveness, with honest confidence reporting. Tries
       three strategies in order:
@@ -962,18 +962,18 @@ clawctl logs sarah -f --since=1h</div>
         will succeed</em>).</li>
     </ol>
     <div class="cmd"><span class="c"># Verify one agent — exits 0 only when verified</span>
-clawctl auth verify sarah
+claws auth verify sarah
 
 <span class="c"># Fleet auth inventory</span>
-clawctl auth status
+claws auth status
 
 <span class="c"># Same, but run verify per row and add a VERIFIED column</span>
-clawctl auth status --probe
+claws auth status --probe
 
 <span class="c"># Re-run OAuth even when already verified (rare)</span>
-clawctl auth sarah codex --force</div>
+claws auth sarah codex --force</div>
 
-    <h3>6. <code>clawctl channels</code> — fleet channel matrix</h3>
+    <h3>6. <code>claws channels</code> — fleet channel matrix</h3>
     <p>
       Rows are agents, columns are channel types (telegram, discord, slack,
       signal, whatsapp). Cells show the <code>dmPolicy</code> when the
@@ -982,13 +982,13 @@ clawctl auth sarah codex --force</div>
       <code>channel status</code> per agent.
     </p>
     <div class="cmd"><span class="c"># Fleet-wide matrix</span>
-clawctl channels
+claws channels
 
 <span class="c"># Scope to one group</span>
-clawctl channels --group=backend
+claws channels --group=backend
 
 <span class="c"># JSON for dashboards: { columns: [...], rows: [{name, cells}] }</span>
-clawctl channels --json</div>
+claws channels --json</div>
 
     <div class="tip">
       <strong>Pluralised vs singular.</strong> <code>channels</code> (plural)
@@ -1004,13 +1004,13 @@ clawctl channels --json</div>
         <tr><th>Symptom</th><th>Start here</th></tr>
       </thead>
       <tbody>
-        <tr><td>"Something feels off in production"</td><td><code>clawctl errors</code></td></tr>
-        <tr><td>"Docker shows containers I don't recognise"</td><td><code>clawctl orphans</code></td></tr>
-        <tr><td>"An agent stopped responding on Telegram"</td><td><code>clawctl auth verify &lt;name&gt;</code> then <code>clawctl logs &lt;name&gt; --since=10m</code></td></tr>
-        <tr><td>"Which agents are missing a channel?"</td><td><code>clawctl channels</code></td></tr>
-        <tr><td>"A 401 is bouncing between agents"</td><td><code>clawctl logs --group=&lt;g&gt; -f --grep=401</code></td></tr>
-        <tr><td>"What state is broken vs what config is broken?"</td><td><code>clawctl drift</code></td></tr>
-        <tr><td>"Audit something happened last night"</td><td><code>clawctl errors --since=12h</code> + <code>clawctl access audit --since=12h</code></td></tr>
+        <tr><td>"Something feels off in production"</td><td><code>claws errors</code></td></tr>
+        <tr><td>"Docker shows containers I don't recognise"</td><td><code>claws orphans</code></td></tr>
+        <tr><td>"An agent stopped responding on Telegram"</td><td><code>claws auth verify &lt;name&gt;</code> then <code>claws logs &lt;name&gt; --since=10m</code></td></tr>
+        <tr><td>"Which agents are missing a channel?"</td><td><code>claws channels</code></td></tr>
+        <tr><td>"A 401 is bouncing between agents"</td><td><code>claws logs --group=&lt;g&gt; -f --grep=401</code></td></tr>
+        <tr><td>"What state is broken vs what config is broken?"</td><td><code>claws drift</code></td></tr>
+        <tr><td>"Audit something happened last night"</td><td><code>claws errors --since=12h</code> + <code>claws access audit --since=12h</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -1065,12 +1065,12 @@ clawctl channels --json</div>
     <div style="margin-top: 40px;">
       <h3 style="color: var(--dark-text);">Quick start (any pattern)</h3>
       <div class="cmd"><span class="c"># Interactive guided setup — works for all patterns</span>
-clawctl setup
+claws setup
 
 <span class="c"># Or the scripted version</span>
-clawctl team create my-team
-clawctl create my-team/first-agent --auth=codex --telegram=TOKEN
-clawctl start my-team/first-agent</div>
+claws team create my-team
+claws create my-team/first-agent --auth=codex --telegram=TOKEN
+claws start my-team/first-agent</div>
     </div>
   </div>
 </div>
@@ -1078,7 +1078,7 @@ clawctl start my-team/first-agent</div>
 <footer>
   <div class="container">
     <p>
-      clawctl &mdash; AI agent team manager<br>
+      claws &mdash; AI agent team manager<br>
       <a href="channels-guide.html">Channel Setup Guide</a> &middot;
       <a href="https://github.com/ab0t-com/claws">GitHub</a>
     </p>

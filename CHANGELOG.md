@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to clawctl are documented here.
+All notable changes to claws are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -15,26 +15,26 @@ First public release under the MIT license.
 
 ### Added — Fleet observability
 
-- **`clawctl errors`** — incident-triage umbrella view. Composes container
-  state, recent log errors, recent failed `clawctl` operations, and orphan
+- **`claws errors`** — incident-triage umbrella view. Composes container
+  state, recent log errors, recent failed `claws` operations, and orphan
   Docker containers into one screen, then prints a "Fix paths" trailer of
   directive commands. Read-only; never executes anything.
   Flags: `--since=<dur>`, `--group=<name>`, `--json`.
-- **`clawctl drift`** — four-dimension state consistency check (forward
+- **`claws drift`** — four-dimension state consistency check (forward
   orphans, reverse orphans, disk drift, registry drift). Emits per-finding
   fix commands. Read-only.
-- **`clawctl orphans`** — surface Docker containers that match the
+- **`claws orphans`** — surface Docker containers that match the
   `openclaw-` naming prefix but are not in the port registry (e.g.
   containers a test run left behind). Subcommands: `list` (default),
   `clean <container> [--yes]`, `clean --all [--yes]`. Includes a
   `--reverse` mode that surfaces registry entries whose Docker container
   is missing.
-- **`clawctl channels`** (pluralised) — fleet-wide channel matrix. Rows
+- **`claws channels`** (pluralised) — fleet-wide channel matrix. Rows
   are agents, columns are channel types (telegram, discord, slack, signal,
   whatsapp). Cells show the dmPolicy when enabled, or `—` when absent.
   Flags: `--group=<name>`, `--json`. Singular `channel <verb>` continues
   to operate on one instance.
-- **`clawctl logs --group=<name> -f`** — interleaved live tail across
+- **`claws logs --group=<name> -f`** — interleaved live tail across
   every member of a group with per-member ANSI colour prefix; Ctrl-C
   exits cleanly. Without `-f`, sequential dump with section headers.
   Supports `--since=<dur>` and `--grep=<pattern>` in both modes; `--grep`
@@ -42,14 +42,14 @@ First public release under the MIT license.
 
 ### Added — Auth verification
 
-- **`clawctl auth verify <name>`** — per-instance auth liveness check.
+- **`claws auth verify <name>`** — per-instance auth liveness check.
   Tries (1) the auth-check endpoint, (2) `/readyz` `failing[]` inspection,
   (3) log scan for auth errors in the last 5 minutes. Exits 0 only on
   verified ok. Honest about confidence: a log-scan "ok" means "no errors
   seen", not "next call will succeed".
-- **`clawctl auth status --probe`** — adds a `VERIFIED` column to the
+- **`claws auth status --probe`** — adds a `VERIFIED` column to the
   fleet auth status table by running `verify` per row.
-- **`clawctl auth codex --force`** — opt out of idempotence preflight
+- **`claws auth codex --force`** — opt out of idempotence preflight
   when you specifically want to re-run OAuth.
 
 ### Added — Release infrastructure
@@ -72,7 +72,7 @@ First public release under the MIT license.
   2. **Local-release** — runs from inside an extracted tarball,
      installs the adjacent binary.
   3. **Local-dev** — invoked from a git checkout (or with
-     `CLAWCTL_LOCAL_DEV=1`); builds from source via `go build`.
+     `CLAWS_LOCAL_DEV=1`); builds from source via `go build`.
   HTTPS-only, fails on any HTTP error, refuses to overwrite existing
   install without `--force`, supports `--dry-run`.
 - **`scripts/publish-release.sh`** — one-shot release driver. Validates
@@ -81,10 +81,19 @@ First public release under the MIT license.
 
 ### Changed
 
+- **Binary renamed: `clawctl` → `claws`.** All commands, help text,
+  install/release scripts, and documentation refer to the new name.
+  Anyone with a prior `clawctl` binary on PATH should remove it and
+  reinstall as `claws`.
+- **Env-var prefix renamed: `CLAWCTL_*` → `CLAWS_*`.** Affects
+  `CLAWCTL_BASE_PORT`, `CLAWCTL_LOCAL_DEV`, `CLAWCTL_CONFIG_DIR`,
+  `CLAWCTL_GATEWAY_PORT`, `CLAWCTL_RUNTIME`, and `CLAWCTL_SKIP_VALIDATE`.
+  `OPENCLAW_*` env vars (which govern the OpenClaw runtime itself) are
+  unchanged.
 - **Module path** — `clawctl` → `github.com/ab0t-com/claws`.
 - **Repo layout** — all Go source moved from the repo root to
-  `cmd/clawctl/`. HTML assets moved from the repo root to `html/`.
-  Build command is now `go build ./cmd/clawctl/`.
+  `cmd/claws/`. HTML assets moved from the repo root to `html/`.
+  Build command is now `go build ./cmd/claws/`.
 - **`docker-compose.yml`** — gateway in-container bind hardcoded to
   `0.0.0.0`. Host-side exposure is governed by `OPENCLAW_HOST_BIND`.
   Prior coupling caused gateway to bind loopback inside the container

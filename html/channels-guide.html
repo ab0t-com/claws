@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>clawctl — Channel Setup Guide</title>
+  <title>claws — Channel Setup Guide</title>
   <meta name="description" content="Step-by-step guides for connecting your AI agents to Telegram, Discord, Slack, WhatsApp, and Signal.">
   <meta name="theme-color" content="#fafafa">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
@@ -289,17 +289,17 @@
         <strong>Add to your agent</strong>
         <div class="cmd-block">
           <span class="comment"># During setup (interactive prompt)</span><br>
-          clawctl setup<br><br>
+          claws setup<br><br>
           <span class="comment"># Or add to an existing agent</span><br>
-          clawctl channel add my-agent telegram --token=7123456789:AAH...<br><br>
+          claws channel add my-agent telegram --token=7123456789:AAH...<br><br>
           <span class="comment"># Or inline with create</span><br>
-          clawctl create alice --telegram=7123456789:AAH...
+          claws create alice --telegram=7123456789:AAH...
         </div>
       </li>
       <li>
         <strong>Approve the pairing</strong>
         <p>Message the bot in Telegram. It will show a pairing code. Enter it:</p>
-        <div class="cmd-block">clawctl approve my-agent telegram CODE123</div>
+        <div class="cmd-block">claws approve my-agent telegram CODE123</div>
       </li>
     </ol>
 
@@ -349,15 +349,15 @@
       <li>
         <strong>Add to your agent</strong>
         <div class="cmd-block">
-          clawctl channel add my-agent discord --token=MTIz...<br><br>
+          claws channel add my-agent discord --token=MTIz...<br><br>
           <span class="comment"># Or inline with create</span><br>
-          clawctl create alice --discord=MTIz...
+          claws create alice --discord=MTIz...
         </div>
       </li>
       <li>
         <strong>Approve the pairing</strong>
         <p>DM the bot on Discord. Enter the pairing code:</p>
-        <div class="cmd-block">clawctl approve my-agent discord CODE123</div>
+        <div class="cmd-block">claws approve my-agent discord CODE123</div>
       </li>
     </ol>
 
@@ -384,7 +384,7 @@
       </li>
       <li>
         <strong>Enable Socket Mode</strong>
-        <p>In the left sidebar, go to <strong>"Socket Mode"</strong>. Toggle it <strong>ON</strong>. When prompted, create an app-level token with the <code>connections:write</code> scope. Name it anything (e.g., "clawctl"). Copy the <code>xapp-...</code> token.</p>
+        <p>In the left sidebar, go to <strong>"Socket Mode"</strong>. Toggle it <strong>ON</strong>. When prompted, create an app-level token with the <code>connections:write</code> scope. Name it anything (e.g., "claws"). Copy the <code>xapp-...</code> token.</p>
       </li>
       <li>
         <strong>Subscribe to events</strong>
@@ -415,7 +415,7 @@
       <li>
         <strong>Add to your agent</strong>
         <div class="cmd-block">
-          clawctl channel add my-agent slack \<br>
+          claws channel add my-agent slack \<br>
           &nbsp;&nbsp;--bot-token=xoxb-... \<br>
           &nbsp;&nbsp;--app-token=xapp-...
         </div>
@@ -445,7 +445,7 @@
       </li>
       <li>
         <strong>Start the channel setup</strong>
-        <div class="cmd-block">clawctl channel add my-agent whatsapp</div>
+        <div class="cmd-block">claws channel add my-agent whatsapp</div>
         <p>This starts an interactive flow that will display a QR code in your terminal.</p>
       </li>
       <li>
@@ -459,12 +459,12 @@
       <li>
         <strong>Approve the pairing</strong>
         <p>Send a message to the bot's WhatsApp number from your personal phone. Enter the pairing code:</p>
-        <div class="cmd-block">clawctl approve my-agent whatsapp CODE123</div>
+        <div class="cmd-block">claws approve my-agent whatsapp CODE123</div>
       </li>
     </ol>
 
     <div class="warning">
-      <strong>Important:</strong> WhatsApp's default DM policy is <code>allowlist</code> (stricter than pairing). You must explicitly add approved contacts: <code>clawctl channel allow my-agent whatsapp +1234567890</code>
+      <strong>Important:</strong> WhatsApp's default DM policy is <code>allowlist</code> (stricter than pairing). You must explicitly add approved contacts: <code>claws channel allow my-agent whatsapp +1234567890</code>
     </div>
 
     <div class="tip">
@@ -491,12 +491,12 @@
       </li>
       <li>
         <strong>Add to your agent</strong>
-        <div class="cmd-block">clawctl channel add my-agent signal --number=+1234567890</div>
+        <div class="cmd-block">claws channel add my-agent signal --number=+1234567890</div>
       </li>
       <li>
         <strong>Approve contacts</strong>
         <p>Signal defaults to <code>allowlist</code> mode. Add approved senders:</p>
-        <div class="cmd-block">clawctl channel allow my-agent signal +0987654321</div>
+        <div class="cmd-block">claws channel allow my-agent signal +0987654321</div>
       </li>
     </ol>
 
@@ -516,25 +516,25 @@
 
     <div class="cmd-block">
       <span class="comment"># Add channels</span><br>
-      clawctl channel add &lt;agent&gt; telegram --token=TOKEN<br>
-      clawctl channel add &lt;agent&gt; discord  --token=TOKEN<br>
-      clawctl channel add &lt;agent&gt; slack    --bot-token=xoxb-... --app-token=xapp-...<br>
-      clawctl channel add &lt;agent&gt; whatsapp<br>
-      clawctl channel add &lt;agent&gt; signal   --number=+1234567890<br><br>
+      claws channel add &lt;agent&gt; telegram --token=TOKEN<br>
+      claws channel add &lt;agent&gt; discord  --token=TOKEN<br>
+      claws channel add &lt;agent&gt; slack    --bot-token=xoxb-... --app-token=xapp-...<br>
+      claws channel add &lt;agent&gt; whatsapp<br>
+      claws channel add &lt;agent&gt; signal   --number=+1234567890<br><br>
 
       <span class="comment"># Or inline with create</span><br>
-      clawctl create alice --telegram=TOKEN<br>
-      clawctl create alice --discord=TOKEN<br><br>
+      claws create alice --telegram=TOKEN<br>
+      claws create alice --discord=TOKEN<br><br>
 
       <span class="comment"># Approve pairing</span><br>
-      clawctl approve &lt;agent&gt; &lt;channel&gt; CODE<br><br>
+      claws approve &lt;agent&gt; &lt;channel&gt; CODE<br><br>
 
       <span class="comment"># Manage channels</span><br>
-      clawctl channel status &lt;agent&gt;<br>
-      clawctl channel security &lt;agent&gt;<br>
-      clawctl channel send &lt;agent&gt; telegram --enable<br>
-      clawctl channel allow &lt;agent&gt; telegram USER_ID<br>
-      clawctl channel remove &lt;agent&gt; telegram
+      claws channel status &lt;agent&gt;<br>
+      claws channel security &lt;agent&gt;<br>
+      claws channel send &lt;agent&gt; telegram --enable<br>
+      claws channel allow &lt;agent&gt; telegram USER_ID<br>
+      claws channel remove &lt;agent&gt; telegram
     </div>
 
     <div style="margin-top: 32px;">
@@ -552,7 +552,7 @@
 
 <footer>
   <div class="container">
-    <p>clawctl &mdash; AI agent team manager. <a href="https://github.com/ab0t-com/claws">GitHub</a></p>
+    <p>claws &mdash; AI agent team manager. <a href="https://github.com/ab0t-com/claws">GitHub</a></p>
   </div>
 </footer>
 

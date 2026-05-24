@@ -10,7 +10,7 @@ Currently:
 - Image is always `openclaw:local` (locally built, mutable tag)
 - No `docker pull` path — can't pull from a registry
 - No version pinning — rebuilding the image changes what all instances run
-- No `clawctl upgrade` command
+- No `claws upgrade` command
 - No way to run different instances on different image versions
 - Admin cannot restrict which images are allowed (ticket 2 prerequisite)
 
@@ -19,12 +19,12 @@ Currently:
 ### Image Sources
 
 ```bash
-clawctl image build                           # build from local openclaw repo
-clawctl image build --tag=v2026.3.25          # build with specific tag
-clawctl image pull openclaw:latest            # pull from registry
-clawctl image pull ghcr.io/openclaw/openclaw:v2026.3.25  # pull specific version
-clawctl image list                            # list local images
-clawctl image pin <instance> <image:tag>      # pin instance to specific image
+claws image build                           # build from local openclaw repo
+claws image build --tag=v2026.3.25          # build with specific tag
+claws image pull openclaw:latest            # pull from registry
+claws image pull ghcr.io/openclaw/openclaw:v2026.3.25  # pull specific version
+claws image list                            # list local images
+claws image pin <instance> <image:tag>      # pin instance to specific image
 ```
 
 ### Per-Instance Image Override
@@ -39,10 +39,10 @@ Compose template already supports this via `${OPENCLAW_IMAGE:-openclaw:local}`.
 ### Upgrade Flow
 
 ```bash
-clawctl upgrade <instance>                    # pull latest, restart
-clawctl upgrade <instance> --image=openclaw:v2026.4.1  # upgrade to specific version
-clawctl upgrade --all                         # upgrade all instances
-clawctl upgrade --all --rolling               # rolling restart (one at a time)
+claws upgrade <instance>                    # pull latest, restart
+claws upgrade <instance> --image=openclaw:v2026.4.1  # upgrade to specific version
+claws upgrade --all                         # upgrade all instances
+claws upgrade --all --rolling               # rolling restart (one at a time)
 ```
 
 Upgrade steps:

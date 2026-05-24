@@ -1,4 +1,4 @@
-# clawctl
+# claws
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -21,48 +21,48 @@ The installer downloads the latest GitHub release, verifies the SHA256 against `
 ```bash
 # 1. Build from source (or use install.sh above)
 ./scripts/rebuild.sh                     # build + vet + short tests
-# or:  go build -o clawctl ./cmd/clawctl/
+# or:  go build -o claws ./cmd/claws/
 
 # 2. Initialize
-./clawctl init
+./claws init
 
 # 3. Create your first instance
-./clawctl create alice
+./claws create alice
 
 # 4. Add authentication
-./clawctl auth alice codex              # OpenAI Codex OAuth
-./clawctl auth alice apikey openai sk-… # or API key
+./claws auth alice codex              # OpenAI Codex OAuth
+./claws auth alice apikey openai sk-… # or API key
 
 # 5. Start
-./clawctl start alice
+./claws start alice
 
 # 6. Connect (SSH tunnel from your laptop)
-./clawctl tunnel
+./claws tunnel
 # prints: ssh -N -L 18789:127.0.0.1:18789 ubuntu@<server>
 ```
 
 ## Commands
 
-Run `clawctl help` for the full list, or `clawctl <command> --help` for details on any command.
+Run `claws help` for the full list, or `claws <command> --help` for details on any command.
 
 ### Lifecycle
 
 ```
-clawctl create <name>              Create a new instance
-clawctl start <name>               Start (waits for health check)
-clawctl stop <name>                Stop
-clawctl restart <name>             Restart
-clawctl remove <name> [--purge]    Remove (--purge deletes all data)
+claws create <name>              Create a new instance
+claws start <name>               Start (waits for health check)
+claws stop <name>                Stop
+claws restart <name>             Restart
+claws remove <name> [--purge]    Remove (--purge deletes all data)
 ```
 
 ### Info
 
 ```
-clawctl list [--json]              List all instances
-clawctl status <name> [--json]     Show instance details
-clawctl health [name...] [--json]  Deep health probe
-clawctl dashboard [--interval=5s]  Live refreshing view
-clawctl activity [--since=2h]      Recent actions across instances
+claws list [--json]              List all instances
+claws status <name> [--json]     Show instance details
+claws health [name...] [--json]  Deep health probe
+claws dashboard [--interval=5s]  Live refreshing view
+claws activity [--since=2h]      Recent actions across instances
 ```
 
 ### Groups
@@ -70,10 +70,10 @@ clawctl activity [--since=2h]      Recent actions across instances
 Organize instances into groups with shared resources:
 
 ```
-clawctl group create backend
-clawctl create backend/sarah
-clawctl create backend/bob
-clawctl group list
+claws group create backend
+claws create backend/sarah
+claws create backend/bob
+claws group list
 ```
 
 ### Manager/Worker Roles
@@ -81,13 +81,13 @@ clawctl group list
 Assign roles within a group for task-based coordination:
 
 ```
-clawctl create team/lead --role=manager
-clawctl create team/dev1 --role=worker --manager=lead
+claws create team/lead --role=manager
+claws create team/dev1 --role=worker --manager=lead
 
-clawctl task create team "review PR #42" --from=lead
-clawctl task list team
-clawctl task claim team <id> --by=dev1
-clawctl task complete team <id> --result="approved"
+claws task create team "review PR #42" --from=lead
+claws task list team
+claws task claim team <id> --by=dev1
+claws task complete team <id> --result="approved"
 ```
 
 > **Note:** Tasks use filesystem `rename()` for atomic transitions and only work on local storage, not S3 FUSE mounts.
@@ -98,50 +98,50 @@ Connect instances to messaging platforms. Each instance can run multiple channel
 
 ```bash
 # Quick: use the interactive wizard
-clawctl channel alice telegram
+claws channel alice telegram
 
 # Or configure directly
-clawctl exec alice config set channels.telegram.enabled true --json
-clawctl exec alice config set channels.telegram.botToken '"123:ABC..."' --json
-clawctl exec alice config set channels.telegram.dmPolicy '"pairing"' --json
-clawctl restart alice
+claws exec alice config set channels.telegram.enabled true --json
+claws exec alice config set channels.telegram.botToken '"123:ABC..."' --json
+claws exec alice config set channels.telegram.dmPolicy '"pairing"' --json
+claws restart alice
 
 # WhatsApp requires QR scan
-clawctl exec alice channels login --channel whatsapp
+claws exec alice channels login --channel whatsapp
 
 # Check channel status
-clawctl exec alice channels status --probe
+claws exec alice channels status --probe
 ```
 
 ### Storage (S3)
 
 ```
-clawctl storage setup --bucket=my-backup
-clawctl storage sync                     # additive copy (safe)
-clawctl storage sync --mirror --yes      # destructive mirror
-clawctl storage mount                    # FUSE mount
-clawctl storage status
+claws storage setup --bucket=my-backup
+claws storage sync                     # additive copy (safe)
+claws storage sync --mirror --yes      # destructive mirror
+claws storage mount                    # FUSE mount
+claws storage status
 ```
 
 ### Proxy (Caddy)
 
 ```
-clawctl proxy setup --domain=ai.example.com
-clawctl proxy setup --domain=ai.example.com --dry-run
-clawctl proxy status
+claws proxy setup --domain=ai.example.com
+claws proxy setup --domain=ai.example.com --dry-run
+claws proxy status
 ```
 
-Auth headers are injected by default (disable with `--no-auth`). Config is written to `/etc/caddy/conf.d/clawctl.conf` (not the main Caddyfile).
+Auth headers are injected by default (disable with `--no-auth`). Config is written to `/etc/caddy/conf.d/claws.conf` (not the main Caddyfile).
 
 ### Image & Upgrade
 
 ```bash
-clawctl image list                              # list local images
-clawctl image pull openclaw:v2026.3.25          # pull from registry
-clawctl image pin team/sarah openclaw:v2026.3.25  # pin instance to version
+claws image list                              # list local images
+claws image pull openclaw:v2026.3.25          # pull from registry
+claws image pin team/sarah openclaw:v2026.3.25  # pin instance to version
 
-clawctl upgrade team/sarah --image=openclaw:v2026.4.1  # upgrade with rollback
-clawctl upgrade --all --image=openclaw:v2026.4.1       # upgrade all instances
+claws upgrade team/sarah --image=openclaw:v2026.4.1  # upgrade with rollback
+claws upgrade --all --image=openclaw:v2026.4.1       # upgrade all instances
 ```
 
 Upgrade stops the instance, starts with the new image, waits for health check. If health fails within 30s, it automatically rolls back to the previous image.
@@ -149,41 +149,41 @@ Upgrade stops the instance, starts with the new image, waits for health check. I
 ### Backup & Restore
 
 ```bash
-clawctl backup alice
-clawctl backup alice --exclude-credentials
-clawctl restore alice alice-backup-20260317.tar.gz
+claws backup alice
+claws backup alice --exclude-credentials
+claws restore alice alice-backup-20260317.tar.gz
 ```
 
 ### Admin — Security & Access
 
 ```bash
 # Security policy (restricts what instances can do)
-clawctl policy init                    # create secure defaults
-clawctl policy validate                # check all instances
-clawctl policy enforce --restart       # fix all violations + restart
+claws policy init                    # create secure defaults
+claws policy validate                # check all instances
+claws policy enforce --restart       # fix all violations + restart
 
-# Access control (restricts who can run clawctl)
-clawctl access init                    # set up roles (you become admin)
-clawctl access grant deploy-bot operator  # give limited access
-clawctl access grant alice user        # read-only, scoped to their instance
-clawctl access audit --since=1h        # view command audit log
+# Access control (restricts who can run claws)
+claws access init                    # set up roles (you become admin)
+claws access grant deploy-bot operator  # give limited access
+claws access grant alice user        # read-only, scoped to their instance
+claws access audit --since=1h        # view command audit log
 
 # Token management
-clawctl token rotate team/sarah        # rotate gateway auth token
-clawctl token show team/sarah          # view token (truncated)
+claws token rotate team/sarah        # rotate gateway auth token
+claws token show team/sarah          # view token (truncated)
 
 # Security audit (comprehensive check)
-clawctl audit                          # runs all security checks
-clawctl doctor --fix                   # auto-fix file permissions
+claws audit                          # runs all security checks
+claws doctor --fix                   # auto-fix file permissions
 ```
 
 ### Diagnostics
 
 ```bash
-clawctl init           # first-run setup
-clawctl version        # versions and environment
-clawctl doctor         # check Docker, image, disk, tools
-clawctl doctor --fix   # auto-fix file permissions
+claws init           # first-run setup
+claws version        # versions and environment
+claws doctor         # check Docker, image, disk, tools
+claws doctor --fix   # auto-fix file permissions
 ```
 
 ## Configuration
@@ -207,8 +207,8 @@ Instances are configured via layered JSON merge:
 |----------|---------|-------------|
 | `OPENCLAW_ROOT` | `~/.openclaw` | Root directory for all instances |
 | `OPENCLAW_IMAGE` | `openclaw:local` | Docker image to use |
-| `CLAWCTL_BASE_PORT` | `18789` | Starting port for allocation |
-| `CLAWCTL_SKIP_VALIDATE` | (unset) | Skip compose config validation |
+| `CLAWS_BASE_PORT` | `18789` | Starting port for allocation |
+| `CLAWS_SKIP_VALIDATE` | (unset) | Skip compose config validation |
 
 ## Architecture
 
@@ -222,7 +222,7 @@ Instances are configured via layered JSON merge:
 
 ```
 .
-├── cmd/clawctl/         Go source (all .go files, package main)
+├── cmd/claws/         Go source (all .go files, package main)
 ├── html/                Static UI / landing pages bundled in releases
 ├── docs/                Markdown documentation (channels, runtimes)
 ├── scripts/

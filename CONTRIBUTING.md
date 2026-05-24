@@ -1,6 +1,6 @@
-# Contributing to clawctl
+# Contributing to claws
 
-Thanks for your interest in clawctl. This document covers everything you need to know to develop, test, and submit changes.
+Thanks for your interest in claws. This document covers everything you need to know to develop, test, and submit changes.
 
 ## Quick start
 
@@ -25,14 +25,14 @@ cd claws
 ## Repository layout
 
 ```
-cmd/clawctl/         All Go source (package main, ~60 files)
+cmd/claws/         All Go source (package main, ~60 files)
 html/                Static UI / landing pages bundled in releases
 docs/                Markdown user documentation
 scripts/             Build, release, install, security audit, git hooks
 docker-compose.yml   Substrate template instances are built from
 ```
 
-There is intentionally no `internal/` package split. Everything lives in `cmd/clawctl/` as one package to keep call sites short and avoid premature abstraction. If you find yourself wanting to add `internal/`, open an issue first to discuss why.
+There is intentionally no `internal/` package split. Everything lives in `cmd/claws/` as one package to keep call sites short and avoid premature abstraction. If you find yourself wanting to add `internal/`, open an issue first to discuss why.
 
 ## Development loop
 
@@ -42,19 +42,19 @@ There is intentionally no `internal/` package split. Everything lives in `cmd/cl
 ./scripts/rebuild.sh --race      # build + tests with -race (~180s)
 ```
 
-The binary lands at `./clawctl` so you can run it immediately:
+The binary lands at `./claws` so you can run it immediately:
 
 ```bash
-./clawctl help
-./clawctl list
+./claws help
+./claws list
 ```
 
 For dogfooding against a scratch state directory:
 
 ```bash
 TMP=$(mktemp -d)
-OPENCLAW_ROOT=$TMP ./clawctl init
-OPENCLAW_ROOT=$TMP ./clawctl create demo
+OPENCLAW_ROOT=$TMP ./claws init
+OPENCLAW_ROOT=$TMP ./claws create demo
 # ...
 ```
 
@@ -63,19 +63,19 @@ OPENCLAW_ROOT=$TMP ./clawctl create demo
 ## Tests
 
 ```bash
-go test ./cmd/clawctl/...                              # full suite
-go test -short ./cmd/clawctl/...                       # skip slow integration tests
-go test -run TestIntegration_Drift ./cmd/clawctl/...   # one test
-go test -race -short ./cmd/clawctl/...                 # race detector
+go test ./cmd/claws/...                              # full suite
+go test -short ./cmd/claws/...                       # skip slow integration tests
+go test -run TestIntegration_Drift ./cmd/claws/...   # one test
+go test -race -short ./cmd/claws/...                 # race detector
 ```
 
-The integration tests build the `clawctl` binary into a tempdir and exercise it as a subprocess. They do not require Docker for most cases (they stub out the compose calls). Tests that genuinely need Docker are gated behind `testing.Short()` or skip cleanly when Docker is absent.
+The integration tests build the `claws` binary into a tempdir and exercise it as a subprocess. They do not require Docker for most cases (they stub out the compose calls). Tests that genuinely need Docker are gated behind `testing.Short()` or skip cleanly when Docker is absent.
 
 ### Writing tests
 
 - Use `t.TempDir()` for any filesystem state. The test harness registers cleanup automatically.
 - Prefer table-driven tests for any function with branching logic.
-- For new commands, add at least one integration test that runs the command end-to-end (`cmd/clawctl/integration_test.go`).
+- For new commands, add at least one integration test that runs the command end-to-end (`cmd/claws/integration_test.go`).
 
 ## Coding conventions
 

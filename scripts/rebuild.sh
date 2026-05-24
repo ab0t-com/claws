@@ -1,12 +1,12 @@
 #!/bin/bash
-# clawctl rebuild — fast local-dev rebuild
+# claws rebuild — fast local-dev rebuild
 #
 # Usage:
 #   ./scripts/rebuild.sh             # build + vet + short tests
 #   ./scripts/rebuild.sh --quick     # build only, skip vet & tests
 #   ./scripts/rebuild.sh --race      # build + tests with -race
 #
-# Output: ./clawctl binary at repo root, ready to run.
+# Output: ./claws binary at repo root, ready to run.
 #
 # This is the inner-loop script used while iterating. For cross-platform
 # release artifacts, use ./scripts/release.sh instead.
@@ -49,7 +49,7 @@ if ! command -v go &>/dev/null; then
     fi
 fi
 
-echo -e "${BOLD}clawctl rebuild${NC}  ${DIM}($(go version | awk '{print $3}'))${NC}"
+echo -e "${BOLD}claws rebuild${NC}  ${DIM}($(go version | awk '{print $3}'))${NC}"
 
 # --- Version stamp from git when available ---
 if VERSION=$(git -C "$ROOT" describe --tags --dirty --always 2>/dev/null); then
@@ -60,10 +60,10 @@ fi
 LDFLAGS="-X main.Version=${VERSION}"
 
 # --- Build ---
-echo -e "  ${DIM}building ./cmd/clawctl/ → ./clawctl${NC}"
-go build -ldflags "$LDFLAGS" -o "$ROOT/clawctl" ./cmd/clawctl/
-SIZE=$(du -h "$ROOT/clawctl" | awk '{print $1}')
-echo -e "  ${GREEN}✓${NC} clawctl ${VERSION} (${SIZE})"
+echo -e "  ${DIM}building ./cmd/claws/ → ./claws${NC}"
+go build -ldflags "$LDFLAGS" -o "$ROOT/claws" ./cmd/claws/
+SIZE=$(du -h "$ROOT/claws" | awk '{print $1}')
+echo -e "  ${GREEN}✓${NC} claws ${VERSION} (${SIZE})"
 
 if [ "$QUICK" -eq 1 ]; then
     echo -e "  ${DIM}--quick: skipping vet & tests${NC}"
@@ -71,8 +71,8 @@ if [ "$QUICK" -eq 1 ]; then
 fi
 
 # --- Vet ---
-echo -e "  ${DIM}go vet ./cmd/clawctl/...${NC}"
-if ! go vet ./cmd/clawctl/...; then
+echo -e "  ${DIM}go vet ./cmd/claws/...${NC}"
+if ! go vet ./cmd/claws/...; then
     echo -e "  ${RED}✗ vet failed${NC}" >&2
     exit 1
 fi
@@ -85,8 +85,8 @@ TEST_FLAGS="-short -timeout=300s"
 if [ "$RACE" -eq 1 ]; then
     TEST_FLAGS="-race -short -timeout=600s"
 fi
-echo -e "  ${DIM}go test ${TEST_FLAGS} ./cmd/clawctl/...${NC}"
-if go test $TEST_FLAGS ./cmd/clawctl/... 2>&1 | tail -5; then
+echo -e "  ${DIM}go test ${TEST_FLAGS} ./cmd/claws/...${NC}"
+if go test $TEST_FLAGS ./cmd/claws/... 2>&1 | tail -5; then
     echo -e "  ${GREEN}✓${NC} tests pass"
 else
     echo -e "  ${YELLOW}!${NC} some tests failed — see output above"
@@ -94,4 +94,4 @@ else
 fi
 
 echo ""
-echo -e "  ${GREEN}rebuild complete${NC}  →  ./clawctl"
+echo -e "  ${GREEN}rebuild complete${NC}  →  ./claws"

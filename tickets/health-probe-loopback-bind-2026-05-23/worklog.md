@@ -6,7 +6,7 @@ Append-only.
 
 ## 2026-05-23 — Fix shipped (claude)
 
-**Goal.** Stop `--bind=loopback` from making the gateway unreachable through Docker's port mapping. Per the ticket, the in-container listener should always be on `0.0.0.0`; host-side restriction lives in `OPENCLAW_HOST_BIND` (which Docker already enforces via the `ports:` mapping). This unblocks `clawctl health`, makes the README's SSH-tunnel example actually work, and removes the false-negative that triggered the 2026-05-23 triage thrash.
+**Goal.** Stop `--bind=loopback` from making the gateway unreachable through Docker's port mapping. Per the ticket, the in-container listener should always be on `0.0.0.0`; host-side restriction lives in `OPENCLAW_HOST_BIND` (which Docker already enforces via the `ports:` mapping). This unblocks `claws health`, makes the README's SSH-tunnel example actually work, and removes the false-negative that triggered the 2026-05-23 triage thrash.
 
 ### What changed
 
@@ -39,7 +39,7 @@ The ticket offered two options. Option A: hardcode `--bind 0.0.0.0` in the compo
 
 - Build clean, vet clean.
 - Targeted test sweep (`TestPolicyEnforce*`, `TestIntegration_*Group`) passes in 33s.
-- Smoke against scratch root: `clawctl create alpha --bind=loopback` writes the env correctly; rendered compose has `--bind 0.0.0.0` in-container and `host_ip: 127.0.0.1` in the host port mapping.
+- Smoke against scratch root: `claws create alpha --bind=loopback` writes the env correctly; rendered compose has `--bind 0.0.0.0` in-container and `host_ip: 127.0.0.1` in the host port mapping.
 
 ### Migration path for the live agents on this host
 
@@ -56,12 +56,12 @@ The ticket offered two options. Option A: hardcode `--bind 0.0.0.0` in the compo
 2. **Recreate each container so it picks up the new template:**
 
    ```bash
-   clawctl restart team/sarah --hard
-   clawctl restart team/john --hard
-   clawctl restart team/lead --hard
-   clawctl restart team1/ben --hard
+   claws restart team/sarah --hard
+   claws restart team/john --hard
+   claws restart team/lead --hard
+   claws restart team1/ben --hard
    # or, with the new team-noun verb from ticket 10:
-   clawctl team restart team --hard --yes
+   claws team restart team --hard --yes
    ```
 
    `--hard` does `docker compose down + up -d` (vs the default `restart` which is process-restart-only and doesn't re-render the compose template).
@@ -69,7 +69,7 @@ The ticket offered two options. Option A: hardcode `--bind 0.0.0.0` in the compo
 3. **Verify the fix worked:**
 
    ```bash
-   clawctl health           # should flip from all-down to all-healthy
+   claws health           # should flip from all-down to all-healthy
    curl -s http://127.0.0.1:18789/healthz   # should now actually respond
    ```
 
@@ -88,8 +88,8 @@ When ticket 12 lands and tests can reliably clean up after themselves, this is a
 
 ### Acceptance criteria from the ticket — status
 
-- [x] After `clawctl create alpha` (default `--bind=loopback`), the rendered compose has `--bind 0.0.0.0` in the gateway command (verified via `docker compose config`).
-- [x] `clawctl list` and `clawctl health` will agree (`docker ps healthy` ↔ host curl reaches the gateway) once the migration above runs. **Until then, they continue to disagree on the live host** — that's the migration story, not a residual code issue.
+- [x] After `claws create alpha` (default `--bind=loopback`), the rendered compose has `--bind 0.0.0.0` in the gateway command (verified via `docker compose config`).
+- [x] `claws list` and `claws health` will agree (`docker ps healthy` ↔ host curl reaches the gateway) once the migration above runs. **Until then, they continue to disagree on the live host** — that's the migration story, not a residual code issue.
 - [x] SSH tunnel forwarding `127.0.0.1:<port>` will reach the gateway post-migration.
 - [x] `--bind=loopback` still unreachable from non-localhost host addresses (Docker port mapping still binds host port to `127.0.0.1`).
 - [ ] Integration test gated behind a build tag. **Deferred to ticket 12 landing first** (see above).
@@ -99,7 +99,7 @@ When ticket 12 lands and tests can reliably clean up after themselves, this is a
 - Repo file modified: `docker-compose.yml` (one functional line changed + comment).
 - Live `~/.openclaw/docker-compose.yml`: **untouched** per safety contract.
 - Live agent containers: **untouched** per safety contract. They continue to run under the old template.
-- The four orphans surfaced earlier in the session by `clawctl orphans` (`alpha-one`, `alpha-two`, `bob`): **still present**, still unrelated to this ticket.
+- The four orphans surfaced earlier in the session by `claws orphans` (`alpha-one`, `alpha-two`, `bob`): **still present**, still unrelated to this ticket.
 
 ### Next
 

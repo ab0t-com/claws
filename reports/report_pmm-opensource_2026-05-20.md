@@ -13,7 +13,7 @@
 
 **Answer.**
 
-- **What it does:** clawctl is a single-binary command line that turns one Linux server into a private multi-tenant home for **1-8 messaging-connected AI agents**. Each agent is an isolated Docker container with its own identity, credentials, workspace, channels (WhatsApp/Telegram/Discord/Slack/Signal), and security policy. Optionally, agents form teams with a shared workspace and a manager/worker task queue.
+- **What it does:** claws is a single-binary command line that turns one Linux server into a private multi-tenant home for **1-8 messaging-connected AI agents**. Each agent is an isolated Docker container with its own identity, credentials, workspace, channels (WhatsApp/Telegram/Discord/Slack/Signal), and security policy. Optionally, agents form teams with a shared workspace and a manager/worker task queue.
 - **Who it's for:** the operator who already self-hosts things (Caddy, syncthing, Tailscale, nextcloud) and who wants to run their own AI agents instead of paying for an opaque SaaS. **Not** a SaaS replacement for the casual user; **not** Kubernetes for agent fleets.
 - **Should you open-source it?** **Yes, with one short hardening sprint.** The product is real (verified end-to-end in [dogfood log](../tests/dogfood_log_2026-05-20.md)). The remaining blockers are repository hygiene (LICENSE, CONTRIBUTING, CoC, SECURITY, CI) and a positioning page — not product features.
 - **What to call it (positioning).** "The control panel for your private AI agents" or "Run your own AI team on one server." Lean into self-host, privacy, identity-per-agent, and the messaging-channel surface. Don't position against Kubernetes; position against "the SaaS that has your WhatsApp messages."
@@ -37,13 +37,13 @@
 | **Adjacent** | 2-10 person teams running internal AI agents (one per function: support, dev, ops, sales) | Need isolation between agents, shared knowledge between them, and an audit trail |
 | **Aspirational** | Small consultancies or "AI-first" boutiques deploying client agents on per-tenant boxes | Need multi-tenant access control and the runtime adapter (different agent stacks per client) |
 
-What clawctl is **not** for: large fleets (>8 instances per host), multi-host orchestration, public cloud auto-scaling, anyone who needs a UI today (no web UI ships in-repo, only an `INTEGRATION_ANALYSIS.md`-style landing HTML and a `dashboard` TUI).
+What claws is **not** for: large fleets (>8 instances per host), multi-host orchestration, public cloud auto-scaling, anyone who needs a UI today (no web UI ships in-repo, only an `INTEGRATION_ANALYSIS.md`-style landing HTML and a `dashboard` TUI).
 
 ### 1.3 Jobs to be done (in operator language)
 
-| Job | clawctl command(s) | How it shows up in marketing |
+| Job | claws command(s) | How it shows up in marketing |
 |-----|--------------------|------------------------------|
-| "Stand up a private AI agent on my own server in 5 minutes" | `clawctl setup` | **The one-command quickstart.** |
+| "Stand up a private AI agent on my own server in 5 minutes" | `claws setup` | **The one-command quickstart.** |
 | "Give my Mum / customer / colleague their own agent that messages them on WhatsApp" | `create` + `channel add whatsapp` + `approve` | **"Each agent is reachable on the platform people already use."** |
 | "Run a team of agents that share a workspace and dispatch tasks to each other" | `team create` + `--role=manager|worker` + `task create/claim/complete` | **"Multi-agent coordination without a message bus."** |
 | "Lock down what these agents can do (channels, networking, who can talk to them)" | `policy init` + `policy enforce --restart` + `channel security` | **"Safe by default. Verifiable by audit."** |
@@ -66,7 +66,7 @@ These are *not* near-term decisions. Just inventorying optionality.
 
 ## 2. Object model — what users need to grok
 
-The 2026-03-27 PMM audit nailed this: today's clawctl exposes **eight** primary objects (Instance, Group, Role, Runtime, Channel, Policy, Access, Task). For a casual operator, that's at least five too many. The `setup` command was the right intervention — it lets a new user think only about three:
+The 2026-03-27 PMM audit nailed this: today's claws exposes **eight** primary objects (Instance, Group, Role, Runtime, Channel, Policy, Access, Task). For a casual operator, that's at least five too many. The `setup` command was the right intervention — it lets a new user think only about three:
 
 - **Team** (= group, hidden from new users)
 - **Agent** (= instance, with auth + a channel)
@@ -74,7 +74,7 @@ The 2026-03-27 PMM audit nailed this: today's clawctl exposes **eight** primary 
 
 Anything else (runtime, policy, access, task, role) is *defaulted intelligently* and only surfaced when needed. Marketing copy should keep this discipline: never mention "instance," "group," "runtime," "role" in the first paragraph of any landing page. Lead with "agent" and "team."
 
-> **Recommendation:** add a `clawctl --explain` or a `concepts` topic to `help` that walks through the three-object mental model for new users. Today's `help groups` topic already does this for the team/agent piece — extend it.
+> **Recommendation:** add a `claws --explain` or a `concepts` topic to `help` that walks through the three-object mental model for new users. Today's `help groups` topic already does this for the team/agent piece — extend it.
 
 ---
 
@@ -82,15 +82,15 @@ Anything else (runtime, policy, access, task, role) is *defaulted intelligently*
 
 ### 3.1 Adjacent solutions
 
-| Category | Examples | How clawctl differs |
+| Category | Examples | How claws differs |
 |----------|----------|---------------------|
 | **Multi-VM-on-one-host CLIs** | `multipass`, `lxc/lxd`, `podman quadlet` | Same shape (instance lifecycle on one box), but those are generic VMs/containers — no first-class agent identity, no channel integration, no policy on tools/DMs |
-| **Agent-runner toolkits** | LangGraph, AutoGen, CrewAI, Letta | Those are *frameworks* the agent author uses. clawctl is the *operational layer* underneath the framework. Complementary, not competitive |
-| **Hosted agent platforms** | OpenAI Assistants, Anthropic Workbench, Vercel AI SDK hosted | Hosted = vendor owns conversations + credentials + storage. clawctl is the self-hosted opposite |
-| **K8s/Nomad-class orchestrators** | Kubernetes operators (e.g., Argo, kagent), Nomad jobs | Multi-host, multi-tenant, multi-cluster. clawctl is deliberately one-host, fleet ≤ 8 — *that's the whole point* |
-| **Self-host home-automation CLIs** | Home Assistant supervisor, Nextcloud `occ`, `tailscale` CLI | Closest spiritual cousins. Same operator persona, same self-host ethos. clawctl borrows the file-based-state + tiered-help patterns |
+| **Agent-runner toolkits** | LangGraph, AutoGen, CrewAI, Letta | Those are *frameworks* the agent author uses. claws is the *operational layer* underneath the framework. Complementary, not competitive |
+| **Hosted agent platforms** | OpenAI Assistants, Anthropic Workbench, Vercel AI SDK hosted | Hosted = vendor owns conversations + credentials + storage. claws is the self-hosted opposite |
+| **K8s/Nomad-class orchestrators** | Kubernetes operators (e.g., Argo, kagent), Nomad jobs | Multi-host, multi-tenant, multi-cluster. claws is deliberately one-host, fleet ≤ 8 — *that's the whole point* |
+| **Self-host home-automation CLIs** | Home Assistant supervisor, Nextcloud `occ`, `tailscale` CLI | Closest spiritual cousins. Same operator persona, same self-host ethos. claws borrows the file-based-state + tiered-help patterns |
 
-### 3.2 Where clawctl is uniquely positioned
+### 3.2 Where claws is uniquely positioned
 
 The combination of {single host, ≤ 8 instances, file-based state, zero external Go deps, messaging-first channels, RBAC over the CLI, runtime-adapter pattern, safe-by-default security} does not exist in any single competing tool. This is a *category-defining* small tool — but only in the niche of "self-hosted private AI agents on one box."
 
@@ -121,8 +121,8 @@ Scored against typical OSS launch criteria.
 | **Docs site** | 🟡 `docs/channels.md`, `docs/runtimes.md` are good. | Add `docs/concepts.md` (3-object mental model), `docs/file-formats.md` (the on-disk schemas — see engineering report §9 item 2), and `docs/security.md` (consolidate `security` help topic + audit-script behavior). |
 | **Examples** | ❌ No `examples/` dir. | Add three: (1) one-agent quickstart (`setup --non-interactive` script), (2) two-person team with shared workspace, (3) custom runtime (Python agent). |
 | **Issue + PR templates** | ❌ Missing. | Standard `.github/ISSUE_TEMPLATE/*.md` (bug, feature, security-redirect) + `PULL_REQUEST_TEMPLATE.md`. |
-| **Branding** | 🟡 Three landing HTMLs exist; "clawctl" / "openclaw" relationship is unclear in the README. | Settle this *before* publishing: is clawctl an OpenClaw subproject, a sibling tool, or independent? Today the binary lives outside the OpenClaw repo. Treat as "clawctl: control plane for OpenClaw (and other) agent runtimes." |
-| **Demo / screencast** | ❌ None recorded. | One asciicast of `clawctl setup` from blank box to Telegram message. <60s. |
+| **Branding** | 🟡 Three landing HTMLs exist; "clawctl" / "openclaw" relationship is unclear in the README. | Settle this *before* publishing: is claws an OpenClaw subproject, a sibling tool, or independent? Today the binary lives outside the OpenClaw repo. Treat as "clawctl: control plane for OpenClaw (and other) agent runtimes." |
+| **Demo / screencast** | ❌ None recorded. | One asciicast of `claws setup` from blank box to Telegram message. <60s. |
 | **Roadmap** | 🟡 Implicit in `tickets/` and reports. | Move to a public `ROADMAP.md` so contributors see the direction. |
 | **Code quality bar** | ✅ `go test ./...` green, 232 tests, `go vet` clean, zero external Go deps. | None. |
 | **Security defaults** | ✅ Loopback default, 0600 perms, cap_drop ALL, DM pairing, audit on, outbound off. | None — these *are* the headline. |
@@ -138,9 +138,9 @@ Scored against typical OSS launch criteria.
 ### 5.1 The minimum viable launch
 
 1. **GitHub repo public** with the 9 hygiene items above.
-2. **One landing page** at e.g. `clawctl.dev` (use one of the existing `landing*.html` mockups; pick best, ship). Three sections: hero ("Run your own AI team on one server"), the `clawctl setup` asciicast, three quickstart commands. Link to GitHub.
+2. **One landing page** at e.g. `clawctl.dev` (use one of the existing `landing*.html` mockups; pick best, ship). Three sections: hero ("Run your own AI team on one server"), the `claws setup` asciicast, three quickstart commands. Link to GitHub.
 3. **One blog post** — 1500 words. Hook: "We didn't want a hosted assistant. We wanted a server full of agents we could trust." Walk through `setup`, the safe defaults, and the runtime adapter.
-4. **One Hacker News submission** ("Show HN: clawctl — multi-instance AI agent manager for one server"). Mention zero deps, file-based state, runtime adapter.
+4. **One Hacker News submission** ("Show HN: claws — multi-instance AI agent manager for one server"). Mention zero deps, file-based state, runtime adapter.
 5. **One asciicast** (asciinema), one demo video (≤2 min, no editing required), embedded in landing and blog.
 6. **One reference deployment** — Hetzner / DigitalOcean playbook (Ansible or just a shell script) that goes from a fresh Ubuntu box to a running `team/sarah` agent in 5 minutes. This is the *proof* the README's promise is real.
 
@@ -149,14 +149,14 @@ Scored against typical OSS launch criteria.
 - **Self-host community**: r/selfhosted, lobste.rs, awesome-selfhosted PR.
 - **AI builder community**: Hacker News, r/LocalLLaMA (positioning: "infra for your local models that have to face the world"), Latent Space podcast cold pitch.
 - **Mastodon/Bluesky**: link the demo video; tag self-host and AI tooling community.
-- **OpenClaw repo cross-link**: README of OpenClaw points at clawctl as the recommended way to run "more than one openclaw instance."
+- **OpenClaw repo cross-link**: README of OpenClaw points at claws as the recommended way to run "more than one openclaw instance."
 
 ### 5.3 Success metrics for the first 30 days
 
 | Metric | Target | Why this number |
 |---|---:|---|
 | GitHub stars | 200+ | Indicates the niche found you |
-| `clawctl setup` invocations (anonymized opt-in telemetry, optional) | n/a unless you add it | Don't add telemetry for v0 — wrong tone for the persona |
+| `claws setup` invocations (anonymized opt-in telemetry, optional) | n/a unless you add it | Don't add telemetry for v0 — wrong tone for the persona |
 | Open-source issues filed by non-staff | 5+ | Validates that strangers can use it |
 | External contributors (≥1 merged PR) | 1-2 | Pulse check on community formation |
 | Cited in 1 "best self-host AI" listicle | 1 | Distribution unlock |
@@ -170,14 +170,14 @@ If you hit 4 of 6 in 30 days, you have a project. If you hit 1, the positioning 
 
 ### 6.1 Naming and identity
 
-- **clawctl vs OpenClaw.** Most operators encountering the GitHub repo won't have heard of OpenClaw. The README assumes familiarity. Either: (a) embed a 3-line "what's OpenClaw?" in the README and the landing page, or (b) reposition clawctl as "the multi-agent control plane (runs OpenClaw by default)" so the relationship is explicit.
+- **claws vs OpenClaw.** Most operators encountering the GitHub repo won't have heard of OpenClaw. The README assumes familiarity. Either: (a) embed a 3-line "what's OpenClaw?" in the README and the landing page, or (b) reposition claws as "the multi-agent control plane (runs OpenClaw by default)" so the relationship is explicit.
 - **Trademarks / pre-existing names.** Quick web due diligence on "clawctl," "openclaw," and "claw" before publishing. Avoid surprises.
 
 ### 6.2 Compliance and platform-policy risk
 
 The product wires AI agents to **WhatsApp, Telegram, Discord, Slack, Signal**. Each has TOS implications when you build automation on top:
 
-- **WhatsApp** via Baileys (the underlying library OpenClaw uses) is *unofficial*. Meta has banned numbers running it. Operators take this risk individually; clawctl should document the risk on `docs/channels.md` and on the WhatsApp section of the landing page — *not bury it*.
+- **WhatsApp** via Baileys (the underlying library OpenClaw uses) is *unofficial*. Meta has banned numbers running it. Operators take this risk individually; claws should document the risk on `docs/channels.md` and on the WhatsApp section of the landing page — *not bury it*.
 - **Telegram, Discord, Slack** have official bot APIs and are fine.
 - **Signal** uses signal-cli, also unofficial but tolerated.
 
@@ -185,15 +185,15 @@ The product wires AI agents to **WhatsApp, Telegram, Discord, Slack, Signal**. E
 
 ### 6.3 Security responsibility
 
-clawctl by design holds messaging tokens (very sensitive — full takeover of a person's messaging channel), gateway tokens, and potentially API keys (Anthropic, OpenAI, Codex). If a bad release ever logs a token to stdout, it's a national headline. **Mitigations already in place:** config masking in `config show --no-secrets`, token truncation in `status`, 0600 file mode, audit script that checks credential perms. **Add for v1:**
+claws by design holds messaging tokens (very sensitive — full takeover of a person's messaging channel), gateway tokens, and potentially API keys (Anthropic, OpenAI, Codex). If a bad release ever logs a token to stdout, it's a national headline. **Mitigations already in place:** config masking in `config show --no-secrets`, token truncation in `status`, 0600 file mode, audit script that checks credential perms. **Add for v1:**
 
 - A SECURITY.md that explains the threat model in plain English.
 - A pre-commit gitleaks hook *enabled by default* (the hook script exists; install it in `scripts/install-hooks.sh` and document).
-- A `clawctl --version`-included build provenance (commit SHA, build time) so users can verify they're on the version they think they are.
+- A `claws --version`-included build provenance (commit SHA, build time) so users can verify they're on the version they think they are.
 
 ### 6.4 Maintenance load
 
-Going public introduces an **issue stream** that the maintainer must field. clawctl's surface is broad (~50 commands, 8 channels, 6 capability axes per runtime, S3/proxy/cron integrations). One person on a side project can be overwhelmed in 30 days. Mitigation:
+Going public introduces an **issue stream** that the maintainer must field. claws's surface is broad (~50 commands, 8 channels, 6 capability axes per runtime, S3/proxy/cron integrations). One person on a side project can be overwhelmed in 30 days. Mitigation:
 
 - Issue templates that triage by component (channels / runtime / lifecycle / policy / docs).
 - Explicit "known limitations" list in README and `docs/concepts.md`: 1-host only, ≤ 8 instances, no Windows, requires Docker Compose v2, no support for FUSE-mounted task queues.
@@ -211,7 +211,7 @@ The full dogfood log is at [`tests/dogfood_log_2026-05-20.md`](../tests/dogfood_
 
 1. **The `setup` flow really does work as advertised.** A new operator can go zero-to-running-team in one command. This *is* the marketing line; it's not aspirational.
 2. **Audit script's scope leak (S2 in dogfood log)** is the kind of thing that, the first time a contributor sees it, makes them think "this is sloppy." Fix before publication — it's a 10-minute filter on `docker ps` output.
-3. **JSON-parity gap (dogfood S3)** matters more for OSS than for internal use. The first contributor who tries to wire clawctl into a dashboard will hit this within ten minutes. Worth landing before launch.
+3. **JSON-parity gap (dogfood S3)** matters more for OSS than for internal use. The first contributor who tries to wire claws into a dashboard will hit this within ten minutes. Worth landing before launch.
 4. **`gateway.bind` cosmetic issue (S1)** is exactly the kind of thing security-curious operators write blog posts about. "I configured loopback but `config show` says lan!" Even though the *runtime* binds correctly, the optics are bad. Fix is small.
 
 ---

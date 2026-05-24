@@ -19,7 +19,7 @@ Each task says **what** to run, **why**, **risk**, and **how long.**
 re-OAuth'd her. The other openai-codex agents (`team/john`, `team/lead`)
 share the *provider*, not the credential — but they were set up around the
 same time. They might be on the same expiry timer. `team1/ben` is on
-Anthropic (different provider entirely). Today's `clawctl auth status --probe`
+Anthropic (different provider entirely). Today's `claws auth status --probe`
 shows `john` flipped to `✓ no errors 5m` (post-test-message activity, or
 because nothing's tried recently). The reliable test is a real message.
 
@@ -30,13 +30,13 @@ because nothing's tried recently). The reliable test is a real message.
 #   1. send the agent a quick Telegram message ("test")
 #   2. wait ~5 seconds
 #   3. verify
-./clawctl auth verify team/john
-./clawctl auth verify team/lead
-./clawctl auth verify team1/ben
+./claws auth verify team/john
+./claws auth verify team/lead
+./claws auth verify team1/ben
 ```
 
-If verify reports `✗ failing`: run `./clawctl auth <name> codex` (for
-openai-codex agents) or `./clawctl auth team1/ben apikey anthropic <key>`
+If verify reports `✗ failing`: run `./claws auth <name> codex` (for
+openai-codex agents) or `./claws auth team1/ben apikey anthropic <key>`
 (for ben, if Anthropic is what's set up).
 
 **Risk.** Sending test messages is read-only-ish; reauth modifies
@@ -61,7 +61,7 @@ attempts.
 **Run.**
 
 ```bash
-./clawctl channel remove team/sarah whatsapp
+./claws channel remove team/sarah whatsapp
 # (no --yes needed; idempotent)
 ```
 
@@ -83,8 +83,8 @@ there's nothing to preserve.
 
 **Why.** `openclaw-alpha-one`, `openclaw-alpha-two`, `openclaw-bob` are
 restart-looping with mount paths that no longer exist. Each spends a few
-percent of CPU on its retry cycle. They're invisible to `clawctl list`
-(not in the registry) but visible to `clawctl orphans` and `clawctl
+percent of CPU on its retry cycle. They're invisible to `claws list`
+(not in the registry) but visible to `claws orphans` and `clawctl
 errors`. Caused by integration tests that ran *before* ticket 12's
 cleanup hook shipped; the hook now prevents new occurrences but doesn't
 retroactively clean these.
@@ -92,9 +92,9 @@ retroactively clean these.
 **Run.**
 
 ```bash
-./clawctl orphans clean --all --yes
+./claws orphans clean --all --yes
 # Then confirm:
-./clawctl orphans
+./claws orphans
 # Expected: "No orphan containers found."
 ```
 
@@ -113,7 +113,7 @@ know about them, no operator interaction with them in months). Safe.
 **Why.** Ticket 9 fixed the `--bind=loopback` bug where the gateway
 listened on the *container's* loopback (unreachable through Docker's
 port mapping). The fix is in the repo's `docker-compose.yml`. Live
-containers are still on the old template — `clawctl health` keeps
+containers are still on the old template — `claws health` keeps
 reporting "down" for all four agents, the README's SSH tunnel example
 still doesn't reach them, and any external probe (including
 `auth status --probe`'s Strategy A and B) gets connection-refused.
@@ -127,11 +127,11 @@ cp /home/ubuntu/claw/workspace/clawctl-go/docker-compose.yml ~/.openclaw/docker-
 # 2. Recreate each container with the new template.
 #    --hard does docker compose down + up -d, which is the only way to
 #    pick up template changes (a soft restart doesn't re-read it).
-./clawctl team restart team --hard --yes      # sarah, john, lead
-./clawctl restart team1/ben --hard
+./claws team restart team --hard --yes      # sarah, john, lead
+./claws restart team1/ben --hard
 
 # 3. Verify the fix worked.
-./clawctl health
+./claws health
 # Expected: all four flip from "down" to "healthy".
 curl -s http://127.0.0.1:18789/healthz
 # Expected: 200 OK (vs. today's connection refused).
@@ -205,12 +205,12 @@ binary was committed early on; for a public release it should not be.)
 
 ---
 
-## T6. (Follow-up enhancement) Surface restart-loop counts more loudly in `clawctl errors`
+## T6. (Follow-up enhancement) Surface restart-loop counts more loudly in `claws errors`
 
 **Status:** `[ ]`
 
 **Why.** During this session's wrap-up the operator asked: "do we have a
-command to see restart-looped things?" Today, `clawctl errors` already
+command to see restart-looped things?" Today, `claws errors` already
 does — but for **orphans** specifically, the restart count isn't shown.
 Bob has 1500+ restarts on it. A `restarts=1543` field next to each
 orphan would make the urgency immediately obvious without needing to
@@ -222,11 +222,11 @@ orphan would make the urgency immediately obvious without needing to
 - Populate it in `inspectOrphan` (one more `docker inspect --format
   '{{.RestartCount}}'` call per orphan — same shape as the per-instance
   restart-count code path in `errors_cmd.go`).
-- Render in both `clawctl orphans` and the orphans section of
-  `clawctl errors` as `(N restarts)` in yellow when > 5.
+- Render in both `claws orphans` and the orphans section of
+  `claws errors` as `(N restarts)` in yellow when > 5.
 - JSON: add the field; existing consumers see one extra key, no break.
 
-**Out of scope.** Don't add a new top-level `clawctl restart-loops`
+**Out of scope.** Don't add a new top-level `claws restart-loops`
 verb. The signal already lives in `errors` and `orphans`; adding a verb
 duplicates surface for no new information.
 

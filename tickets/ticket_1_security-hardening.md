@@ -14,7 +14,7 @@ The security audit (`scripts/security-audit.sh`) reports 4 failures and 27 warni
 The `group add` command moved instances but preserved old 0664 permissions. New instances get 0600 but existing ones don't.
 
 **Files:** `group.go` cmdGroupAdd — after moving, should `chmod 0600` the instance.env
-**Also:** Add a `clawctl fix-permissions` or run it as part of `clawctl doctor --fix`
+**Also:** Add a `claws fix-permissions` or run it as part of `claws doctor --fix`
 
 ```bash
 # Manual fix now:
@@ -53,7 +53,7 @@ Change default to `loopback`. Users who need LAN access opt in with `--bind=lan`
 OPENCLAW_GATEWAY_BIND=${OPENCLAW_GATEWAY_BIND:-loopback}
 ```
 
-### 1.4 Add `clawctl doctor --fix` to auto-remediate permissions
+### 1.4 Add `claws doctor --fix` to auto-remediate permissions
 
 **File:** `doctor.go`
 

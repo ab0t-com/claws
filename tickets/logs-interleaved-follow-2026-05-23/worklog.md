@@ -58,11 +58,11 @@ Append-only.
 
 ### Acceptance criteria from the ticket — status
 
-- [x] `clawctl logs --group=<team> -f` streams interleaved live logs with per-member color prefix.
+- [x] `claws logs --group=<team> -f` streams interleaved live logs with per-member color prefix.
 - [x] `Ctrl-C` cleanly stops all subprocesses (via context cancellation + CommandContext SIGKILL).
 - [x] `--grep=<pattern>` composes with `-f --group=`.
 - [x] 1MB scanner buffer for long lines.
-- [x] Help text on `clawctl logs --help` documents the combined form.
+- [x] Help text on `claws logs --help` documents the combined form.
 - [ ] Integration test that exercises real Docker and asserts at least one line per member arrives — **deferred** to operator validation. The drop-on-full unit test plus the structural-correctness review covers the implementation risk.
 
 ### Safety
@@ -73,4 +73,4 @@ Append-only.
 
 ### Next
 
-Ticket 14 — `clawctl errors [--group=]` umbrella. Composes existing read paths (container state + log errors + audit errors + orphans) into one incident-triage screen. Building blocks all exist; this is the composition layer.
+Ticket 14 — `claws errors [--group=]` umbrella. Composes existing read paths (container state + log errors + audit errors + orphans) into one incident-triage screen. Building blocks all exist; this is the composition layer.

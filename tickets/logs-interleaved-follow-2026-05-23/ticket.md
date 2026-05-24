@@ -1,4 +1,4 @@
-# Ticket: `clawctl logs --group=<name> -f` (interleaved multi-instance follow)
+# Ticket: `claws logs --group=<name> -f` (interleaved multi-instance follow)
 
 **Created:** 2026-05-23
 **Status:** Open
@@ -9,9 +9,9 @@
 
 ## Problem
 
-`clawctl logs --group=<team>` (non-follow) ships in Task F+H of the fleet-team-control ticket — it iterates members sequentially with section headers (`=== team/sarah ===`). Operators investigating a *past* incident can use this.
+`claws logs --group=<team>` (non-follow) ships in Task F+H of the fleet-team-control ticket — it iterates members sequentially with section headers (`=== team/sarah ===`). Operators investigating a *past* incident can use this.
 
-But `clawctl logs --group=<team> -f` (live interleaved tail) is rejected with a directive error today:
+But `claws logs --group=<team> -f` (live interleaved tail) is rejected with a directive error today:
 
 > `--group= with -f (interleaved follow) is not yet supported — run -f per instance, or omit -f for sequential tail`
 
@@ -73,11 +73,11 @@ func cmdLogsGroupFollow(paths Paths, members []RegistryEntry, grep string) error
 
 ## Acceptance criteria
 
-- [ ] `clawctl logs --group=<team> -f` streams interleaved live logs from every team member, prefixed by member name with a stable color per member.
+- [ ] `claws logs --group=<team> -f` streams interleaved live logs from every team member, prefixed by member name with a stable color per member.
 - [ ] `Ctrl-C` cleanly stops all subprocesses (no orphaned `docker compose logs -f` processes).
 - [ ] `--grep=<pattern>` composes with `-f --group=` — filter applied per line.
 - [ ] Buffer sized for 1MB lines (some OpenClaw log lines are long).
-- [ ] Help text on `clawctl logs --help` documents the combined form.
+- [ ] Help text on `claws logs --help` documents the combined form.
 - [ ] Integration test that fires up a real `docker compose` and asserts that at least one line from each member is received within a short window. Gated behind `testing.Short()` like the existing `TestIntegration_StartGroupExpansion`.
 
 ## Related

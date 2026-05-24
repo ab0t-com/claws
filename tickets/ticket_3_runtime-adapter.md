@@ -6,7 +6,7 @@
 
 ## Problem
 
-clawctl is hardcoded to OpenClaw:
+claws is hardcoded to OpenClaw:
 - Compose command: `node dist/index.js gateway` (`docker-compose.yml:33`)
 - Health check: `fetch('http://127.0.0.1:18789/healthz')` (`docker-compose.yml:44`)
 - CLI commands: `openclaw channels add`, `openclaw pairing approve` (`channel.go`, `commands.go`)
@@ -20,7 +20,7 @@ But the control plane pattern (port management, groups, shared resources, task q
 ### Runtime Interface
 
 ```go
-// Runtime defines how clawctl interacts with a specific agent gateway runtime.
+// Runtime defines how claws interacts with a specific agent gateway runtime.
 type Runtime struct {
     Name            string   // "openclaw", "custom", etc.
     Image           string   // default Docker image
@@ -66,13 +66,13 @@ Each runtime provides its own compose template:
 ### Instance-Level Runtime Selection
 
 ```bash
-clawctl create alice --runtime=openclaw          # default
-clawctl create bob --runtime=custom-agent        # different runtime
+claws create alice --runtime=openclaw          # default
+claws create bob --runtime=custom-agent        # different runtime
 ```
 
 Stored in `instance.env`:
 ```
-CLAWCTL_RUNTIME=openclaw
+CLAWS_RUNTIME=openclaw
 ```
 
 ### What Changes in clawctl
@@ -89,10 +89,10 @@ CLAWCTL_RUNTIME=openclaw
 ### Commands
 
 ```
-clawctl runtime list                    # list available runtimes
-clawctl runtime show <name>             # show runtime config
-clawctl runtime add <name> --image=...  # register a new runtime
-clawctl runtime remove <name>           # remove a runtime
+claws runtime list                    # list available runtimes
+claws runtime show <name>             # show runtime config
+claws runtime add <name> --image=...  # register a new runtime
+claws runtime remove <name>           # remove a runtime
 ```
 
 ## Implementation Order
@@ -104,7 +104,7 @@ clawctl runtime remove <name>           # remove a runtime
 5. Refactor `probeInstance()` to use runtime endpoints
 6. Refactor `dc()` to use runtime compose template
 7. Refactor channel/auth commands to use runtime CLI commands
-8. Add `clawctl runtime` subcommands
+8. Add `claws runtime` subcommands
 9. Document how to create a custom runtime definition
 
 ## Testing

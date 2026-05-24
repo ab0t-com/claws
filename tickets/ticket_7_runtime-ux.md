@@ -31,13 +31,13 @@ The key insight: **80% of users only need `--image=`**. The full runtime adapter
 
 **Problem 1: The simple case is hidden behind the complex case.**
 
-A user who wants to run a slim build has to discover that `--image=` exists. The help text and docs present `clawctl runtime add` as the way to use different images. A user reading the help thinks:
+A user who wants to run a slim build has to discover that `--image=` exists. The help text and docs present `claws runtime add` as the way to use different images. A user reading the help thinks:
 
 > "I want to use nemoclaw instead of openclaw. I need to register a runtime."
 
 When actually:
 
-> "I just need `clawctl create alice --image=nemoclaw:latest` and everything works."
+> "I just need `claws create alice --image=nemoclaw:latest` and everything works."
 
 **Problem 2: Creating a new runtime is too many manual steps.**
 
@@ -48,7 +48,7 @@ To properly register nemoclaw:
 3. Figure out what port it listens on internally
 4. Figure out what compose services it needs
 5. Create or copy a compose template
-6. Run `clawctl runtime add nemoclaw --image=... --health=... --port=... --gateway-service=...`
+6. Run `claws runtime add nemoclaw --image=... --health=... --port=... --gateway-service=...`
 
 That's 6 steps requiring knowledge of the runtime's internals. Most users don't know what a "gateway service" is. They have a Docker image and want to run it.
 
@@ -59,7 +59,7 @@ Most forks of OpenClaw change 1-2 things (image, maybe health endpoint). But `ru
 If nemoclaw is 99% compatible with OpenClaw (same ports, same CLI, different image), the user should say:
 
 ```bash
-clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest
+claws runtime add nemoclaw --from=openclaw --image=nemoclaw:latest
 ```
 
 Not re-specify 40 fields.
@@ -69,14 +69,14 @@ Not re-specify 40 fields.
 After `runtime add`, the user has no way to test if their definition is correct until they `create` + `start` an instance and watch it fail. There's no:
 
 ```bash
-clawctl runtime test nemoclaw
+claws runtime test nemoclaw
 ```
 
 That would pull the image, start a temporary container, hit the health endpoint, and report success/failure — all without creating a persistent instance.
 
 **Problem 5: No way to share runtime definitions.**
 
-If a team figures out the right settings for nemoclaw, there's no easy way to share. The JSON file is in `~/.openclaw/runtimes/nemoclaw.json` but there's no `clawctl runtime export/import` flow. Users would have to manually copy files.
+If a team figures out the right settings for nemoclaw, there's no easy way to share. The JSON file is in `~/.openclaw/runtimes/nemoclaw.json` but there's no `claws runtime export/import` flow. Users would have to manually copy files.
 
 **Problem 6: No compose template scaffolding.**
 
@@ -89,7 +89,7 @@ If a user has a Docker image and doesn't know its internals, there's no way to a
 - What health endpoint does it have?
 - What user does it run as?
 
-A `clawctl runtime detect <image>` could inspect the image and suggest a runtime definition.
+A `claws runtime detect <image>` could inspect the image and suggest a runtime definition.
 
 ---
 
@@ -101,7 +101,7 @@ A `clawctl runtime detect <image>` could inspect the image and suggest a runtime
 **Current flow:** User may not realize `--image=` exists, tries to figure out runtime add.
 **Target flow:**
 ```bash
-clawctl create alice --image=my-openclaw:slim
+claws create alice --image=my-openclaw:slim
 # That's it. Everything else is identical to default.
 ```
 **Gap:** Documentation and help text don't lead with this path.
@@ -112,7 +112,7 @@ clawctl create alice --image=my-openclaw:slim
 **Current flow:** Manual `runtime add` with 6+ flags.
 **Target flow:**
 ```bash
-clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest --health=/status
+claws runtime add nemoclaw --from=openclaw --image=nemoclaw:latest --health=/status
 # Inherits everything from openclaw, overrides image and health
 ```
 **Gap:** No `--from=` inheritance on runtime add.
@@ -123,12 +123,12 @@ clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest --health=/s
 **Current flow:** Must know all the right flags.
 **Target flow:**
 ```bash
-clawctl runtime init my-agent
+claws runtime init my-agent
 # Creates ~/.openclaw/runtimes/my-agent.json with documented fields
 # Creates ~/.openclaw/runtimes/my-agent-compose.yml scaffold
 # User edits both files
 
-clawctl runtime test my-agent
+claws runtime test my-agent
 # Validates the definition works
 ```
 **Gap:** No `init` scaffolding, no `test` validation.
@@ -140,10 +140,10 @@ clawctl runtime test my-agent
 **Target flow:**
 ```bash
 # Export
-clawctl runtime export nemoclaw > nemoclaw-runtime.json
+claws runtime export nemoclaw > nemoclaw-runtime.json
 
 # On another machine
-clawctl runtime import nemoclaw-runtime.json
+claws runtime import nemoclaw-runtime.json
 ```
 **Gap:** No `export/import` commands.
 
@@ -152,9 +152,9 @@ clawctl runtime import nemoclaw-runtime.json
 
 **Target flow:**
 ```bash
-clawctl runtime detect my-unknown-agent:latest
+claws runtime detect my-unknown-agent:latest
 # Inspects image: exposes port 8080, runs as user 'app', entrypoint is python
-# Suggests: clawctl runtime add my-agent --image=my-unknown-agent:latest --port=8080 --health=/health --no-channels --no-cli
+# Suggests: claws runtime add my-agent --image=my-unknown-agent:latest --port=8080 --health=/health --no-channels --no-cli
 ```
 **Gap:** No `detect` command.
 
@@ -183,23 +183,23 @@ if fromName != "" {
 // Then apply --flags on top
 ```
 
-**Test:** `clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest` → runtime has OpenClaw's ports/health/CLI but nemoclaw's image.
+**Test:** `claws runtime add nemoclaw --from=openclaw --image=nemoclaw:latest` → runtime has OpenClaw's ports/health/CLI but nemoclaw's image.
 
 ---
 
 ### 7.2 — `runtime init <name>` (Scaffolding)
 
-**What:** Creates a JSON definition and compose template with documented fields that the user can edit. Like `clawctl init` but for a runtime.
+**What:** Creates a JSON definition and compose template with documented fields that the user can edit. Like `claws init` but for a runtime.
 
 **Files:** New code in `runtime.go`
 **Effort:** Medium
 
 ```bash
-clawctl runtime init my-agent
+claws runtime init my-agent
 # Creates:
 #   ~/.openclaw/runtimes/my-agent.json         (with comments explaining each field)
 #   ~/.openclaw/runtimes/my-agent-compose.yml   (minimal compose template)
-# Prints: "Edit these files, then run: clawctl runtime test my-agent"
+# Prints: "Edit these files, then run: claws runtime test my-agent"
 ```
 
 The scaffold compose template should be minimal and well-commented:
@@ -226,7 +226,7 @@ services:
 **Effort:** Medium
 
 ```bash
-clawctl runtime test my-agent
+claws runtime test my-agent
 # 1. Pull image if not present
 # 2. Start temporary container with --rm
 # 3. Wait for health endpoint (up to 30s)
@@ -257,10 +257,10 @@ func cmdRuntimeTest(args []string) error {
 
 ```bash
 # Export (includes compose template if present)
-clawctl runtime export nemoclaw > nemoclaw.bundle.json
+claws runtime export nemoclaw > nemoclaw.bundle.json
 
 # Import
-clawctl runtime import nemoclaw.bundle.json
+claws runtime import nemoclaw.bundle.json
 ```
 
 The bundle format is just the runtime JSON with an optional `composeTemplate` field containing the compose YAML as a string:
@@ -287,7 +287,7 @@ The bundle format is just the runtime JSON with an optional `composeTemplate` fi
 **Effort:** Medium
 
 ```bash
-clawctl runtime detect my-agent:latest
+claws runtime detect my-agent:latest
 # Inspecting my-agent:latest...
 #   Exposed ports: 8080
 #   User: app
@@ -295,7 +295,7 @@ clawctl runtime detect my-agent:latest
 #   Health: (unknown — try /health, /healthz, /)
 #
 # Suggested command:
-#   clawctl runtime add my-agent --image=my-agent:latest --port=8080 --container-home=/home/app --no-channels --no-cli
+#   claws runtime add my-agent --image=my-agent:latest --port=8080 --container-home=/home/app --no-channels --no-cli
 ```
 
 Uses `docker inspect` to read:
@@ -321,9 +321,9 @@ Uses `docker inspect` to read:
 
 Most users only need to specify a different Docker image:
 
-    clawctl create alice --image=openclaw:slim
-    clawctl create bob --image=nemoclaw:latest
-    clawctl upgrade alice --image=openclaw:v2026.4.1
+    claws create alice --image=openclaw:slim
+    claws create bob --image=nemoclaw:latest
+    claws upgrade alice --image=openclaw:v2026.4.1
 
 This works for any image that's compatible with OpenClaw (same ports,
 same health endpoints, same CLI). This covers:
@@ -338,17 +338,17 @@ If your agent has different ports, health endpoints, or CLI commands,
 you need a custom runtime definition:
 
     # Start from OpenClaw and override what's different
-    clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest --health=/status
+    claws runtime add nemoclaw --from=openclaw --image=nemoclaw:latest --health=/status
 
     # Or scaffold from scratch
-    clawctl runtime init my-python-agent
+    claws runtime init my-python-agent
     # Edit the generated files, then:
-    clawctl runtime test my-python-agent
-    clawctl create alice --runtime=my-python-agent
+    claws runtime test my-python-agent
+    claws create alice --runtime=my-python-agent
 
     # Share with your team
-    clawctl runtime export my-python-agent > my-python-agent.json
-    clawctl runtime import my-python-agent.json
+    claws runtime export my-python-agent > my-python-agent.json
+    claws runtime import my-python-agent.json
 ```
 
 **Help text changes:**
@@ -367,30 +367,30 @@ you need a custom runtime definition:
 1. **Running a slim build**
    ```bash
    docker build --build-arg OPENCLAW_VARIANT=slim -t openclaw:slim .
-   clawctl create alice --image=openclaw:slim
+   claws create alice --image=openclaw:slim
    ```
 
 2. **Running with specific extensions only**
    ```bash
    docker build --build-arg OPENCLAW_EXTENSIONS="telegram discord" -t openclaw:minimal .
-   clawctl create alice --image=openclaw:minimal
+   claws create alice --image=openclaw:minimal
    ```
 
 3. **Running a compatible fork (nemoclaw)**
    ```bash
-   clawctl runtime add nemoclaw --from=openclaw --image=nemoclaw:latest
-   clawctl create alice --runtime=nemoclaw
+   claws runtime add nemoclaw --from=openclaw --image=nemoclaw:latest
+   claws create alice --runtime=nemoclaw
    ```
 
 4. **Running a divergent fork (different health endpoint)**
    ```bash
-   clawctl runtime add nanoclaw --from=openclaw --image=nanoclaw:latest --health=/api/health --ready=
-   clawctl create alice --runtime=nanoclaw
+   claws runtime add nanoclaw --from=openclaw --image=nanoclaw:latest --health=/api/health --ready=
+   claws create alice --runtime=nanoclaw
    ```
 
 5. **Running a completely different agent (Python)**
    ```bash
-   clawctl runtime init my-python-agent
+   claws runtime init my-python-agent
    # Edit ~/.openclaw/runtimes/my-python-agent.json:
    #   "defaultImage": "my-python-agent:latest"
    #   "internalPort": 8080
@@ -398,16 +398,16 @@ you need a custom runtime definition:
    #   "gatewayService": "agent"
    #   "cliService": ""  (no CLI)
    # Edit ~/.openclaw/runtimes/my-python-agent-compose.yml
-   clawctl runtime test my-python-agent
-   clawctl create alice --runtime=my-python-agent
+   claws runtime test my-python-agent
+   claws create alice --runtime=my-python-agent
    ```
 
 6. **Running mixed runtimes in one group**
    ```bash
-   clawctl group create research
-   clawctl create research/gpt-agent --runtime=openclaw
-   clawctl create research/claude-agent --runtime=nanoclaw
-   clawctl create research/custom --runtime=my-python-agent
+   claws group create research
+   claws create research/gpt-agent --runtime=openclaw
+   claws create research/claude-agent --runtime=nanoclaw
+   claws create research/custom --runtime=my-python-agent
    # All three share the group workspace and task queue
    ```
 

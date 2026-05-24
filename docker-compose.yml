@@ -38,10 +38,10 @@ services:
     # already governed by OPENCLAW_HOST_BIND (the `ports:` mapping above) —
     # using OPENCLAW_GATEWAY_BIND=loopback here made the gateway bind to the
     # container's own loopback, which Docker's port-mapping cannot reach,
-    # silently breaking `clawctl health`, the SSH tunnel example in the
+    # silently breaking `claws health`, the SSH tunnel example in the
     # README, and any external probe. Loopback-only deployments are still
     # honoured: OPENCLAW_HOST_BIND=127.0.0.1 (the default for --bind=loopback
-    # in clawctl) keeps the host port bound only to localhost. See
+    # in claws) keeps the host port bound only to localhost. See
     # tickets/health-probe-loopback-bind-2026-05-23/ for the full rationale.
     command:
       [

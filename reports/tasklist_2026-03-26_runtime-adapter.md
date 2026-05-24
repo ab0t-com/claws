@@ -3,7 +3,7 @@
 **Branch:** `feature/runtime-adapter`
 **Created:** 2026-03-26
 **Ticket:** ticket_3_runtime-adapter.md
-**Goal:** Decouple clawctl from OpenClaw so it can manage any containerized agent runtime.
+**Goal:** Decouple claws from OpenClaw so it can manage any containerized agent runtime.
 
 ---
 
@@ -38,7 +38,7 @@ $---- [x] 01-runtime-struct
 Create `runtime.go` with:
 - `Runtime` struct with all configurable fields
 - `openclawRuntime()` returning the built-in OpenClaw defaults
-- `readRuntime(paths, name)` to load from instance.env `CLAWCTL_RUNTIME`
+- `readRuntime(paths, name)` to load from instance.env `CLAWS_RUNTIME`
 - `resolveRuntime(paths, instanceName)` to get the runtime for an instance
 - Runtime registry dir: `~/.openclaw/runtimes/` for custom runtimes
 - `loadRuntimeFromFile(path)` for JSON-defined custom runtimes
@@ -57,12 +57,12 @@ Create `runtime.go` with:
 
 $---- [x] 02-runtime-commands
 
-### 02 — Add `clawctl runtime` management commands
+### 02 — Add `claws runtime` management commands
 
-- `clawctl runtime list` — list available runtimes
-- `clawctl runtime show <name>` — print runtime config
-- `clawctl runtime add <name> --image=... --health=...` — register custom runtime
-- `clawctl runtime remove <name>` — remove custom runtime
+- `claws runtime list` — list available runtimes
+- `claws runtime show <name>` — print runtime config
+- `claws runtime add <name> --image=... --health=...` — register custom runtime
+- `claws runtime remove <name>` — remove custom runtime
 - Add to main.go switch, help.go, README
 
 **Tests:**
@@ -77,7 +77,7 @@ $---- [x] 03-create-with-runtime
 ### 03 — Wire `--runtime=` into `cmdCreate`
 
 - Add `--runtime=` flag parsing in cmdCreate
-- Store `CLAWCTL_RUNTIME=<name>` in instance.env
+- Store `CLAWS_RUNTIME=<name>` in instance.env
 - Use `runtime.ConfigFileName` instead of hardcoded `openclaw.json`
 - Use `runtime.GatewayService` in compose calls
 - Default: `openclaw` if no `--runtime=` specified
@@ -85,7 +85,7 @@ $---- [x] 03-create-with-runtime
 
 **Files to modify:** commands.go
 **Tests:**
-- Create with default runtime stores CLAWCTL_RUNTIME=openclaw
+- Create with default runtime stores CLAWS_RUNTIME=openclaw
 - Create with custom runtime stores correct value
 - resolveRuntime reads from instance.env
 
@@ -200,7 +200,7 @@ Currently one `docker-compose.yml` for all instances. With adapters, each runtim
 
 **Design:**
 - Runtime struct has `ComposeTemplate` field (path or embedded)
-- `clawctl runtime add` accepts `--compose=<path>` to register a compose template
+- `claws runtime add` accepts `--compose=<path>` to register a compose template
 - Stored in `~/.openclaw/runtimes/<name>-compose.yml`
 - `resolvePaths()` already supports dynamic compose template path
 - `dc()` in compose.go uses `paths.ComposeTemplate` — need to override per-instance
@@ -232,8 +232,8 @@ $---- [x] 09-channel-runtime-awareness
 
 Channels (WhatsApp, Telegram, etc.) are an OpenClaw concept. Other runtimes may not have channels. Need to handle:
 
-- `clawctl channel add` — check if runtime supports channels
-- `clawctl approve` — check if runtime supports pairing
+- `claws channel add` — check if runtime supports channels
+- `claws approve` — check if runtime supports pairing
 - Channel config paths (`channels.telegram.botToken`) are OpenClaw-specific
 
 **Design:**
@@ -294,11 +294,11 @@ $---- [x] 12-env-var-naming
 The env vars in instance.env and docker-compose.yml are all prefixed `OPENCLAW_*`. Other runtimes may need different var names.
 
 **Options:**
-A) Keep OPENCLAW_* as the universal clawctl prefix (it's our control plane's naming)
+A) Keep OPENCLAW_* as the universal claws prefix (it's our control plane's naming)
 B) Make env var names runtime-configurable
-C) Use generic names: `CLAWCTL_GATEWAY_PORT`, `CLAWCTL_CONFIG_DIR`, etc.
+C) Use generic names: `CLAWS_GATEWAY_PORT`, `CLAWS_CONFIG_DIR`, etc.
 
-**Recommendation:** Option A for clawctl-internal vars (port, bind, token, image), runtime-specific for vars passed to the container. The compose template is per-runtime anyway, so it maps clawctl env vars to whatever the runtime needs.
+**Recommendation:** Option A for clawctl-internal vars (port, bind, token, image), runtime-specific for vars passed to the container. The compose template is per-runtime anyway, so it maps claws env vars to whatever the runtime needs.
 
 ---
 
@@ -311,7 +311,7 @@ $---- [x] 13-storage-naming
 - Mount path: `"/mnt/s3/openclaw"` (storage.go:189)
 - Sync excludes assume OpenClaw dirs: `credentials/`, `sessions/`, `delivery-queue/`, `media/` (storage.go:261-265)
 
-**Recommendation:** Keep as-is for now. Storage is a clawctl feature, not runtime-specific. The exclude patterns should be configurable per-runtime but that can be a follow-up.
+**Recommendation:** Keep as-is for now. Storage is a claws feature, not runtime-specific. The exclude patterns should be configurable per-runtime but that can be a follow-up.
 
 ---
 
@@ -333,14 +333,14 @@ C) Keep as-is (other runtimes provide their own merge logic or don't use merge)
 ## Additional Findings from Deep Scan
 
 ### Items NOT requiring changes (keeping as clawctl-universal):
-- `OPENCLAW_ROOT` env var → This is the clawctl root, not runtime-specific. Keep it.
-- `.port-registry` format → clawctl internal, not runtime-specific
-- `instance.env` format → clawctl internal
-- Policy/access/audit files → clawctl internal
-- Port allocation scheme (base + step * index) → clawctl internal
+- `OPENCLAW_ROOT` env var → This is the claws root, not runtime-specific. Keep it.
+- `.port-registry` format → claws internal, not runtime-specific
+- `instance.env` format → claws internal
+- Policy/access/audit files → claws internal
+- Port allocation scheme (base + step * index) → claws internal
 - Project name prefix `openclaw-` → Decision: keep universal (see task 07)
-- Cron comment marker → clawctl internal
-- Gitleaks config → clawctl internal
+- Cron comment marker → claws internal
+- Gitleaks config → claws internal
 
 ### Items requiring runtime-specific compose templates:
 - Gateway command: `node dist/index.js gateway` → per-runtime compose
@@ -358,9 +358,9 @@ C) Keep as-is (other runtimes provide their own merge logic or don't use merge)
 3. **Compose template is per-runtime** — each runtime has its own docker-compose.yml. dc() resolves internally.
 4. **Channel commands are gated** — `SupportsChannels` flag on runtime, error message if unsupported
 5. **Config filename is per-runtime** — allows each runtime to use its own config format
-6. **Backward compatible** — existing instances without `CLAWCTL_RUNTIME` in env default to `openclaw`
-7. **OPENCLAW_ROOT stays as-is** — it's the clawctl root directory, not OpenClaw-specific
-8. **OPENCLAW_* env vars in instance.env stay** — these are clawctl's internal format. The per-runtime compose template maps them to whatever the runtime needs
+6. **Backward compatible** — existing instances without `CLAWS_RUNTIME` in env default to `openclaw`
+7. **OPENCLAW_ROOT stays as-is** — it's the claws root directory, not OpenClaw-specific
+8. **OPENCLAW_* env vars in instance.env stay** — these are claws's internal format. The per-runtime compose template maps them to whatever the runtime needs
 9. **Container internal paths are per-runtime** — `/home/node/.openclaw` is OpenClaw-specific. Runtime struct defines these.
 10. **Config merging is OpenClaw-specific** — other runtimes skip it or provide their own logic
 11. **Storage exclude patterns stay generic** — `credentials/`, `sessions/` are reasonable for any runtime
@@ -385,7 +385,7 @@ C) Keep as-is (other runtimes provide their own merge logic or don't use merge)
 [2026-03-26] Deep explore agent scan: found 4 additional categories (container paths, env naming, storage naming, merge assumptions). Updated tasklist to 14 subtasks. Mapped 80+ hardcoded references across 15 files. Locked in 11 design decisions.
 [2026-03-26] 01+02 runtime-struct+commands [DONE] Created runtime.go: Runtime struct (35 fields), RuntimeCapabilities, openclawRuntime() built-in, registry (list/get/resolve/load/save), helper methods (ConfigPath, HasCLI, SupportsChannels, SupportsPairing, RequireCapability, BridgePortFor, ComposeTemplatePath). Commands: runtime list/show/add/remove. 18 tests (7 unit + 11 integration). All tests pass.
 [2026-03-26] 01+02 AUDIT [DONE] Deep explore audit found: missing ProjectPrefix/ConfigFormat/ComposeOverride/HealthCheckType/CustomEnvVars fields, silent failure in resolveRuntime, missing edge case tests. Fixed: added 7 new fields to Runtime, resolveRuntime now returns error (broken reference = explicit error, missing env = default), added mustResolveRuntime for convenience, added MakeProjectName/DefaultContainerName/OverridePath methods. 10 new tests covering broken references, corrupted JSON, missing names, non-JSON files. 30+ runtime tests total. All tests pass.
-[2026-03-26] 03 create-with-runtime [DONE] Added --runtime= flag to cmdCreate. Stores CLAWCTL_RUNTIME in instance.env. Uses rt.DefaultImage instead of hardcoded "openclaw:local". Uses rt.ConfigFileName for output path. Skips config merge when rt.SupportsConfig=false. 3 new integration tests (default, custom, unknown). All tests pass.
+[2026-03-26] 03 create-with-runtime [DONE] Added --runtime= flag to cmdCreate. Stores CLAWS_RUNTIME in instance.env. Uses rt.DefaultImage instead of hardcoded "openclaw:local". Uses rt.ConfigFileName for output path. Skips config merge when rt.SupportsConfig=false. 3 new integration tests (default, custom, unknown). All tests pass.
 [2026-03-26] 04 refactor-compose-calls [DONE] Replaced ALL 28 hardcoded service name references across 9 files with gatewayService()/cliService() helpers. dc()/dcOutput() now resolve runtime internally for compose template, project name, override path.
 [2026-03-26] 05 refactor-config-filename [DONE] Replaced 18 hardcoded "openclaw.json" references across 5 files with rt.ConfigPath()/rt.ConfigFileName. Removed unused filepath imports.
 [2026-03-26] 06 refactor-health-endpoints [DONE] Replaced 4 hardcoded /healthz and 2 /readyz references with rt.HealthEndpoint/rt.ReadyEndpoint. Readiness check skipped when rt.ReadyEndpoint is empty.
@@ -396,7 +396,7 @@ C) Keep as-is (other runtimes provide their own merge logic or don't use merge)
 [2026-03-26] --- RUNTIME ADAPTER COMPLETE --- All 14 subtasks done. Full adapter pattern implemented.
 [2026-03-27] ticket-7 runtime-ux [DONE] All 7 subtasks: (7.1) --from= inheritance on runtime add. (7.2) runtime init scaffolds JSON + compose template. (7.3) runtime test validates image/compose/service. (7.4) runtime export/import for sharing definitions. (7.5) runtime detect auto-suggests settings from Docker image inspection. (7.6) Help text rewritten — leads with --image= for simple cases, runtime for advanced. (7.7) docs/runtimes.md with 7 recipes. Also added OOM/crash-loop detection to audit script, fixed 1GB→2GB memory limit default. 10 new tests. All tests pass.
 [2026-03-26] 04 refactor-compose-calls [DONE] Replaced ALL 28 hardcoded "openclaw-gateway"/"openclaw-cli" references across 9 files (commands.go, channel.go, image.go, storage.go, group.go, activity.go, policy.go, shared.go, compose.go). Added gatewayService()/cliService() convenience helpers. Refactored dc()/dcOutput() to resolve runtime for compose template, project name, override path. rebuildOverride and rebuildGroupOverride now use rt.MountSkills/MountWorkspace/MountHooks/MountTasks/MountOutput/MountManager/MountWorkers instead of hardcoded /home/node paths. Zero hardcoded service names remain outside runtime.go definitions. All tests pass.
-[2026-03-26] channel-security [DONE] Safe channel defaults + security management. Incident: WhatsApp agent sent messages to unauthorized contacts because OpenClaw defaults actions.sendMessage=true and clawctl didn't set explicit action defaults on channel add. Changes across 4 files:
+[2026-03-26] channel-security [DONE] Safe channel defaults + security management. Incident: WhatsApp agent sent messages to unauthorized contacts because OpenClaw defaults actions.sendMessage=true and claws didn't set explicit action defaults on channel add. Changes across 4 files:
   - channel.go: Added channelSafeDefaults map (per-channel action defaults: sendMessage/messages OFF, reactions ON, read-only ON). applyChannelSafeDefaults() called from cmdChannelAdd and cmdChannelAddWithLogin. --allow-send flag for explicit opt-in. 4 new subcommands: channel security (show posture), channel send (toggle outbound), channel allow/deny (manage allowFrom).
   - policy.go: Added RequireOutboundAllowlist field to Policy struct (default true on policy init). enforceOutboundAllowlist() method checks sendMessage not enabled without allowFrom. Wired into policy validate and policy enforce (auto-disables sendMessage when no allowFrom).
   - help.go: Updated channel help with security/send/allow/deny docs, safe defaults explanation. Updated policy help with requireOutboundAllowlist.

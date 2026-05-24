@@ -1,8 +1,8 @@
-# clawctl × intent-gateway — Structural Analysis & Integration Plan
+# claws × intent-gateway — Structural Analysis & Integration Plan
 
 ## STEP 1: Entity Definition
 
-### clawctl Entities
+### claws Entities
 
 | Entity | State/Lifecycle | Description |
 |---|---|---|
@@ -36,13 +36,13 @@
 
 ### Canonicalization (Shared Concepts)
 
-| clawctl concept | intent-gateway concept | Same thing? |
+| claws concept | intent-gateway concept | Same thing? |
 |---|---|---|
-| Task queue (pending/claimed/done) | Worker inbox + transport events | **Related.** clawctl's task queue is a directory convention. The intent-gateway's worker+transport is a processing pipeline. They solve the same problem at different levels. |
-| Health check (/healthz + /readyz) | Worker status (healthy/enabled) | **Complementary.** clawctl checks the container. intent-gateway checks the processing pipeline. |
-| Activity feed (file scans) | Hook events (JSONL stream) | **Complementary.** clawctl observes from outside. intent-gateway logs from inside. |
+| Task queue (pending/claimed/done) | Worker inbox + transport events | **Related.** claws's task queue is a directory convention. The intent-gateway's worker+transport is a processing pipeline. They solve the same problem at different levels. |
+| Health check (/healthz + /readyz) | Worker status (healthy/enabled) | **Complementary.** claws checks the container. intent-gateway checks the processing pipeline. |
+| Activity feed (file scans) | Hook events (JSONL stream) | **Complementary.** claws observes from outside. intent-gateway logs from inside. |
 | Shared workspace | Compliance log directory | **Overlapping.** Both write to shared directories. Compliance logs could live in shared workspace. |
-| Instance role (manager/worker) | Approval grants (actor/scope/window) | **Different but composable.** clawctl controls who sees what files. intent-gateway controls who can do what actions. |
+| Instance role (manager/worker) | Approval grants (actor/scope/window) | **Different but composable.** claws controls who sees what files. intent-gateway controls who can do what actions. |
 
 ---
 
@@ -56,7 +56,7 @@
            │ [Explicit, High]                         │ [Explicit, High]
            ▼                                          ▼
 ┌─────────────────────┐                   ┌─────────────────────────┐
-│      clawctl         │                   │   OpenClaw Gateway       │
+│      claws         │                   │   OpenClaw Gateway       │
 │  (instance manager)  │                   │   (AI agent runtime)     │
 └──────────┬──────────┘                   └───────────┬─────────────┘
            │                                          │
@@ -104,7 +104,7 @@
 │    └── credentials/         ← never shared                       │
 │                                                                  │
 │  ~/.openclaw/<group>/shared/                                     │
-│    ├── tasks/               ← clawctl task queue                 │
+│    ├── tasks/               ← claws task queue                 │
 │    │   ├── pending/                                              │
 │    │   ├── claimed/                                              │
 │    │   └── done/                                                 │
@@ -122,12 +122,12 @@
 
 | From | To | Type | Certainty | Evidence |
 |---|---|---|---|---|
-| Operator → clawctl | creates/manages instances | Explicit | High | CLI commands |
+| Operator → claws | creates/manages instances | Explicit | High | CLI commands |
 | Operator → OpenClaw Gateway | sends messages via WhatsApp | Explicit | High | Chat interface |
-| clawctl → Instance (Docker) | compose up/down/restart | Explicit | High | `dc()` wrapper |
-| clawctl → Port Registry | allocates/frees ports | Explicit | High | `registry.go` |
-| clawctl → Compose Override | generates volume mounts | Explicit | High | `shared.go`, `group.go` |
-| clawctl → S3 | backup/sync/mount | Explicit | High | `storage.go` |
+| claws → Instance (Docker) | compose up/down/restart | Explicit | High | `dc()` wrapper |
+| claws → Port Registry | allocates/frees ports | Explicit | High | `registry.go` |
+| claws → Compose Override | generates volume mounts | Explicit | High | `shared.go`, `group.go` |
+| claws → S3 | backup/sync/mount | Explicit | High | `storage.go` |
 | OpenClaw → Agent | runs AI model, processes messages | Explicit | High | OpenClaw source |
 | Agent → Workspace | reads/writes files | Explicit | High | Tool profile (read/write/exec) |
 | Agent → intent-gateway | runs `sarahctl` commands | **Inferred** | Med | The agent built this tool and runs it from workspace |
@@ -136,10 +136,10 @@
 | intent-gateway → Transport Registry | deduplicates events | Explicit | High | `transport.go` |
 | intent-gateway → Hook Log | emits JSONL events | Explicit | High | `hooks.go` |
 | intent-gateway → Worker Inbox | processes queued events | Explicit | High | `worker.go` |
-| clawctl task queue ↔ intent-gateway worker | **could** share the same directory | **Inferred** | Med | Both use file-based job queues |
-| clawctl activity ↔ intent-gateway hooks | **could** read from same JSONL | **Inferred** | Med | Both produce event streams |
-| clawctl health ↔ intent-gateway worker status | **could** aggregate | **Inferred** | Med | Both report health |
-| Approval grants ↔ clawctl roles | **could** enforce who can do what | **Inferred** | Low | Different mechanisms today |
+| claws task queue ↔ intent-gateway worker | **could** share the same directory | **Inferred** | Med | Both use file-based job queues |
+| claws activity ↔ intent-gateway hooks | **could** read from same JSONL | **Inferred** | Med | Both produce event streams |
+| claws health ↔ intent-gateway worker status | **could** aggregate | **Inferred** | Med | Both report health |
+| Approval grants ↔ claws roles | **could** enforce who can do what | **Inferred** | Low | Different mechanisms today |
 
 ---
 
@@ -149,17 +149,17 @@
 
 | Node | Why it's orphaned | Impact |
 |---|---|---|
-| **Approval engine** | clawctl has no concept of "permissions" between instances. Manager/worker is filesystem mounts, not approval-gated actions. | A manager could grant time-bound tool access to workers, but nothing enforces this today. |
-| **Hash-chained compliance ledger** | clawctl has no audit trail for its own operations. `clawctl create`, `remove`, `start` leave no immutable log. | Operator actions are invisible to the compliance system. |
-| **Transport bridge (webhook adapter)** | The intent-gateway can receive webhooks, but clawctl doesn't expose ports or routes for webhooks. | External systems can't push events to the intent-gateway without manual port forwarding. |
-| **Scheduler** | The intent-gateway has cron scheduling, but clawctl doesn't know about it. Scheduled tasks run inside one agent's workspace. | No cross-instance scheduling. Manager can't schedule work for workers. |
+| **Approval engine** | claws has no concept of "permissions" between instances. Manager/worker is filesystem mounts, not approval-gated actions. | A manager could grant time-bound tool access to workers, but nothing enforces this today. |
+| **Hash-chained compliance ledger** | claws has no audit trail for its own operations. `claws create`, `remove`, `start` leave no immutable log. | Operator actions are invisible to the compliance system. |
+| **Transport bridge (webhook adapter)** | The intent-gateway can receive webhooks, but claws doesn't expose ports or routes for webhooks. | External systems can't push events to the intent-gateway without manual port forwarding. |
+| **Scheduler** | The intent-gateway has cron scheduling, but claws doesn't know about it. Scheduled tasks run inside one agent's workspace. | No cross-instance scheduling. Manager can't schedule work for workers. |
 | **Callback system** | The intent-gateway can fire named callbacks, but there's no way for one instance to fire a callback on another. | Inter-instance event-driven automation is missing. |
 
 ### Ambiguities
 
 | Relationship | What's unclear |
 |---|---|
-| Who runs `sarahctl`? | The agent runs it from its workspace. But should clawctl also be able to invoke it? Or should the intent-gateway be a sidecar container? |
+| Who runs `sarahctl`? | The agent runs it from its workspace. But should claws also be able to invoke it? Or should the intent-gateway be a sidecar container? |
 | Where do compliance logs live? | Currently in the agent's private workspace (`.compliance-staging/`). Should they be in shared workspace so the manager can audit them? |
 | Is the intent-gateway per-instance or shared? | Sarah built it for herself. Should every instance get a copy? Or should one instance run it as a service for all? |
 | How do approval grants propagate? | If a manager grants an approval, does every worker see it? Or only the ones the grant specifies? |
@@ -168,11 +168,11 @@
 
 ## STEP 4: Integration Points
 
-### Integration 1: Transport Bridge → clawctl Proxy
+### Integration 1: Transport Bridge → claws Proxy
 
 **Problem:** The intent-gateway can receive webhook events, but there's no way to route external webhooks to a specific instance.
 
-**Solution:** clawctl's Caddy proxy can route webhook paths to the right instance:
+**Solution:** claws's Caddy proxy can route webhook paths to the right instance:
 
 ```
 https://claw.example.com/backend/sarah/webhook → :18789/webhook
@@ -193,18 +193,18 @@ compliance:
   audit_log_dir: /home/node/.openclaw/shared/compliance/logs
 ```
 
-Since clawctl already mounts `shared/` into every grouped instance, all agents write to the same compliance ledger. The manager gets a unified view. Hash chains still work because writes are append-only.
+Since claws already mounts `shared/` into every grouped instance, all agents write to the same compliance ledger. The manager gets a unified view. Hash chains still work because writes are append-only.
 
 **Certainty:** High (just a config change)
 
-### Integration 3: Approval Engine → clawctl Group Roles
+### Integration 3: Approval Engine → claws Group Roles
 
-**Problem:** clawctl's manager/worker roles are filesystem-level (who can read what). The intent-gateway's approval engine is action-level (who can do what, when). They don't talk to each other.
+**Problem:** claws's manager/worker roles are filesystem-level (who can read what). The intent-gateway's approval engine is action-level (who can do what, when). They don't talk to each other.
 
-**Solution:** When clawctl creates a manager, it also grants a default approval:
+**Solution:** When claws creates a manager, it also grants a default approval:
 
 ```bash
-clawctl create backend/lead --role=manager
+claws create backend/lead --role=manager
 # Under the hood, also runs:
 sarahctl approval grant '{
   "actor": "lead",
@@ -217,15 +217,15 @@ sarahctl approval grant '{
 }'
 ```
 
-Workers get narrower grants — only the tools and paths their role needs. The intent-gateway enforces it. clawctl scaffolds it.
+Workers get narrower grants — only the tools and paths their role needs. The intent-gateway enforces it. claws scaffolds it.
 
-**Certainty:** Medium (requires clawctl to know about sarahctl's CLI)
+**Certainty:** Medium (requires claws to know about sarahctl's CLI)
 
-### Integration 4: clawctl Task Queue → intent-gateway Worker
+### Integration 4: claws Task Queue → intent-gateway Worker
 
-**Problem:** clawctl scaffolds `pending/claimed/done` directories. The intent-gateway has a worker that processes inbox events. They're two separate job queues.
+**Problem:** claws scaffolds `pending/claimed/done` directories. The intent-gateway has a worker that processes inbox events. They're two separate job queues.
 
-**Solution:** Unify them. The intent-gateway's worker reads from the same `pending/` directory that clawctl's task queue uses. The worker's transport bridge normalizes task files into compliance records.
+**Solution:** Unify them. The intent-gateway's worker reads from the same `pending/` directory that claws's task queue uses. The worker's transport bridge normalizes task files into compliance records.
 
 ```
 Manager writes:  shared/tasks/pending/review-pr-42.md
@@ -233,15 +233,15 @@ Worker's intent-gateway picks it up:
   → transport.Ingest() → compliance ledger → hook emitted → agent processes
 ```
 
-The intent-gateway adds: deduplication, hash-chaining, compliance logging, hook events. clawctl's task queue becomes the intake for the intent-gateway's processing pipeline.
+The intent-gateway adds: deduplication, hash-chaining, compliance logging, hook events. claws's task queue becomes the intake for the intent-gateway's processing pipeline.
 
 **Certainty:** Medium (requires adapting the worker to read markdown task files)
 
-### Integration 5: Hook Events → clawctl Activity Feed
+### Integration 5: Hook Events → claws Activity Feed
 
-**Problem:** clawctl's activity feed scans file modification times — a blunt instrument. The intent-gateway emits structured JSONL hook events with timestamps, event types, and payloads.
+**Problem:** claws's activity feed scans file modification times — a blunt instrument. The intent-gateway emits structured JSONL hook events with timestamps, event types, and payloads.
 
-**Solution:** `clawctl activity` reads intent-gateway hook logs in addition to file scans:
+**Solution:** `claws activity` reads intent-gateway hook logs in addition to file scans:
 
 ```go
 // In activity.go, add:
@@ -255,9 +255,9 @@ This gives the activity feed real event data: "sarah granted an approval," "work
 
 ### Integration 6: Health Aggregation
 
-**Problem:** clawctl checks container health (/healthz, /readyz). The intent-gateway has its own worker health status. They're separate.
+**Problem:** claws checks container health (/healthz, /readyz). The intent-gateway has its own worker health status. They're separate.
 
-**Solution:** `clawctl health` also reads the intent-gateway's worker status:
+**Solution:** `claws health` also reads the intent-gateway's worker status:
 
 ```go
 workerStatusPath := filepath.Join(dir, "workspace", ".compliance-staging", "runtime", "worker-status.json")
@@ -283,13 +283,13 @@ USER EXPERIENCE (what the operator sees):
   "I want a team of agents that coordinate, audit their work,
    and I can monitor from one place."
 
-  clawctl group create backend
-  clawctl create backend/lead --role=manager
-  clawctl create backend/dev1 --role=worker --manager=lead
-  clawctl create backend/dev2 --role=worker --manager=lead
-  clawctl start backend/lead
-  clawctl start backend/dev1
-  clawctl start backend/dev2
+  claws group create backend
+  claws create backend/lead --role=manager
+  claws create backend/dev1 --role=worker --manager=lead
+  claws create backend/dev2 --role=worker --manager=lead
+  claws start backend/lead
+  claws start backend/dev1
+  claws start backend/dev2
 
   # Manager assigns work (via chat or file):
   #   "Review PR #42 and write a summary"
@@ -301,16 +301,16 @@ USER EXPERIENCE (what the operator sees):
   #   → intent-gateway emits hook: "task.completed"
 
   # Operator checks:
-  clawctl dashboard           # live view: all 3 agents healthy
-  clawctl activity --group=backend  # "dev1 completed review-pr-42"
-  clawctl health              # gateway + worker health per instance
+  claws dashboard           # live view: all 3 agents healthy
+  claws activity --group=backend  # "dev1 completed review-pr-42"
+  claws health              # gateway + worker health per instance
 
   # Compliance audit (anytime):
   #   Hash-chained JSONL logs prove every action, every approval,
   #   every message was recorded and never tampered with.
 ```
 
-### What clawctl Provides
+### What claws Provides
 
 - **Lifecycle** — create, start, stop, remove instances
 - **Structure** — groups, manager/worker topology, port allocation
@@ -333,8 +333,8 @@ USER EXPERIENCE (what the operator sees):
 | Item | Effort | Priority |
 |---|---|---|
 | Configure compliance logs to shared workspace | Config change | P0 |
-| Read hook JSONL in `clawctl activity` | ~30 lines Go | P0 |
-| Read worker-status.json in `clawctl health` | ~20 lines Go | P0 |
+| Read hook JSONL in `claws activity` | ~30 lines Go | P0 |
+| Read worker-status.json in `claws health` | ~20 lines Go | P0 |
 | Proxy webhook routes per instance | Caddy config gen | P1 |
 | Scaffold default approval grants for manager/worker | ~50 lines Go | P1 |
 | Unify task queue with worker inbox | Adapter in intent-gateway | P2 |
@@ -345,7 +345,7 @@ USER EXPERIENCE (what the operator sees):
 
 ## Integration 7: The Sidecar Pattern (Sarah's Ticket)
 
-Sarah wrote a ticket (`2026-03-10-ingestion-threading-stream.md`) requesting exactly what clawctl + intent-gateway together provide. Her core problem:
+Sarah wrote a ticket (`2026-03-10-ingestion-threading-stream.md`) requesting exactly what claws + intent-gateway together provide. Her core problem:
 
 > "Background agents must not interrupt or derail the core process."
 
@@ -364,17 +364,17 @@ She wants her coding work (main process) separated from ingestion, status checks
 | Deduplication | Yes | intent-gateway transport registry |
 | Multi-threaded contexts | **No** | thread_id exists, routing doesn't |
 
-### The Solution: clawctl Sidecar Instance
+### The Solution: claws Sidecar Instance
 
 ```bash
 # Create the group
-clawctl group create backend
+claws group create backend
 
 # Sarah's main instance — coding, reviewing, building
-clawctl create backend/sarah --role=manager
+claws create backend/sarah --role=manager
 
 # Sidecar instance — ingestion, threading, status reporting
-clawctl create backend/sarah-ingest --role=worker --manager=sarah
+claws create backend/sarah-ingest --role=worker --manager=sarah
 ```
 
 The sidecar instance:
@@ -437,29 +437,29 @@ This is the pub/sub pattern from distributed systems — the sidecar is the subs
 | Thread routing logic in intent-gateway worker | `internal/worker/worker.go` | Medium — classify by thread_id, write to per-thread task files |
 | OpenClaw hook that forwards messages to sidecar inbox | Shared hooks directory | Small — hook script that appends to sidecar's inbox JSONL |
 | Sidecar startup script (runs worker loop on boot) | Instance workspace | Small — `sarahctl run` as the container entrypoint override |
-| clawctl sidecar command | `clawctl create --sidecar` shorthand | Small — creates worker with auto-start worker loop |
+| claws sidecar command | `claws create --sidecar` shorthand | Small — creates worker with auto-start worker loop |
 
 ### User Experience
 
 ```bash
 # Setup (once)
-clawctl group create backend
-clawctl create backend/sarah --role=manager
-clawctl create backend/sarah-ingest --role=worker --manager=sarah --sidecar
-clawctl start backend/sarah
-clawctl start backend/sarah-ingest
+claws group create backend
+claws create backend/sarah --role=manager
+claws create backend/sarah-ingest --role=worker --manager=sarah --sidecar
+claws start backend/sarah
+claws start backend/sarah-ingest
 
 # Daily: sarah codes. Messages arrive. She's never interrupted.
 # The sidecar ingests, dedupes, routes, and logs.
 # Sarah checks her task queue when SHE decides to.
 
 # Monitoring
-clawctl dashboard
+claws dashboard
 # Shows:
 #   backend/sarah          :18789  healthy  coding          3h uptime
 #   backend/sarah-ingest   :18889  healthy  12 events/hr    3h uptime
 
-clawctl activity --group=backend
+claws activity --group=backend
 # Shows:
 #   10:15  sarah-ingest  transport  ingested whatsapp event e-4821
 #   10:15  sarah-ingest  compliance message hash-chained

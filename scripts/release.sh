@@ -1,5 +1,5 @@
 #!/bin/bash
-# clawctl release — build cross-platform binaries
+# claws release — build cross-platform binaries
 #
 # Usage: ./scripts/release.sh [version]
 #   version defaults to git tag or "dev-<sha>"
@@ -11,7 +11,7 @@
 #   linux/amd64, linux/arm64
 #   darwin/amd64, darwin/arm64
 #
-# Note: Windows is not supported. clawctl uses Unix-specific syscalls
+# Note: Windows is not supported. claws uses Unix-specific syscalls
 # (flock, statfs) and manages Linux Docker containers. WSL2 users on
 # Windows should use the linux/amd64 build.
 set -euo pipefail
@@ -19,7 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="$ROOT/release"
-SRC_PKG="./cmd/clawctl/"
+SRC_PKG="./cmd/claws/"
 
 # --- Discover a usable go ---
 if ! command -v go &>/dev/null; then
@@ -44,7 +44,7 @@ GREEN="\033[0;32m"
 DIM="\033[0;90m"
 NC="\033[0m"
 
-echo -e "${BOLD}clawctl release — ${VERSION}${NC}"
+echo -e "${BOLD}claws release — ${VERSION}${NC}"
 echo -e "${DIM}go: $(go version | awk '{print $3}')${NC}"
 echo ""
 
@@ -70,8 +70,8 @@ for target in "${TARGETS[@]}"; do
     os="${target%%/*}"
     arch="${target##*/}"
 
-    binary="clawctl"
-    dirname="clawctl-${VERSION}-${os}-${arch}"
+    binary="claws"
+    dirname="claws-${VERSION}-${os}-${arch}"
     outdir="$RELEASE_DIR/$dirname"
     mkdir -p "$outdir"
 
@@ -99,7 +99,7 @@ for target in "${TARGETS[@]}"; do
 
     # ---- Generate per-target MANIFEST.txt ----
     {
-        echo "clawctl release manifest"
+        echo "claws release manifest"
         echo "========================"
         echo "version:    ${VERSION}"
         echo "target:     ${os}/${arch}"
@@ -134,7 +134,7 @@ echo ""
 echo "  Checksums: $RELEASE_DIR/SHA256SUMS"
 echo ""
 echo -e "${BOLD}Next steps:${NC}"
-echo "  1. Inspect a manifest:   tar tzf release/clawctl-${VERSION}-linux-amd64.tar.gz | head"
+echo "  1. Inspect a manifest:   tar tzf release/claws-${VERSION}-linux-amd64.tar.gz | head"
 echo "  2. Tag the release:      git tag ${VERSION} && git push --tags"
 echo "  3. Upload to GitHub:     gh release create ${VERSION} \\"
 echo "                             release/*.tar.gz release/SHA256SUMS"

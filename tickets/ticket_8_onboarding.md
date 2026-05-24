@@ -1,4 +1,4 @@
-# Ticket 8: One-Click Onboarding — `clawctl setup` and Safe-by-Default Init
+# Ticket 8: One-Click Onboarding — `claws setup` and Safe-by-Default Init
 
 **Priority:** P0 — Ship-blocking for one-click vision
 **Created:** 2026-03-27
@@ -17,7 +17,7 @@ The vision is: **one command from nothing to a working team**.
 
 ## Changes
 
-### 8.1 — `clawctl init` creates policy + access + audit automatically
+### 8.1 — `claws init` creates policy + access + audit automatically
 
 **Current:** `init` creates directories and copies compose template. Security is a separate step.
 **After:** `init` also creates `policy.json` (secure defaults), `.access.json` (current user as admin), enables audit logging. No extra commands.
@@ -36,7 +36,7 @@ if !accessExists(paths) {
 }
 ```
 
-**Test:** `clawctl init` → `policy.json` exists, `.access.json` exists, audit log enabled.
+**Test:** `claws init` → `policy.json` exists, `.access.json` exists, audit log enabled.
 
 ---
 
@@ -51,7 +51,7 @@ if !accessExists(paths) {
 ```go
 if len(os.Args) < 2 {
     if !rootExists(paths) {
-        printWelcome()  // "Run: clawctl setup"
+        printWelcome()  // "Run: claws setup"
     } else {
         printBriefStatus()  // instance count, health summary
     }
@@ -61,7 +61,7 @@ if len(os.Args) < 2 {
 
 ---
 
-### 8.3 — `clawctl setup` — guided interactive onboarding
+### 8.3 — `claws setup` — guided interactive onboarding
 
 **Current:** Doesn't exist.
 **After:** Single command that walks through init + team + agent + auth + channel + start.
@@ -82,7 +82,7 @@ if len(os.Args) < 2 {
 
 **Non-interactive mode:**
 ```bash
-clawctl setup --non-interactive \
+claws setup --non-interactive \
   --team=research \
   --agent=sarah \
   --auth=apikey --anthropic-key=sk-... \
@@ -114,7 +114,7 @@ skeleton := map[string]any{
 
 ---
 
-### 8.5 — Unified `clawctl status`
+### 8.5 — Unified `claws status`
 
 **Current:** User must run list + health + policy validate + audit separately.
 **After:** One command shows everything.
@@ -123,7 +123,7 @@ skeleton := map[string]any{
 **Effort:** Medium
 
 ```
-$ clawctl status
+$ claws status
 
   Team: research (3 agents)
 
@@ -147,18 +147,18 @@ $ clawctl status
 
 - `clawctl` (no args, first run) → welcome + setup
 - `clawctl` (no args, initialized) → brief status + "run help for commands"
-- `clawctl help` → concise grouped commands (current, but shorter)
-- `clawctl help setup` → onboarding guide
-- `clawctl help security` → security guide
-- `clawctl help channels` → channel guide
-- `clawctl <cmd> --help` → command-specific (already works)
+- `claws help` → concise grouped commands (current, but shorter)
+- `claws help setup` → onboarding guide
+- `claws help security` → security guide
+- `claws help channels` → channel guide
+- `claws <cmd> --help` → command-specific (already works)
 
 **Files:** `main.go`, `help.go`
 **Effort:** Medium
 
 ---
 
-### 8.7 — `clawctl team create` shortcut
+### 8.7 — `claws team create` shortcut
 
 **Current:** `group create` + `group shared --all` = 2 commands.
 **After:** `team create <name>` does both in one.
@@ -167,8 +167,8 @@ $ clawctl status
 **Effort:** Small
 
 ```bash
-clawctl team create research
-# = clawctl group create research + clawctl group shared research --all
+claws team create research
+# = claws group create research + claws group shared research --all
 ```
 
 ---
@@ -185,9 +185,9 @@ clawctl team create research
 | `setup --non-interactive --team=t --agent=a` creates team + agent | 8.3 |
 | `setup` is idempotent | 8.3 |
 | New instance has tools.profile=coding | 8.4 |
-| `clawctl status` shows all agents with health | 8.5 |
-| `clawctl help` is shorter than current | 8.6 |
-| `clawctl team create` creates group + shared | 8.7 |
+| `claws status` shows all agents with health | 8.5 |
+| `claws help` is shorter than current | 8.6 |
+| `claws team create` creates group + shared | 8.7 |
 
 ---
 
@@ -199,4 +199,4 @@ clawctl team create research
 4. **8.7** (team create shortcut) — small win
 5. **8.5** (unified status) — one-screen overview
 6. **8.6** (tiered help) — reduces information overload
-7. **8.3** (clawctl setup) — the big one, needs all above working first
+7. **8.3** (claws setup) — the big one, needs all above working first

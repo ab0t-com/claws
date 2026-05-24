@@ -20,7 +20,7 @@ There is no way for an admin to enforce security policies across all instances. 
 
 ### Policy File: `~/.openclaw/policy.json`
 
-A global policy file that constrains what instances can do. Policy is enforced by clawctl at create/start time and validated by the security audit.
+A global policy file that constrains what instances can do. Policy is enforced by claws at create/start time and validated by the security audit.
 
 ```json5
 {
@@ -46,8 +46,8 @@ A global policy file that constrains what instances can do. Policy is enforced b
   "requireImageDigest": false,              // require sha256 pinning
 
   // Access
-  "allowedUsers": [],                       // OS users who can run clawctl (empty = any)
-  "auditLog": true                          // log all clawctl commands to audit file
+  "allowedUsers": [],                       // OS users who can run claws (empty = any)
+  "auditLog": true                          // log all claws commands to audit file
 }
 ```
 
@@ -70,9 +70,9 @@ A global policy file that constrains what instances can do. Policy is enforced b
 ### Implementation
 
 1. Create `policy.go` with `readPolicy()`, `enforcePolicy()`, `validatePolicy()`
-2. `clawctl policy show` — print current policy
-3. `clawctl policy init` — create default policy.json with secure defaults
-4. `clawctl policy validate` — check all instances against policy
+2. `claws policy show` — print current policy
+3. `claws policy init` — create default policy.json with secure defaults
+4. `claws policy validate` — check all instances against policy
 5. Integrate enforcement into create, start, channel add, config set
 6. Add policy check to `scripts/security-audit.sh`
 

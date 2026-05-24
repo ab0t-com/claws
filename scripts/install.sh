@@ -1,15 +1,15 @@
 #!/bin/bash
-# clawctl installer
+# claws installer
 #
 # Remote (release):
 #   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh -s -- --version=v1.0.0
 #
-# Local (running from an extracted release tarball, next to ./clawctl):
+# Local (running from an extracted release tarball, next to ./claws):
 #   ./install.sh
 #
 # Local-dev (running from a fresh git clone with Go installed):
-#   CLAWCTL_LOCAL_DEV=1 ./scripts/install.sh
+#   CLAWS_LOCAL_DEV=1 ./scripts/install.sh
 #   # or just run:  ./scripts/rebuild.sh
 #
 # Install location:
@@ -30,7 +30,7 @@ set -euo pipefail
 REPO_OWNER="ab0t-com"
 REPO_NAME="claws"
 REPO="${REPO_OWNER}/${REPO_NAME}"
-BINARY="clawctl"
+BINARY="claws"
 
 # =====================================================================
 # Colors
@@ -55,7 +55,7 @@ VERSION=""
 INSTALL_DIR=""
 DRY_RUN=0
 FORCE=0
-LOCAL_DEV="${CLAWCTL_LOCAL_DEV:-}"
+LOCAL_DEV="${CLAWS_LOCAL_DEV:-}"
 
 for arg in "$@"; do
     case "$arg" in
@@ -80,7 +80,7 @@ run() {
     fi
 }
 
-echo -e "${BOLD}clawctl installer${NC}"
+echo -e "${BOLD}claws installer${NC}"
 echo ""
 
 # =====================================================================
@@ -143,7 +143,7 @@ install_binary() {
 # Copy compose template + html assets to data dir.
 install_data_assets() {
     local src_dir="$1"
-    local DATA_DIR="$HOME/.local/share/clawctl"
+    local DATA_DIR="$HOME/.local/share/claws"
     run "mkdir -p \"$DATA_DIR\""
     if [ -f "$src_dir/docker-compose.yml" ]; then
         run "cp \"$src_dir/docker-compose.yml\" \"$DATA_DIR/\""
@@ -192,11 +192,11 @@ if [ "$LOCAL_DEV" = "1" ]; then
     ok "Local-dev install complete."
     verify_on_path
     echo ""
-    echo "  Next: clawctl setup"
+    echo "  Next: claws setup"
     exit 0
 fi
 
-# --- Local-release mode: running from an extracted tarball next to ./clawctl ---
+# --- Local-release mode: running from an extracted tarball next to ./claws ---
 if [ -f "$SCRIPT_DIR/$BINARY" ]; then
     echo ""
     info "Found $BINARY binary next to installer."
@@ -205,7 +205,7 @@ if [ -f "$SCRIPT_DIR/$BINARY" ]; then
     ok "Installed from local release dir."
     verify_on_path
     echo ""
-    echo "  Next: clawctl setup"
+    echo "  Next: claws setup"
     exit 0
 fi
 
@@ -246,7 +246,7 @@ if [ -z "$VERSION" ]; then
     info "Latest: $VERSION"
 fi
 
-TARBALL="clawctl-${VERSION}-${OS}-${ARCH}.tar.gz"
+TARBALL="claws-${VERSION}-${OS}-${ARCH}.tar.gz"
 BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
 TARBALL_URL="${BASE_URL}/${TARBALL}"
 CHECKSUMS_URL="${BASE_URL}/SHA256SUMS"
@@ -294,7 +294,7 @@ echo -n "  Extracting... "
 tar xzf "$TMP/$TARBALL" -C "$TMP"
 echo -e "${GREEN}OK${NC}"
 
-EXTRACT_DIR=$(find "$TMP" -maxdepth 1 -type d -name "clawctl-*" | head -1)
+EXTRACT_DIR=$(find "$TMP" -maxdepth 1 -type d -name "claws-*" | head -1)
 [ -n "$EXTRACT_DIR" ] || die "extracted dir not found in archive"
 
 EXTRACTED_BIN="$EXTRACT_DIR/$BINARY"
@@ -305,11 +305,11 @@ install_binary "$EXTRACTED_BIN"
 install_data_assets "$EXTRACT_DIR"
 
 echo ""
-ok "clawctl ${VERSION} installed."
+ok "claws ${VERSION} installed."
 verify_on_path
 
 echo ""
 echo "  Get started:"
-echo "    clawctl setup    — guided setup (recommended)"
-echo "    clawctl help     — see all commands"
+echo "    claws setup    — guided setup (recommended)"
+echo "    claws help     — see all commands"
 echo ""

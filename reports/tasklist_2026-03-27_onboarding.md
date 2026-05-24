@@ -8,7 +8,7 @@
 
 ## P0: Ship-Blocking
 
-### 1. Enhance `clawctl init` — create policy + access + audit automatically
+### 1. Enhance `claws init` — create policy + access + audit automatically
 - [x] **1a.** After dir creation, call policy init logic inline (secure defaults)
   - `init.go:100-120` — policy created with loopback, DM pairing, audit on, 2GB mem, etc.
 - [x] **1b.** Create `.access.json` with current user as admin
@@ -27,7 +27,7 @@
 - [x] **2c.** Tests for first-run detection
   - `setup_test.go:13-47` — Uninitialized, InitializedNoAgents, InitializedWithAgents
 
-### 3. `clawctl setup` — guided interactive onboarding
+### 3. `claws setup` — guided interactive onboarding
 - [x] **3a.** Create `setup.go` with `cmdSetup(args []string) error`
 - [x] **3b.** Wire into `main.go` switch — `case "setup":` at line 104
 - [x] **3c.** Step 1: Check prerequisites (Docker, Compose, image, disk)
@@ -57,7 +57,7 @@
 
 ## P1: Essential UX
 
-### 4. Inline auth + channel on `clawctl create`
+### 4. Inline auth + channel on `claws create`
 - [x] **4a.** Add `--auth=codex`, `--auth=apikey` flags to `cmdCreate`
   - `commands.go:29` — `inlineAuth` var, `commands.go:44-45` — flag parsing
 - [x] **4b.** Add `--telegram=TOKEN`, `--discord=TOKEN`, `--slack-bot=TOKEN --slack-app=TOKEN` flags
@@ -69,7 +69,7 @@
 - [x] **4e.** Tests for inline create
   - `setup_test.go:134-155` — CreateInlineFlagsParsed, CreateInlineTelegramParsed
 
-### 5. Unified `clawctl status`
+### 5. Unified `claws status`
 - [x] **5a.** Enhance existing `cmdStatus` to show: instance health, policy compliance, recent activity, warnings
   - `commands.go:608-609` — no-args routes to `cmdStatusOverview`
   - `commands.go:668-757` — `cmdStatusOverview`: health table, policy compliance, audit, access
@@ -80,9 +80,9 @@
 
 ### 6. Tiered help
 - [x] **6a.** `clawctl` (no args, initialized) → 5-line quickstart (handled by task 2b)
-- [x] **6b.** `clawctl help` → "Getting Started" section at top of full help
+- [x] **6b.** `claws help` → "Getting Started" section at top of full help
   - `main.go:132-136` — setup/init/doctor at top
-- [x] **6c.** `clawctl help <topic>` → detailed guides (setup, security, channels, groups, commands)
+- [x] **6c.** `claws help <topic>` → detailed guides (setup, security, channels, groups, commands)
   - `help.go:591-690` — `topicHelp` map + `printTopicHelp()` function
   - `main.go:113-115` — routes `help <topic>` to `printTopicHelp`
 - [x] **6d.** Tests for tiered help
@@ -90,7 +90,7 @@
 
 ## P2: Nice to Have
 
-### 7. `clawctl team create` shortcut
+### 7. `claws team create` shortcut
 - [x] **7a.** Add `team` subcommand that delegates to group create + shared --all
   - `group.go:150-185` — `cmdTeam`, `cmdTeamCreate` (create + shared skills/workspace/hooks/tasks)
   - `main.go:69-70` — `case "team":` in switch
@@ -146,18 +146,18 @@ _Entries added as work progresses._
 ### 2026-03-27 — Implementation Session
 
 #### P0 Completed
-- **Task 1: Enhanced `clawctl init`** (`init.go`)
+- **Task 1: Enhanced `claws init`** (`init.go`)
   - Added auto-creation of `policy.json` with secure defaults (loopback, DM pairing, audit on)
   - Added auto-creation of `.access.json` with current user as admin + operator/user roles
   - Both skip if files already exist (idempotent)
-  - Updated "Next steps" output to recommend `clawctl setup`
+  - Updated "Next steps" output to recommend `claws setup`
 
 - **Task 2: First-run detection** (`main.go`)
   - `clawctl` (no args, uninitialized) → welcome message suggesting `setup`, `init`, `help`
   - `clawctl` (no args, initialized) → agent count + quick links (`list`, `dashboard`, `help`)
   - Added "Getting Started" section at top of `printHelp()` with setup/init/doctor
 
-- **Task 3: `clawctl setup`** (new file: `setup.go`)
+- **Task 3: `claws setup`** (new file: `setup.go`)
   - Full guided interactive flow: prereqs → workspace → team → agent → auth → channel → start → summary
   - Non-interactive mode via `--non-interactive --team= --agent= --auth= --channel= --telegram-token=`
   - Reuses existing commands internally (cmdCreate, cmdAuth, cmdChannel, cmdStart)
@@ -165,27 +165,27 @@ _Entries added as work progresses._
   - Wired into main.go switch + printHelp + subcommandHelp
 
 #### P1 Completed
-- **Task 4: Inline flags on `clawctl create`** (`commands.go`)
+- **Task 4: Inline flags on `claws create`** (`commands.go`)
   - Added `--auth=codex`, `--telegram=TOKEN`, `--discord=TOKEN`, `--slack-bot=TOKEN`, `--slack-app=TOKEN`
   - Chains auth + channel add after instance creation with graceful error handling
   - Updated help.go create subcommand help with new flags + example
 
 - **Task 5: Tiered help** (`help.go`, `main.go`)
-  - `clawctl help <topic>` routes to topic guides: setup, security, channels, groups, commands
+  - `claws help <topic>` routes to topic guides: setup, security, channels, groups, commands
   - Falls back to subcommand help if topic matches a command name
   - Unknown topics list available topics + hint for command-level help
 
 #### P1 Completed (continued)
-- **Task 5 (P1): Unified `clawctl status`** (`commands.go`)
-  - `clawctl status` (no args) → system overview: health table, policy compliance, audit, access
-  - `clawctl status <name>` → instance detail (unchanged)
+- **Task 5 (P1): Unified `claws status`** (`commands.go`)
+  - `claws status` (no args) → system overview: health table, policy compliance, audit, access
+  - `claws status <name>` → instance detail (unchanged)
   - `cmdStatusOverview` at `commands.go:668-757`
   - Updated help text in `main.go` Info section + `help.go` subcommand help
 
 #### P2 Completed
-- **Task 7: `clawctl team create`** (`group.go`)
-  - `clawctl team create <name>` = group create + shared skills/workspace/hooks + tasks dir
-  - `clawctl team list` = alias for group list
+- **Task 7: `claws team create`** (`group.go`)
+  - `claws team create <name>` = group create + shared skills/workspace/hooks + tasks dir
+  - `claws team list` = alias for group list
   - Wired into main.go, help sections, subcommand help
 
 - **Task 8: Default tool profile** (`commands.go`)
@@ -206,7 +206,7 @@ _Entries added as work progresses._
 #### Final Verification
 - `go build` clean, `go vet` clean
 - `go test ./...` — all passing (30s)
-- Smoke tested: `clawctl` (no args), `clawctl status`, `clawctl help setup`, `clawctl help security`, `clawctl help bogus`, `clawctl setup --help`, `clawctl create --help`, `clawctl team --help`
+- Smoke tested: `clawctl` (no args), `claws status`, `claws help setup`, `claws help security`, `claws help bogus`, `claws setup --help`, `claws create --help`, `claws team --help`
 
 #### Remaining (out of scope)
 - Task 9: Binary distribution (GitHub Actions, install script, Homebrew tap) — future work
@@ -221,24 +221,24 @@ Full re-read of every changed file against the PMM audit report spec.
 3. **setup.go: auth default was "skip"** — PMM spec shows Codex as the recommended default (Choice [1]). Our code defaulted to "3" (skip). Fixed: default changed to "1" (Codex).
 4. **setup.go: summary lacked health/channel info** — PMM spec shows `research/sarah :18789 healthy telegram` in the team summary. Our summary only printed name + port. Fixed: now probes health verdict and reads configured channels from openclaw.json.
 5. **cmdStatusOverview: shallow policy check** — only checked bind mode + image against policy. The full `cmdPolicyValidate` also checks channel DM policies and outbound allowlist. Fixed: overview now checks all channel-level violations too.
-6. **setup.go: missing `status` in next steps** — the new unified `clawctl status` wasn't listed in setup's "Next steps" block. Fixed.
+6. **setup.go: missing `status` in next steps** — the new unified `claws status` wasn't listed in setup's "Next steps" block. Fixed.
 
 #### PMM Success Metrics Assessment
 
 | Metric | Target | Achieved | Notes |
 |--------|--------|----------|-------|
-| Zero-to-first-message commands | 1 (`setup`) | **Yes** | `clawctl setup` is a single command from nothing to running agent |
+| Zero-to-first-message commands | 1 (`setup`) | **Yes** | `claws setup` is a single command from nothing to running agent |
 | Security on fresh setup | 41+ passed, 0 failures | **Yes** | `init` and `setup` both auto-create policy + access + audit |
 | Commands for 3-agent team | 1-3 | **Yes** | 1 `setup` + 2 "add another" prompts |
-| "What do I have?" in one command | `clawctl status` | **Yes** | Shows health, policy, audit, access in one screen |
+| "What do I have?" in one command | `claws status` | **Yes** | Shows health, policy, audit, access in one screen |
 
 #### What's Still Not Perfect (honest PMM eye)
 
-1. **Help is still long** — The PMM said "75 lines and 13 sections is overwhelming". We added "Getting Started" at the top (good), but didn't trim the rest. The full help is now ~80 lines with 15 sections. The tiered help (`help setup`, `help security`) mitigates this — new users hitting `clawctl help` still see the wall, but `clawctl` (no args) now shows a 5-line quickstart instead. Acceptable tradeoff: trimming would break existing users' muscle memory.
+1. **Help is still long** — The PMM said "75 lines and 13 sections is overwhelming". We added "Getting Started" at the top (good), but didn't trim the rest. The full help is now ~80 lines with 15 sections. The tiered help (`help setup`, `help security`) mitigates this — new users hitting `claws help` still see the wall, but `clawctl` (no args) now shows a 5-line quickstart instead. Acceptable tradeoff: trimming would break existing users' muscle memory.
 
 2. **`setup` can't add multiple agents non-interactively** — The `--agent=` flag only specifies one agent. The PMM spec showed `--agent=sarah --agent=john`. This would require slice-based flag parsing. Low priority: the interactive loop handles this well.
 
-3. **No `--migrate` flag on setup** — The PMM spec mentioned `clawctl setup --migrate` for existing users. Not implemented. Existing users can run `init` (idempotent) to get policy + access retroactively.
+3. **No `--migrate` flag on setup** — The PMM spec mentioned `claws setup --migrate` for existing users. Not implemented. Existing users can run `init` (idempotent) to get policy + access retroactively.
 
 4. **Object count not reduced** — PMM wanted users to think about 3 objects (team, agent, channel) not 8. We helped by adding `team create` and the guided `setup` flow that hides groups/roles/runtimes/policies/access/tasks. But the full help still exposes all 8. This is intentional: power users need them.
 
@@ -262,13 +262,13 @@ walked every user journey, simulated first-time experience.
 1. **cmdCreate output leaks into setup flow** — When setup calls cmdCreate internally,
    the standalone output (creation details, sandbox warning, "Next steps" hints, SSH tunnel)
    prints mid-flow, contradicting the guided prompts that follow. User sees "Next steps:
-   clawctl auth ..." immediately before setup handles auth automatically.
+   claws auth ..." immediately before setup handles auth automatically.
    **Fix:** Added `quietCreate` flag (`config.go`). Setup sets it before calling cmdCreate.
    Suppresses: creation detail block, sandbox warning, "Next steps", SSH tunnel hint.
    The "Instance created" info line still prints as confirmation.
 
 2. **`--auth=apikey` on create silently did nothing** — The inline auth only handled
-   `"codex"`, so `clawctl create alice --auth=apikey` created the instance but silently
+   `"codex"`, so `claws create alice --auth=apikey` created the instance but silently
    skipped auth with no warning. User thinks auth is configured when it isn't.
    **Fix:** Added explicit branches for `"apikey"` (warns that provider+key needed, prints
    the command to run) and unknown values (warns about invalid mode).
@@ -287,7 +287,7 @@ walked every user journey, simulated first-time experience.
    channels, which is useless. Changed default from "5" (Skip) to "1" (Telegram),
    matching the PMM spec's example flow.
 
-6. **`help commands` was circular** — Topic just said "Run clawctl help". Replaced with
+6. **`help commands` was circular** — Topic just said "Run claws help". Replaced with
    a concise quick-reference of the 10 most important commands + topic list.
 
 7. **SSH tunnel hint for non-loopback** — Gated the SSH tunnel suggestion on
@@ -302,7 +302,7 @@ walked every user journey, simulated first-time experience.
 - Non-interactive setup only supports 1 agent — needs slice-based flag parsing
 - `status` overview missing recent activity section — would need `cmdActivity` integration
 - `RequireSandbox = false` in defaults — deliberate: start permissive, admin tightens
-- Full `clawctl help` still ~80 lines — mitigated by tiered help + no-args quickstart
+- Full `claws help` still ~80 lines — mitigated by tiered help + no-args quickstart
 
 #### Final Verification
 - `go build` clean, `go vet` clean, `go test ./...` all passing (33s)

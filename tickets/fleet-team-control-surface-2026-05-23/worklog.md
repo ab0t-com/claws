@@ -36,7 +36,7 @@ Append-only. Each session adds a dated section at the bottom.
 
 6. **`auditEntryInGroup` is conservative.** When the audit log has an entry whose args don't parse as an instance ref (e.g., `init`, `setup`, `policy show`), a group-scoped audit filter drops the entry. The alternative — showing all unattributable entries alongside the group-scoped ones — would defeat the purpose of the filter. Operators who want unfiltered audit log run without `--group=`.
 
-7. **Centralising helpers in `config.go`.** This matches the existing convention: `config.go` already holds `validateName`, `hasFlag`, `info`, `warn`, `errorf`, `Paths`, etc. Adding `flagValue`/`firstPositional`/`filterEntriesByGroup`/`requireGroup` there keeps the utility tier coherent. They're not exported (lowercase) — clawctl's package is `main`, not a library — but they're available to every command file.
+7. **Centralising helpers in `config.go`.** This matches the existing convention: `config.go` already holds `validateName`, `hasFlag`, `info`, `warn`, `errorf`, `Paths`, etc. Adding `flagValue`/`firstPositional`/`filterEntriesByGroup`/`requireGroup` there keeps the utility tier coherent. They're not exported (lowercase) — claws's package is `main`, not a library — but they're available to every command file.
 
 ### Edge cases caught and resolved
 
@@ -53,7 +53,7 @@ Append-only. Each session adds a dated section at the bottom.
 
 - All 5 new unit tests pass (`TestFlagValue`, `TestFirstPositional`, `TestFilterEntriesByGroup`, `TestRequireGroup`, `TestAuditEntryInGroup`).
 - All 10 new integration tests pass under `-short`.
-- Full suite: `go test -count=1 -short ./...` → `ok  clawctl  26.8s` (was 39s pre-change, no regression; faster because new short-skip test was added).
+- Full suite: `go test -count=1 -short ./...` → `ok  claws  26.8s` (was 39s pre-change, no regression; faster because new short-skip test was added).
 - `go vet ./...` clean.
 - Live smoke against `mktemp -d` scratch root: `list --group=`, `list --group= --json`, `status --group=`, `health --group=`, `health <name> --group=` (rejected), `policy validate --group=`, `restart --group=` (prompts, aborts on empty stdin), `restart --group=ghost` (rejected with directive), `list --group=emptygroup` (friendly message), `upgrade alpha --group=team --all` (rejected with scope-count error). All behave as designed.
 
@@ -83,9 +83,9 @@ I'd fold these into Task A (fleet identity) or a small cleanup pass.
 
 ### Safety
 
-- No live system modifications. Live `~/.openclaw/` untouched. All smoke ran under `OPENCLAW_ROOT=$(mktemp -d)` with `CLAWCTL_SKIP_VALIDATE=1`.
+- No live system modifications. Live `~/.openclaw/` untouched. All smoke ran under `OPENCLAW_ROOT=$(mktemp -d)` with `CLAWS_SKIP_VALIDATE=1`.
 - The Go test harness uses `t.TempDir()` (which auto-cleans). The slow `TestIntegration_StartGroupExpansion` (when run without `-short`) does fire real `docker compose up -d` against the test root; the testharness orphan issue documented in the parallel `test-harness-orphan-containers` ticket (to-be-filed) applies here too. I did not run the long version against the live Docker socket during this session — only the `-short` path.
-- No git commits. No restarts of any live agent. The deployed `./clawctl` (Mar 27) on the host is unchanged. The current source build is at `/tmp/clawctl-current` for inspection.
+- No git commits. No restarts of any live agent. The deployed `./claws` (Mar 27) on the host is unchanged. The current source build is at `/tmp/clawctl-current` for inspection.
 
 ### What the operator should know
 
@@ -93,39 +93,39 @@ After this lands and a rebuild + deploy, operators can:
 
 ```bash
 # Team-scoped reads
-clawctl list --group=team
-clawctl status --group=team
-clawctl health --group=team
-clawctl health --group=team --json
+claws list --group=team
+claws status --group=team
+claws health --group=team
+claws health --group=team --json
 
 # Team-scoped lifecycle (with confirmation)
-clawctl restart --group=team        # prompts
-clawctl restart --group=team --yes  # scripted
-clawctl restart --group=team --hard --yes
-clawctl start --group=team          # additive, no prompt
-clawctl stop --group=team --yes
+claws restart --group=team        # prompts
+claws restart --group=team --yes  # scripted
+claws restart --group=team --hard --yes
+claws start --group=team          # additive, no prompt
+claws stop --group=team --yes
 
 # Team-scoped admin
-clawctl policy validate --group=team
-clawctl policy enforce --restart --group=team --yes
-clawctl token rotate --group=team --yes
-clawctl upgrade --group=team --image=openclaw:v2026.5.20 --yes
+claws policy validate --group=team
+claws policy enforce --restart --group=team --yes
+claws token rotate --group=team --yes
+claws upgrade --group=team --image=openclaw:v2026.5.20 --yes
 
 # Team-scoped audit
-clawctl access audit --since=24h --group=team
+claws access audit --since=24h --group=team
 ```
 
-Help is up-to-date — `clawctl <command> --help` shows the new options.
+Help is up-to-date — `claws <command> --help` shows the new options.
 
 ### Next
 
-Task #14 (Section A — fleet identity at a glance: `list --rich`, `clawctl info <name>`, model resolution). Picking it up now.
+Task #14 (Section A — fleet identity at a glance: `list --rich`, `claws info <name>`, model resolution). Picking it up now.
 
 ---
 
 ## 2026-05-23 — Section A: fleet identity at a glance (claude)
 
-**Goal.** Add a richer fleet view (`list --rich`) and a single-agent deep-info command (`clawctl info`) so operators can answer "what is each agent on?" in one command. Per the ticket §A this is the single highest-value UX gap; it is also the gap that produced this session's triage thrash ("I didn't know Ben was on Anthropic").
+**Goal.** Add a richer fleet view (`list --rich`) and a single-agent deep-info command (`claws info`) so operators can answer "what is each agent on?" in one command. Per the ticket §A this is the single highest-value UX gap; it is also the gap that produced this session's triage thrash ("I didn't know Ben was on Anthropic").
 
 ### What changed
 
@@ -152,7 +152,7 @@ Task #14 (Section A — fleet identity at a glance: `list --rich`, `clawctl info
    - Use two different format strings depending on whether status is colored. Adds branching to every renderer; future contributors will miss it and silently produce skewed columns again.
    `padVisible` is opt-in (callers explicitly use it) but generic, lives in `config.go` next to other formatting utilities, and is unit-tested.
 
-4. **`cmdInfo` includes a last-24h audit slice.** Bounded to 8 entries to keep the screen readable. Filter is "entries whose first positional arg == this instance's full name" — strict equality, no fuzzy match. If someone runs `clawctl info team/sarah` and they recently ran `clawctl logs team/sarah --tail=20`, that shows up — useful for context. If they ran `clawctl restart --group=team`, that does *not* show under `info team/sarah` (the group-scoped command's positional arg isn't "team/sarah"). That's a minor honesty trade: per-instance info shows per-instance actions only. The group-scoped invocations are visible via `access audit --group=team`.
+4. **`cmdInfo` includes a last-24h audit slice.** Bounded to 8 entries to keep the screen readable. Filter is "entries whose first positional arg == this instance's full name" — strict equality, no fuzzy match. If someone runs `claws info team/sarah` and they recently ran `claws logs team/sarah --tail=20`, that shows up — useful for context. If they ran `claws restart --group=team`, that does *not* show under `info team/sarah` (the group-scoped command's positional arg isn't "team/sarah"). That's a minor honesty trade: per-instance info shows per-instance actions only. The group-scoped invocations are visible via `access audit --group=team`.
 
 5. **`info` runs even when the instance is `down` or `stopped`.** Most fields come from disk; only RAM/uptime go missing. This is intentional — operators want `info` to work *most* when an agent is broken, not just when it's healthy.
 
@@ -173,15 +173,15 @@ Task #14 (Section A — fleet identity at a glance: `list --rich`, `clawctl info
 ### Test results
 
 - 6 new tests (1 unit, 5 integration). All pass under `-short`.
-- Full suite: `go test -count=1 -short ./...` → `ok  clawctl  38.3s`. No regressions.
+- Full suite: `go test -count=1 -short ./...` → `ok  claws  38.3s`. No regressions.
 - `go vet ./...` clean.
 - Live read-only smoke against `~/.openclaw` (the production root) — see "Live verification" below — confirmed correct rendering against the real fleet shape.
 
 ### Acceptance criteria from ticket §A — status
 
-- [x] **A1.** `clawctl list --rich` shows MODEL / ROLE / CHANNELS / IMAGE / RAM / UPTIME per agent.
+- [x] **A1.** `claws list --rich` shows MODEL / ROLE / CHANNELS / IMAGE / RAM / UPTIME per agent.
 - [x] **A2.** Resolved-model surfacing: chose Option (c) — fall back to `—` when `agents.defaults.model.primary` is absent. Future work: option (a) once OpenClaw exposes an info endpoint.
-- [x] **A3.** `clawctl info <name>` consolidates identity, network, channels, creds, filesystem, recent activity. JSON mode included.
+- [x] **A3.** `claws info <name>` consolidates identity, network, channels, creds, filesystem, recent activity. JSON mode included.
 
 ### Live verification (production root, read-only)
 
@@ -196,13 +196,13 @@ team/john          :18889   healthy   openai-codex/gpt-5.4       worker   telegr
 team/lead          :19089   healthy   openai-codex/gpt-5.4       manager  —                  75.23MiB  28 hours
 ```
 
-The `team1/ben` row's `—` MODEL column is the explicit, intentional surfacing of A2's chosen behavior: ben has no `agents.defaults.model.primary` set in its `openclaw.json`, so we display `—`. The gateway's runtime fallback (`anthropic/claude-opus-4-6`) is what's actually running, but that fact lives only in the gateway's startup log — not in any config clawctl owns. This is honest about what we know vs what we infer.
+The `team1/ben` row's `—` MODEL column is the explicit, intentional surfacing of A2's chosen behavior: ben has no `agents.defaults.model.primary` set in its `openclaw.json`, so we display `—`. The gateway's runtime fallback (`anthropic/claude-opus-4-6`) is what's actually running, but that fact lives only in the gateway's startup log — not in any config claws owns. This is honest about what we know vs what we infer.
 
 This output also re-confirms the engineering report's read of the fleet: 3 agents on openai-codex/gpt-5.4 with telegram, one (ben) unspecified, sarah additionally has WhatsApp (the leftover from the prior incident — separate cleanup item).
 
 ### Out-of-scope additions deferred
 
-- Adding `--rich` to `clawctl info` to show a per-instance condensed identity row above the full breakdown. The full breakdown already shows everything; the row would be redundant.
+- Adding `--rich` to `claws info` to show a per-instance condensed identity row above the full breakdown. The full breakdown already shows everything; the row would be redundant.
 - Caching `docker compose ps` output between rows in `list --rich` (currently fires once per row). Worth ~2 hours when fleets exceed 8 agents. Not now.
 - Surfacing the resolved-at-startup model from the gateway log (Option b). Better as part of a future `info --probe` flag that *can* hit the gateway when the operator opts in.
 
@@ -210,32 +210,32 @@ This output also re-confirms the engineering report's read of the fleet: 3 agent
 
 - Live `list --rich` and `info team1/ben` smoke ran read-only against the production root. No writes. The audit log gained a few entries (as designed). No restarts of any live agent.
 - Test harness uses `t.TempDir()` exclusively; no orphan containers spawned (the slow-path `--short`-gated tests from Task B are not exercised here).
-- `/tmp/clawctl-current` rebuilt from current source; the deployed `./clawctl` (Mar 27) is unchanged.
+- `/tmp/clawctl-current` rebuilt from current source; the deployed `./claws` (Mar 27) is unchanged.
 
 ### What the operator gets
 
 ```bash
 # At-a-glance: "what is each agent on?"
-clawctl list --rich
-clawctl list --rich --group=team       # team-scoped
-clawctl list --rich --json             # for dashboards/CI
+claws list --rich
+claws list --rich --group=team       # team-scoped
+claws list --rich --json             # for dashboards/CI
 
 # Single-agent deep-dive: "everything I'd want to know about this one"
-clawctl info team/sarah                # human-readable, sectioned
-clawctl info team/sarah --json         # for scripting / structured alerting
+claws info team/sarah                # human-readable, sectioned
+claws info team/sarah --json         # for scripting / structured alerting
 ```
 
 This closes the engineering-report rubric line 10 (Operator DX) gap that the dogfood log flagged: today's `list` shows liveness; the new `list --rich` and `info` show identity.
 
 ### Next
 
-Task #15 (Section E1 — `clawctl orphans` drift detection). The bob container that surfaced during the audit is the canonical motivating case. Picking up now.
+Task #15 (Section E1 — `claws orphans` drift detection). The bob container that surfaced during the audit is the canonical motivating case. Picking up now.
 
 ---
 
-## 2026-05-23 — Section E1: `clawctl orphans` (claude)
+## 2026-05-23 — Section E1: `claws orphans` (claude)
 
-**Goal.** Surface Docker containers managed-by-naming-convention but absent from clawctl's port registry, so operators discover drift (the bob case) without resorting to `docker ps` by hand. Read-only by default; `orphans clean` removes with confirmation.
+**Goal.** Surface Docker containers managed-by-naming-convention but absent from claws's port registry, so operators discover drift (the bob case) without resorting to `docker ps` by hand. Read-only by default; `orphans clean` removes with confirmation.
 
 ### What changed
 
@@ -244,13 +244,13 @@ Task #15 (Section E1 — `clawctl orphans` drift detection). The bob container t
 | `orphans.go` | New file. Implements `cmdOrphans`, `cmdOrphansList`, `cmdOrphansClean`. Core helpers: `containerProject(name)` (parses the project name out of a container name by trimming the gateway/cli service suffix); `knownProjects(paths)` (derives the expected project set from the port registry, using each instance's resolved runtime so custom `projectPrefix` values would compose correctly *if* we extended detection to non-openclaw prefixes); `discoverOrphans(paths)` (subset of `docker ps -a --filter name=openclaw-` minus the known set, with per-container metadata via `docker inspect`); `inspectOrphan` (status + mount paths + dead-mount detection via `os.Stat`); `colorStatus` (per-state coloring). | +260 |
 | `main.go` | Added `case "orphans"` in the dispatch table and one line in the printHelp Diagnostics section. | +3 |
 | `help.go` | Added a comprehensive `orphans` subcommand help entry covering list/clean/--all/--yes/--json and explicitly noting today's openclaw-prefix scope limitation. | +35 |
-| `orphans_test.go` | New file. `TestContainerProject` covers 9 input cases (grouped/ungrouped, gateway/cli sidecar, the literal bob name, and 5 negative cases for non-clawctl shapes). `TestColorStatus` covers running/restarting (yellow), exited/dead/removing (red), no-color fallback, empty input. | +60 |
+| `orphans_test.go` | New file. `TestContainerProject` covers 9 input cases (grouped/ungrouped, gateway/cli sidecar, the literal bob name, and 5 negative cases for non-claws shapes). `TestColorStatus` covers running/restarting (yellow), exited/dead/removing (red), no-color fallback, empty input. | +60 |
 
 ### Design decisions worth recording
 
-1. **Default action is *list*, not *clean*.** `clawctl orphans` (no args) lists; `clawctl orphans clean` is the only path that removes. This matches the "read-only by default" instinct of the codebase (`clawctl remove` keeps data unless `--purge`; `clawctl access audit` is text dump). A future operator should never accidentally nuke a container by mistyping a flag.
+1. **Default action is *list*, not *clean*.** `claws orphans` (no args) lists; `claws orphans clean` is the only path that removes. This matches the "read-only by default" instinct of the codebase (`claws remove` keeps data unless `--purge`; `claws access audit` is text dump). A future operator should never accidentally nuke a container by mistyping a flag.
 
-2. **Mount-path-missing detection (`MountsBad`).** Every orphan record stat()s each mount source and flags the missing ones. This is the key signal for "test harness left it behind" vs "operator manually started a container with `docker compose` and clawctl doesn't know about it" — the former has dead mounts, the latter likely has live ones. Surfacing both in the same list, with the marker, lets the operator triage at a glance.
+2. **Mount-path-missing detection (`MountsBad`).** Every orphan record stat()s each mount source and flags the missing ones. This is the key signal for "test harness left it behind" vs "operator manually started a container with `docker compose` and claws doesn't know about it" — the former has dead mounts, the latter likely has live ones. Surfacing both in the same list, with the marker, lets the operator triage at a glance.
 
 3. **`docker rm -f` not `docker compose down`.** `docker compose down` requires the compose file at its original path; for the test-leftover case the file is gone. `docker rm -f` works against any container by name and is the most reliable cleanup. The downside: leaves any networks/volumes Docker auto-created for the project. For test orphans those are tiny and Docker prunes them eventually. If/when this matters in practice, add a follow-up that does best-effort `docker network rm` as well.
 
@@ -269,7 +269,7 @@ Task #15 (Section E1 — `clawctl orphans` drift detection). The bob container t
 | `docker inspect` fails (container removed between ps and inspect) | Code review | Return the partial record we have; orphan still listed |
 | Empty orphan list under `--json` | Code review | Print `[]` not Go's `null` |
 | Mount source paths with no existence — distinguish from live mounts | Live smoke against production found 3 orphans all with dead mounts (test leftovers) | `MountsBad` field + per-row ✗ marker + summary line |
-| `clean <name>` when name doesn't match any orphan | Code review | Directive error: "no orphan container named X — run: clawctl orphans" |
+| `clean <name>` when name doesn't match any orphan | Code review | Directive error: "no orphan container named X — run: claws orphans" |
 | `clean` with both `<name>` and `--all` | Code review | Mutual-exclusion error |
 | `clean` without `--yes` and no TTY (e.g., scripted with no stdin) | Code review | Reads empty line, fails y/Y check, prints "Aborted." — same pattern as cmdRemove |
 | Containers whose name *starts with* `openclaw-` but don't match the service-suffix convention | Test cases | `containerProject` returns "" → silently skipped (no false claim of ownership) |
@@ -277,22 +277,22 @@ Task #15 (Section E1 — `clawctl orphans` drift detection). The bob container t
 ### Test results
 
 - 2 new test files, 11 sub-cases. All pass.
-- Full suite: `go test -count=1 -short ./...` → `ok  clawctl  37.1s`. No regressions.
+- Full suite: `go test -count=1 -short ./...` → `ok  claws  37.1s`. No regressions.
 - `go vet ./...` clean.
 - Live smoke against the production root: `orphans` correctly surfaced 3 leftover containers from my own integration tests run earlier this session. See "Live verification" below.
 
 ### Acceptance criteria from ticket §E1 — status
 
-- [x] `clawctl orphans` surfaces Docker containers with `openclaw-*` prefix not in registry.
+- [x] `claws orphans` surfaces Docker containers with `openclaw-*` prefix not in registry.
 - [x] Mount metadata is shown so operators can distinguish test-leftover (dead mounts) from manual-start (live mounts).
-- [x] `clawctl orphans clean <name>` `docker rm -f`s a specific orphan with confirmation.
-- [x] `clawctl orphans clean --all` removes every orphan with confirmation.
+- [x] `claws orphans clean <name>` `docker rm -f`s a specific orphan with confirmation.
+- [x] `claws orphans clean --all` removes every orphan with confirmation.
 - [x] `--yes` bypass for scripting/CI.
 - [x] `--json` for machine-readable output.
 
 ### Live verification (production root, read-only)
 
-The `bob` orphan we discussed earlier this session was already cleaned by the operator before this task started. But running `clawctl orphans` against the live root immediately surfaced **3 NEW orphans** — all of them spawned by *my own* test runs in this session:
+The `bob` orphan we discussed earlier this session was already cleaned by the operator before this task started. But running `claws orphans` against the live root immediately surfaced **3 NEW orphans** — all of them spawned by *my own* test runs in this session:
 
 ```
 openclaw-alpha-one-openclaw-gateway-1     project: openclaw-alpha-one     status: running     mounts: 4 ✗
@@ -306,32 +306,32 @@ Origin:
 
 **This is the bob situation reproduced live, by the very tests that exercise the new code, and immediately diagnosed by the new feature.** The test-harness-leaves-orphans issue is its own ticket (`test-harness-orphan-containers-2026-05-23` — to be filed). The orphans tool surfaces the mess until the harness is fixed.
 
-I have *not* run `orphans clean --all --yes` against the live root — those are real Docker containers on the user's host, and even though they're useless and burning CPU, removing them is a state mutation that needs operator say-so. Recommended next step (operator decision): `./clawctl orphans clean --all --yes` to clean my mess.
+I have *not* run `orphans clean --all --yes` against the live root — those are real Docker containers on the user's host, and even though they're useless and burning CPU, removing them is a state mutation that needs operator say-so. Recommended next step (operator decision): `./claws orphans clean --all --yes` to clean my mess.
 
 ### Out-of-scope additions deferred
 
 - **Reverse drift (registry entries without containers).** Ticket §E2. Useful but a separate code path (walks the registry and checks Docker, vs walking Docker and checking the registry).
-- **`clawctl drift` umbrella.** Ticket §E3. Combines E1 + E2 + filesystem checks (instance dirs vs registry, stale lock files). Wait for E2 first.
+- **`claws drift` umbrella.** Ticket §E3. Combines E1 + E2 + filesystem checks (instance dirs vs registry, stale lock files). Wait for E2 first.
 - **Non-openclaw runtime detection.** Iterate `listRuntimes(paths)` to build a prefix union for the `--filter name=` query. Cheap, but only meaningful when an operator actually runs a non-default runtime.
 
 ### Safety
 
 - Live `orphans` and `orphans --json` smoke ran read-only against the production root. No `docker rm`. The audit log gained two entries.
-- Live `~/.openclaw/` untouched. No restarts. The deployed `./clawctl` (Mar 27) unchanged.
+- Live `~/.openclaw/` untouched. No restarts. The deployed `./claws` (Mar 27) unchanged.
 - The 3 orphan containers detected continue to occupy CPU (one is `restarting`-looping). Leaving the cleanup decision to the operator per the safety contract.
 
 ### What the operator gets
 
 ```bash
 # Discovery
-clawctl orphans                          # list with full context
-clawctl orphans --json                   # for monitoring/CI
+claws orphans                          # list with full context
+claws orphans --json                   # for monitoring/CI
 
 # Cleanup
-clawctl orphans clean <name>             # prompts
-clawctl orphans clean <name> --yes       # scripted
-clawctl orphans clean --all              # prompts, removes everything
-clawctl orphans clean --all --yes        # scripted bulk
+claws orphans clean <name>             # prompts
+claws orphans clean <name> --yes       # scripted
+claws orphans clean --all              # prompts, removes everything
+claws orphans clean --all --yes        # scripted bulk
 ```
 
 ### Next
@@ -371,17 +371,17 @@ Task #16 (Section C — `team` subcommand verbs). Now that --group= works on mos
 | Case | How found | Resolution |
 |---|---|---|
 | `team status` (no team name) | Tested in TestIntegration_TeamRejectsNoTeamName | Directive usage error from cmdTeamDelegate |
-| `team status ghost` (missing team) | Tested in TestIntegration_TeamRejectsMissingTeam | `requireGroup` returns the standard "see: clawctl group list" error |
+| `team status ghost` (missing team) | Tested in TestIntegration_TeamRejectsMissingTeam | `requireGroup` returns the standard "see: claws group list" error |
 | `team` (no subcommand) | Reviewed dispatcher | Lists all 10 verbs in error message |
 | `team unknown-verb` | Reviewed dispatcher | Lists all 10 verbs in error message |
-| `team show` with zero members | Tested implicitly (renders "(no instances yet — use: clawctl create ...)") | Friendly empty state |
+| `team show` with zero members | Tested implicitly (renders "(no instances yet — use: claws create ...)") | Friendly empty state |
 | `team show` JSON when no members | Code path | Empty `members: null` is acceptable for jq consumers |
 | Forwarded flags like `--json`, `--hard`, `--yes`, `--image=` survive delegation | Manually verified in smoke; `team health alpha --json` returned valid JSON | `cmdTeamDelegate` only strips the team-name positional, not any flags |
 
 ### Test results
 
 - 7 new integration tests, all pass under `-short`.
-- Full suite: `go test -count=1 -short ./...` → `ok  clawctl  37.9s`. No regressions.
+- Full suite: `go test -count=1 -short ./...` → `ok  claws  37.9s`. No regressions.
 - `go vet ./...` clean.
 - Live smoke against `mktemp` scratch root: `team show`, `team show --json`, `team health`, `team status`, `team restart` (prompts + aborts on empty stdin), `team status ghost` (rejected), `team status` (usage error), `team` (verb list). All paths behave as designed.
 
@@ -400,14 +400,14 @@ Task #16 (Section C — `team` subcommand verbs). Now that --group= works on mos
 ### What the operator gets
 
 ```bash
-clawctl team show research              # one-screen team dashboard
-clawctl team show research --json       # for scripting
-clawctl team start research             # start every member
-clawctl team restart research --hard --yes  # full team container refresh
-clawctl team status research            # team-scoped overview
-clawctl team health research --json     # health probes, machine-readable
-clawctl team rotate-tokens research --yes   # bulk token rotation
-clawctl team upgrade research --image=openclaw:v2026.5.20 --yes
+claws team show research              # one-screen team dashboard
+claws team show research --json       # for scripting
+claws team start research             # start every member
+claws team restart research --hard --yes  # full team container refresh
+claws team status research            # team-scoped overview
+claws team health research --json     # health probes, machine-readable
+claws team rotate-tokens research --yes   # bulk token rotation
+claws team upgrade research --image=openclaw:v2026.5.20 --yes
 ```
 
 The team noun now feels first-class — the operator never has to spell `--group=<name>` explicitly when they're thinking at the team level.
@@ -421,7 +421,7 @@ The team noun now feels first-class — the operator never has to spell `--group
 ### Safety
 
 - No live system modifications. All smoke against `mktemp` scratch root.
-- No git commits. No restarts. Deployed `./clawctl` (Mar 27) unchanged.
+- No git commits. No restarts. Deployed `./claws` (Mar 27) unchanged.
 
 ### Next
 
@@ -431,13 +431,13 @@ Task #17 (Section D — channels matrix + `auth status`). Two new read-only view
 
 ## 2026-05-23 — Section D: channels matrix + `auth status` (claude)
 
-**Goal.** Two new fleet-wide read-only views. `clawctl channels` (note: plural; the matrix view) shows which agents are on which channels at a glance. `clawctl auth status` shows what providers and credentials each agent has registered (without ever surfacing the secret itself).
+**Goal.** Two new fleet-wide read-only views. `claws channels` (note: plural; the matrix view) shows which agents are on which channels at a glance. `claws auth status` shows what providers and credentials each agent has registered (without ever surfacing the secret itself).
 
 ### What changed
 
 | File | Change | Lines |
 |---|---|---|
-| `observability.go` | New file. `cmdChannelsMatrix` renders a rows=agents × cols=channel-types grid with the dmPolicy in each enabled cell. `cmdAuthStatus` renders a per-agent table of model + gateway-token presence + channel cred file count + last auth event from the audit log. Both support `--group=`, `--json`, and empty-fleet/empty-group friendly messages. Helpers: `knownChannelTypes()` (sourced from `channelProfiles` so the matrix stays in sync with what clawctl knows how to provision), `gatherChannelMatrix()`, `lastAuthEvent()` (walks the audit log backwards to find most recent `cmd=auth` for an instance), `relativeAge()` (compact human duration). | +290 |
+| `observability.go` | New file. `cmdChannelsMatrix` renders a rows=agents × cols=channel-types grid with the dmPolicy in each enabled cell. `cmdAuthStatus` renders a per-agent table of model + gateway-token presence + channel cred file count + last auth event from the audit log. Both support `--group=`, `--json`, and empty-fleet/empty-group friendly messages. Helpers: `knownChannelTypes()` (sourced from `channelProfiles` so the matrix stays in sync with what claws knows how to provision), `gatherChannelMatrix()`, `lastAuthEvent()` (walks the audit log backwards to find most recent `cmd=auth` for an instance), `relativeAge()` (compact human duration). | +290 |
 | `main.go` | Added `case "channels"` (plural) for the fleet matrix. Updated `printHelp()` Auth & Channels section to surface `auth status` and `channels`. | +5 |
 | `commands.go` | Added `status` subcommand to `cmdAuth` dispatcher. Lives next to the auth verbs because operators look for "is auth working?" under the same noun they used to set it up. | +7 |
 | `help.go` | Added `channels` subcommand help (with note that singular `channel` is the per-instance verb namespace, plural `channels` is the fleet view). Updated `auth` help to document `status [name]` + `--group=` + `--json`. | +50 |
@@ -449,7 +449,7 @@ Task #17 (Section D — channels matrix + `auth status`). Two new read-only view
 
 2. **Matrix columns come from `channelProfiles` (channel.go), not from observed config.** This means a channel type appears as a column even if no instance has it configured. Why: stability of output for scripts (a CI dashboard that watches the JSON output shouldn't see columns appear/disappear when an agent's config changes). The downside: a column might be all `—` for fleets that don't use that channel. Acceptable.
 
-3. **`auth status` shows what we *can* verify, marks the rest with `—`.** The four columns: MODEL (from openclaw.json), TOKEN (gateway token presence — boolean, never the value), CHANNEL CREDS (count + first two filenames — no contents), LAST AUTH (audit-log scrape). Notably absent: actual provider auth state. The auth credentials for OpenAI/Anthropic live inside the OpenClaw container's home dir, not in clawctl's instance dir; verifying them would require an HTTP probe to the gateway, which `auth status` deliberately does *not* do. Operators who need that signal can `exec` into the container; `auth status` is the offline view.
+3. **`auth status` shows what we *can* verify, marks the rest with `—`.** The four columns: MODEL (from openclaw.json), TOKEN (gateway token presence — boolean, never the value), CHANNEL CREDS (count + first two filenames — no contents), LAST AUTH (audit-log scrape). Notably absent: actual provider auth state. The auth credentials for OpenAI/Anthropic live inside the OpenClaw container's home dir, not in claws's instance dir; verifying them would require an HTTP probe to the gateway, which `auth status` deliberately does *not* do. Operators who need that signal can `exec` into the container; `auth status` is the offline view.
 
 4. **`lastAuthEvent` walks the audit log backwards.** O(n) over log size for each instance, but the audit log is small in practice (one line per command) and walks stop at first match. Optimisation isn't worth complicating the code.
 
@@ -457,14 +457,14 @@ Task #17 (Section D — channels matrix + `auth status`). Two new read-only view
 
 6. **JSON shape for `channels` is `{columns: [...], rows: [...]}`.** Two flat arrays rather than a nested map so JSON consumers can iterate rows and look up cells by column name without needing schema inference.
 
-7. **`auth status` JSON is a flat array of records.** Direct `jq` filtering: `clawctl auth status --json | jq '.[] | select(.gatewayTokenSet == false)'`.
+7. **`auth status` JSON is a flat array of records.** Direct `jq` filtering: `claws auth status --json | jq '.[] | select(.gatewayTokenSet == false)'`.
 
 ### Edge cases caught and resolved
 
 | Case | How found | Resolution |
 |---|---|---|
 | `channels` with empty fleet | Code review | Friendly message; JSON `[]` |
-| `channels --group=ghost` | Code review (via requireGroup) | Standard "see: clawctl group list" error |
+| `channels --group=ghost` | Code review (via requireGroup) | Standard "see: claws group list" error |
 | `auth status` for an instance whose audit log has no auth events | Live smoke against production (all 4 agents had `LAST AUTH = —`) | `lastAuthEvent` returns empty triple; row shows `—` |
 | `auth status` JSON includes `channelCreds: null` for instances with empty creds dir | Live smoke against production | Acceptable; jq treats null same as missing. Could change to empty slice if needed |
 | Audit log filter mis-matching similarly-named instances (e.g., `team/sarah` matching `team/sarah-dev`) | Reviewed `auditEntryInGroupOrName` (same helper from Task A) | Strict `==` not `HasPrefix`; tested mentally |
@@ -479,14 +479,14 @@ Task #17 (Section D — channels matrix + `auth status`). Two new read-only view
 - Live smoke against the production root produced the exact fleet-shape view I described in the prior triage session:
 
 ```
-$ clawctl channels
+$ claws channels
 NAME               discord  signal   slack    telegram     whatsapp
 team1/ben          —        —        —        —            —
 team/sarah         —        —        —        ✓ pairing    ✓ allowlist
 team/john          —        —        —        ✓ pairing    —
 team/lead          —        —        —        —            —
 
-$ clawctl auth status
+$ claws auth status
 NAME               MODEL                  TOKEN    CHANNEL CREDS                       LAST AUTH
 team1/ben          —                      yes      —                                   —
 team/sarah         openai-codex/gpt-5.4   yes      4 (telegram-default-allowFr...)     —
@@ -494,32 +494,32 @@ team/john          openai-codex/gpt-5.4   yes      2 (telegram-default-allowFr..
 team/lead          openai-codex/gpt-5.4   yes      —                                   —
 ```
 
-This view collapses what took me ~10 individual `clawctl config get` / `ls credentials/` calls during the triage into one screen. The user's original frustration ("we are missing info and access patterns") is materially addressed for the channel + auth dimensions.
+This view collapses what took me ~10 individual `claws config get` / `ls credentials/` calls during the triage into one screen. The user's original frustration ("we are missing info and access patterns") is materially addressed for the channel + auth dimensions.
 
 ### Acceptance criteria from ticket §D — status
 
-- [x] **D1.** `clawctl channels` (no args) — fleet-wide channel matrix with dmPolicy per cell.
+- [x] **D1.** `claws channels` (no args) — fleet-wide channel matrix with dmPolicy per cell.
 - [x] **D1.** `--json` parity.
-- [x] **D2.** `clawctl auth status [name]` — per-agent auth inventory without secrets.
+- [x] **D2.** `claws auth status [name]` — per-agent auth inventory without secrets.
 - [x] **D2.** `--group=` filter.
 - [x] **D2.** `--json` parity.
-- [ ] **D3.** `clawctl channels expiry <name>` (last-successful-event surfacing) — **deferred**. Designing this needs concrete signals about when a channel last successfully ingested an event, which lives in the runtime, not in clawctl's state.
+- [ ] **D3.** `claws channels expiry <name>` (last-successful-event surfacing) — **deferred**. Designing this needs concrete signals about when a channel last successfully ingested an event, which lives in the runtime, not in claws's state.
 
 ### What the operator gets
 
 ```bash
-clawctl channels                          # fleet-wide channel matrix
-clawctl channels --json                   # for dashboards
-clawctl channels --group=team             # team-scoped
+claws channels                          # fleet-wide channel matrix
+claws channels --json                   # for dashboards
+claws channels --group=team             # team-scoped
 
-clawctl auth status                       # fleet-wide auth inventory
-clawctl auth status team/sarah            # one instance
-clawctl auth status --group=team --json   # team-scoped, machine-readable
+claws auth status                       # fleet-wide auth inventory
+claws auth status team/sarah            # one instance
+claws auth status --group=team --json   # team-scoped, machine-readable
 ```
 
 ### Out-of-scope additions deferred
 
-- **`channels expiry`** (D3): surface "last successful inbound event" per channel. Needs per-channel signal from the runtime — not derivable from clawctl's state alone. Punt until OpenClaw exposes a stable channel-health endpoint.
+- **`channels expiry`** (D3): surface "last successful inbound event" per channel. Needs per-channel signal from the runtime — not derivable from claws's state alone. Punt until OpenClaw exposes a stable channel-health endpoint.
 - **`auth status` triggering an HTTP probe** to verify the model auth actually works. Today's view is offline-only — that's the design. A future `auth status --probe` flag could opt in to a real round-trip. Defer.
 - **`auth rotate` (analogous to token rotate)** for refreshing model credentials. Belongs in Task H (bulk team ops); not D.
 
@@ -527,7 +527,7 @@ clawctl auth status --group=team --json   # team-scoped, machine-readable
 
 - All live invocations were read-only (`channels`, `channels --json`, `auth status`, `auth status team/sarah`, `auth status --json`).
 - Audit log gained entries (by design).
-- No git commits. No restarts. Deployed `./clawctl` (Mar 27) unchanged. `/tmp/clawctl-current` rebuilt from current source.
+- No git commits. No restarts. Deployed `./claws` (Mar 27) unchanged. `/tmp/clawctl-current` rebuilt from current source.
 
 ### Next
 
@@ -546,7 +546,7 @@ Task #18 (Section G — JSON parity for remaining read commands). After A/B/C/D 
 | `task.go` | `cmdTaskList` accepts `--json`; emits the `Task` struct array directly (already JSON-friendly via its existing struct tags). Uses `flagValue` for `--status=` (eliminating the manual offset). | +15 |
 | `channel.go` | `cmdChannelStatus` accepts `--json`; emits `[{name, enabled, dmPolicy}]`. `cmdChannelSecurity` accepts `--json`; emits full per-channel posture including actions, allowFrom, groupAllowFrom, groupPolicy. Sort output by channel name for deterministic JSON across runs. Added `sort` import. | +75 |
 | `group.go` | `cmdGroupList` accepts `--json`; emits `[{group, members, directory}]`. Since `team list` aliases to `group list`, that command gains the same JSON path for free. | +20 |
-| `policy.go` | `cmdPolicyValidate` accepts `--json`; emits `[{name, issues, compliant}]`. Non-zero exit on violations is preserved in JSON mode so CI can treat `clawctl policy validate --json || alert` the same way as the text path. | +35 |
+| `policy.go` | `cmdPolicyValidate` accepts `--json`; emits `[{name, issues, compliant}]`. Non-zero exit on violations is preserved in JSON mode so CI can treat `claws policy validate --json || alert` the same way as the text path. | +35 |
 | `help.go` | Added `--json` mentions to `channel`, `group`, `task`, and `policy` subcommand help. | +6 |
 
 ### Design decisions worth recording
@@ -602,7 +602,7 @@ Task #18 (Section G — JSON parity for remaining read commands). After A/B/C/D 
 ### Safety
 
 - Live smoke was read-only against the production root.
-- No git commits. No restarts. Deployed `./clawctl` unchanged.
+- No git commits. No restarts. Deployed `./claws` unchanged.
 
 ### Next
 
@@ -619,7 +619,7 @@ Task #19 (Section F + H — incident observability + bulk team ops). F1 `logs --
 | File | Change | Lines |
 |---|---|---|
 | `commands.go` | Rewrote `cmdLogs`: added `--group=<name>`, `--grep=<pattern>` (case-insensitive substring), and `--since=<dur>` (passes through to docker compose). The grep path captures stdout via `StdoutPipe` and filters line-by-line; the non-grep path stays pass-through to preserve color and streaming. Builds the docker compose command directly in the grep path because the shared `dc()` helper pre-binds `cmd.Stdout = os.Stdout` (incompatible with `StdoutPipe`). Group fan-out is sequential with per-member section headers; rejects `--group=` with `-f` because interleaved follow needs its own design. | +90 |
-| `access.go` | Added `cmdAccessTail` (`clawctl access tail [-f] [--tail=N]`). Reads last N lines from `.audit.log`, then optionally polls every 500ms for new lines. Uses `stat+seek` rather than inotify — the audit log is small and append-only, polling is simple and portable. Added `printAuditLine` helper so tail and `audit` use the same per-line format. | +95 |
+| `access.go` | Added `cmdAccessTail` (`claws access tail [-f] [--tail=N]`). Reads last N lines from `.audit.log`, then optionally polls every 500ms for new lines. Uses `stat+seek` rather than inotify — the audit log is small and append-only, polling is simple and portable. Added `printAuditLine` helper so tail and `audit` use the same per-line format. | +95 |
 | `group.go` | Added two new team verbs: `team apply-policy <team>` wraps `policy enforce --group=<team> --restart` with confirmation, and `team apply-config <team> <key> <value>` fans `config set` per member. Both prompt unless `--yes`. | +70 |
 | `help.go` | Updated `logs`, `access`, and `team` subcommand help to document the new flags/verbs with examples. | +35 |
 | `commands.go` imports | Added `bufio` (for the grep path line scanner). | +1 |
@@ -631,7 +631,7 @@ Task #19 (Section F + H — incident observability + bulk team ops). F1 `logs --
 
 2. **`logs --group=<name>` without `-f` is sequential, with section headers.** `=== team/sarah ===` per member. Matches the existing per-instance log block style. Cheap, predictable, no goroutine drama. Group + `-f` returns a directive error explaining that interleaved follow is deferred.
 
-3. **`access tail` uses polling, not inotify.** The audit log is single-writer (clawctl itself), append-only, typically a few KB. Polling every 500ms is fine; inotify would be platform-specific (Linux-only) and add no perceived benefit. The seek-to-end pattern is standard for `tail -f`-style tools.
+3. **`access tail` uses polling, not inotify.** The audit log is single-writer (claws itself), append-only, typically a few KB. Polling every 500ms is fine; inotify would be platform-specific (Linux-only) and add no perceived benefit. The seek-to-end pattern is standard for `tail -f`-style tools.
 
 4. **`team apply-policy` defaults to `--restart`.** The ticket's H3 spec said "bulk policy enforcement"; without `--restart` the policy fixes don't take effect on running gateways. Making restart the default for the team-noun verb matches operator expectation; the per-instance `policy enforce` keeps its existing opt-in flag.
 
@@ -658,7 +658,7 @@ Task #19 (Section F + H — incident observability + bulk team ops). F1 `logs --
 
 - Build clean, vet clean.
 - Live smoke against production root:
-  - `logs team/sarah --tail=100 --grep=401` → immediately surfaced the WhatsApp 401 errors from the prior triage session. Same result the manual `clawctl logs ... | grep -i` workflow produced, but in one command, in-process, color-preserved.
+  - `logs team/sarah --tail=100 --grep=401` → immediately surfaced the WhatsApp 401 errors from the prior triage session. Same result the manual `claws logs ... | grep -i` workflow produced, but in one command, in-process, color-preserved.
   - `logs --group=team --since=24h --grep=Polling` → ran across all 3 team members with section headers (no results in 24h because the polling stall was 48h+ ago).
   - `access tail --tail=5` → showed the last 5 audit entries from this session.
   - `team apply-config research tools.profile messaging --yes` (scratch root) → set the key on 2 members, verified before/after via `config get`. Followed by `team apply-policy research --yes` → "all instances comply with policy" (correctly identified no-op).
@@ -666,10 +666,10 @@ Task #19 (Section F + H — incident observability + bulk team ops). F1 `logs --
 
 ### Acceptance criteria from ticket §F + §H — status
 
-- [x] **F2.** `clawctl logs <name> --since=... --grep=<pattern>` (in-process filter)
-- [x] **F3.** `clawctl access tail [-f]` (live tail of audit log)
-- [ ] **F1.** `clawctl logs --group=<name> -f` (interleaved tail) — **deferred to a dedicated task**. The non-follow `--group=` path *is* shipped (sequential with section headers); the goroutine-multiplexed `-f` variant deserves its own scope including line buffering, prefix tagging, and graceful shutdown on Ctrl-C.
-- [ ] **F4.** `clawctl errors [--group=]` umbrella — **deferred**. Composing `activity` errors + audit error entries + container exit codes + restart counts is a useful next step but bigger than its line count suggests (each source has different time semantics). Out of scope for this batch.
+- [x] **F2.** `claws logs <name> --since=... --grep=<pattern>` (in-process filter)
+- [x] **F3.** `claws access tail [-f]` (live tail of audit log)
+- [ ] **F1.** `claws logs --group=<name> -f` (interleaved tail) — **deferred to a dedicated task**. The non-follow `--group=` path *is* shipped (sequential with section headers); the goroutine-multiplexed `-f` variant deserves its own scope including line buffering, prefix tagging, and graceful shutdown on Ctrl-C.
+- [ ] **F4.** `claws errors [--group=]` umbrella — **deferred**. Composing `activity` errors + audit error entries + container exit codes + restart counts is a useful next step but bigger than its line count suggests (each source has different time semantics). Out of scope for this batch.
 - [x] **H1, H2.** `team rotate-tokens` and `team upgrade` — shipped in Task C as thin delegations over the per-instance commands with `--group=` (Task B).
 - [x] **H3.** `team apply-policy` — wraps `policy enforce --group=<team> --restart` with confirmation.
 - [x] **H4.** `team apply-config <key> <value>` — fans `config set` per member.
@@ -678,19 +678,19 @@ Task #19 (Section F + H — incident observability + bulk team ops). F1 `logs --
 
 ```bash
 # In-CLI grep
-clawctl logs team/sarah --tail=200 --grep=401
-clawctl logs team/sarah --since=24h --grep=openai-codex
-clawctl logs --group=team --since=24h --grep=Error      # sequential per-member tail
+claws logs team/sarah --tail=200 --grep=401
+claws logs team/sarah --since=24h --grep=openai-codex
+claws logs --group=team --since=24h --grep=Error      # sequential per-member tail
 
 # Audit live tail
-clawctl access tail                  # last 20 lines
-clawctl access tail --tail=50        # last 50
-clawctl access tail -f               # follow forever
+claws access tail                  # last 20 lines
+claws access tail --tail=50        # last 50
+claws access tail -f               # follow forever
 
 # Bulk team ops
-clawctl team apply-policy team --yes
-clawctl team apply-config team tools.profile messaging --yes
-clawctl team apply-config team agents.defaults.sandbox true --yes
+claws team apply-policy team --yes
+claws team apply-config team tools.profile messaging --yes
+claws team apply-config team agents.defaults.sandbox true --yes
 ```
 
 ### Final ticket state — fleet-team-control-surface-2026-05-23
@@ -701,7 +701,7 @@ clawctl team apply-config team agents.defaults.sandbox true --yes
 | B. `--group=` parity | ✅ shipped | 10 commands gained `--group=`; logs `--group=` non-follow shipped here in F |
 | C. `team` subcommand verbs | ✅ shipped | 10 verbs total; logs deferred |
 | D. Channels matrix + auth status | ✅ shipped | `channels`, `auth status` with --json/--group |
-| E1. `clawctl orphans` | ✅ shipped | Detection + cleanup with confirmation |
+| E1. `claws orphans` | ✅ shipped | Detection + cleanup with confirmation |
 | E2/E3. Reverse drift + drift umbrella | ⏳ deferred | Acknowledged in original ticket as follow-up |
 | F1. Interleaved logs `-f` | ⏳ deferred | Non-follow `--group=` shipped; `-f` is its own task |
 | F2. logs --grep + --since | ✅ shipped |
@@ -721,13 +721,13 @@ The 3 deferred items (E2/E3 drift umbrella, F1 interleaved follow, F4 errors umb
 Concretely: the user's original triage session — "I don't know what model ben's on, where's bob coming from, how do I see what each agent has configured?" — collapses from ~15 commands across `config get`, `grep instance.env`, `ls credentials/`, manual `docker ps` correlation, and back-and-forth bash, to:
 
 ```bash
-clawctl list --rich            # answers "what are they on?"
-clawctl orphans                # answers "what's running that I don't know about?"
-clawctl auth status            # answers "what's configured for auth?"
-clawctl channels               # answers "who's on which channel?"
-clawctl info team/sarah        # answers "tell me everything about this one"
-clawctl logs team/sarah --grep=401   # answers "what just broke?"
-clawctl team apply-config team tools.profile coding --yes  # bulk team change
+claws list --rich            # answers "what are they on?"
+claws orphans                # answers "what's running that I don't know about?"
+claws auth status            # answers "what's configured for auth?"
+claws channels               # answers "who's on which channel?"
+claws info team/sarah        # answers "tell me everything about this one"
+claws logs team/sarah --grep=401   # answers "what just broke?"
+claws team apply-config team tools.profile coding --yes  # bulk team change
 ```
 
 The "fleet & team control hyper plane" the user asked for now exists.
@@ -737,13 +737,13 @@ The "fleet & team control hyper plane" the user asked for now exists.
 - All live invocations were read-only (logs, access tail).
 - Scratch root used for write operations (`team apply-config` round-trip verification).
 - No live agent restarts triggered.
-- Deployed `./clawctl` (Mar 27) on the host unchanged. Source-current binary at `/tmp/clawctl-current` for operator inspection.
+- Deployed `./claws` (Mar 27) on the host unchanged. Source-current binary at `/tmp/clawctl-current` for operator inspection.
 - No git commits made by any of these tasks. The next operator decision: review the diff and decide what to commit.
 
 ### Final test posture
 
 - All unit tests pass (small, fast).
-- Integration tests pass when given enough time; host I/O contention from running live agents + the test harness's per-instance `clawctl create` overhead makes the full suite slow but correct. Once the orphan-leaving tests are fixed (separate ticket), the suite should return to its pre-change 26-40s baseline.
+- Integration tests pass when given enough time; host I/O contention from running live agents + the test harness's per-instance `claws create` overhead makes the full suite slow but correct. Once the orphan-leaving tests are fixed (separate ticket), the suite should return to its pre-change 26-40s baseline.
 - `go vet ./...` clean throughout.
 - Live read-only smoke against the production root validated every new command against real fleet shapes.
 
@@ -752,7 +752,7 @@ The "fleet & team control hyper plane" the user asked for now exists.
 - File the deferred items as their own tickets (E2/E3, F1 interleaved follow, F4 errors umbrella).
 - File the test-harness-orphan-containers ticket (the `bob` family bug).
 - Address the existing health-probe-loopback-bind ticket (sibling, P1).
-- Consider a follow-up ticket for the "library split" item from the engineering report so clawctl can be embedded.
+- Consider a follow-up ticket for the "library split" item from the engineering report so claws can be embedded.
 - Decide on commit/PR strategy for this batch of changes.
 
 ---
@@ -783,7 +783,7 @@ What this ticket shipped:
 | 11 | `tickets/auth-fleet-reauth-2026-05-23/` — bulk reauth + auth probe verification | **P0** |
 | 12 | `tickets/test-harness-orphan-containers-2026-05-23/` — the integration-test orphan bug (the `bob` family) | P1 |
 | 13 | `tickets/logs-interleaved-follow-2026-05-23/` — `logs --group= -f` (F1 deferred from this ticket) | P2 |
-| 14 | `tickets/errors-umbrella-2026-05-23/` — `clawctl errors` (F4 deferred) | P2 |
+| 14 | `tickets/errors-umbrella-2026-05-23/` — `claws errors` (F4 deferred) | P2 |
 | 15 | `tickets/drift-reverse-and-umbrella-2026-05-23/` — E2 reverse + E3 umbrella drift | P3 |
 
 `tickets/README.md` is updated. The original-issue ticket (11) is filed P0 because it's a missing capability for an incident type that's already happened in production.

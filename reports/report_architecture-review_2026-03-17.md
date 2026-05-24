@@ -1,4 +1,4 @@
-# clawctl Architecture Review — Orchestration & Control Plane
+# claws Architecture Review — Orchestration & Control Plane
 
 **Date:** 2026-03-17
 **Reviewer Perspective:** Principal Architect — orchestration systems, control planes, operational correctness
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-clawctl is a well-scoped control plane for managing multiple OpenClaw instances via Docker Compose. The file-based state model is correct for the 1-8 instance scale. The Docker Compose abstraction layer is clean. The 4-layer config inheritance system is well-designed. However, the codebase has **no concurrency protection** (file locking), a **destructive S3 sync default**, a **half-implemented coordination layer** (manager/worker), and an **unsafe proxy setup** that overwrites system configuration. This report categorizes findings by severity and provides specific remediation guidance.
+claws is a well-scoped control plane for managing multiple OpenClaw instances via Docker Compose. The file-based state model is correct for the 1-8 instance scale. The Docker Compose abstraction layer is clean. The 4-layer config inheritance system is well-designed. However, the codebase has **no concurrency protection** (file locking), a **destructive S3 sync default**, a **half-implemented coordination layer** (manager/worker), and an **unsafe proxy setup** that overwrites system configuration. This report categorizes findings by severity and provides specific remediation guidance.
 
 ---
 
@@ -70,7 +70,7 @@ entries, _ := readRegistry(paths)  // READ
 registerPort(paths, index, name)   // WRITE (appends to registry)
 ```
 
-Two concurrent `clawctl create` calls will race on this file. The same applies to `.group.json`, `.storage.json`, and instance env files.
+Two concurrent `claws create` calls will race on this file. The same applies to `.group.json`, `.storage.json`, and instance env files.
 
 **Impact:** Port collision, registry corruption, duplicate entries.
 
@@ -119,7 +119,7 @@ The compose template (`docker-compose.yml`) is shared across all instances. Per-
 
 The gateway binds internally to port 18789 always (`--port 18789` in the command), with the host port mapped via `OPENCLAW_GATEWAY_PORT`. This is correct — the container-internal port is fixed, only the host mapping varies. Good.
 
-However, `OPENCLAW_GATEWAY_BIND=lan` is set at create time and baked into `instance.env`. There's no way to change it post-creation without manually editing the env file. Consider `clawctl config set <name> bind <value>`.
+However, `OPENCLAW_GATEWAY_BIND=lan` is set at create time and baked into `instance.env`. There's no way to change it post-creation without manually editing the env file. Consider `claws config set <name> bind <value>`.
 
 #### Override Generation
 
@@ -163,7 +163,7 @@ Merge order: global defaults -> group defaults -> template (--from) -> instance 
 
 #### No Config Diffing
 
-There's no way to see what an instance's effective config is after merge, or how it differs from defaults. A `clawctl config diff <name>` would be valuable for debugging.
+There's no way to see what an instance's effective config is after merge, or how it differs from defaults. A `claws config diff <name>` would be valuable for debugging.
 
 #### No Config Validation
 
@@ -198,7 +198,7 @@ The reverse proxy setup (`proxy.go`) has several security issues:
 
 **Fix:**
 - Back up existing Caddyfile before overwriting
-- Write to a Caddy include directory (`/etc/caddy/conf.d/clawctl.conf`) instead
+- Write to a Caddy include directory (`/etc/caddy/conf.d/claws.conf`) instead
 - Add `basic_auth` or `forward_auth` directive with the gateway token
 - Add a `--dry-run` flag that prints the config without writing
 
@@ -259,16 +259,16 @@ This is the equivalent of building a message queue's storage layer but shipping 
 **Option B (complete it):** Implement a minimal task lifecycle:
 
 ```
-clawctl task create <group> --from=<manager> "summarize the Q1 report"
+claws task create <group> --from=<manager> "summarize the Q1 report"
   -> writes JSON to shared/tasks/pending/<uuid>.json
 
-clawctl task list <group> [--status=pending|claimed|done]
+claws task list <group> [--status=pending|claimed|done]
   -> lists tasks with status
 
-clawctl task claim <group> <task-id> --by=<worker>
+claws task claim <group> <task-id> --by=<worker>
   -> atomic rename pending/ -> claimed/
 
-clawctl task complete <group> <task-id>
+claws task complete <group> <task-id>
   -> rename claimed/ -> done/
 ```
 
@@ -294,7 +294,7 @@ The storage setup flow is well-guided:
 
 `rclone sync` mirrors source to destination — files on the destination that don't exist on the source are **deleted**. If a user:
 1. Sets up server A, creates instances, syncs to S3
-2. Sets up server B (fresh), runs `clawctl storage sync`
+2. Sets up server B (fresh), runs `claws storage sync`
 
 The sync from the empty server B will **delete all data in S3**.
 
@@ -308,7 +308,7 @@ The sync from the empty server B will **delete all data in S3**.
 - No file locking
 - Append-only for new files (no random writes)
 
-The workspace migration (`clawctl migrate --to s3`) moves the OpenClaw workspace to a FUSE mount. OpenClaw's workspace includes markdown files that agents edit frequently. This should work for reads but may have issues with concurrent writes from the agent runtime.
+The workspace migration (`claws migrate --to s3`) moves the OpenClaw workspace to a FUSE mount. OpenClaw's workspace includes markdown files that agents edit frequently. This should work for reads but may have issues with concurrent writes from the agent runtime.
 
 **Fix:** Document limitations. Consider making FUSE mount read-only and using rclone sync for writes.
 
@@ -432,7 +432,7 @@ func flagValue(arg, prefix string) (string, bool) {
 ## 10. Architecture Diagram
 
 ```
-                          clawctl CLI (Go binary)
+                          claws CLI (Go binary)
                                |
                     +----------+----------+
                     |                     |
@@ -471,7 +471,7 @@ func flagValue(arg, prefix string) (string, bool) {
 
 5. **Either complete the task lifecycle or remove `--role=`** from create
 6. **Fix activity timestamps** by parsing Docker log format
-7. **Add `clawctl version` and `clawctl doctor`**
+7. **Add `claws version` and `claws doctor`**
 8. **Quote volume paths** in generated override YAML
 
 ### Medium-term (v1.x)

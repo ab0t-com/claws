@@ -1,4 +1,4 @@
-# PMM Audit: clawctl — One-Click Installer Vision
+# PMM Audit: claws — One-Click Installer Vision
 
 **Date:** 2026-03-27
 **Perspective:** Product Marketing Manager — user onboarding, safe defaults, object model clarity, one-click installer goal
@@ -22,7 +22,7 @@ This means: a new user on a fresh server should go from nothing to a working tea
 There is no install. User must:
 1. Have Go installed
 2. Clone the repo
-3. `go build -o clawctl .`
+3. `go build -o claws .`
 4. Have Docker installed and running
 5. Have the OpenClaw image built locally
 
@@ -30,7 +30,7 @@ There is no install. User must:
 
 ### Step 2: Init
 ```bash
-clawctl init
+claws init
 ```
 This works. Creates dirs, checks Docker, copies compose template. **This is good.**
 
@@ -41,7 +41,7 @@ But then:
 
 ### Step 3: Create First Agent
 ```bash
-clawctl create alice
+claws create alice
 ```
 This works. But:
 - No auth is configured — the agent can't talk to any AI model
@@ -51,18 +51,18 @@ This works. But:
 
 ### Step 4: Auth
 ```bash
-clawctl auth alice codex
+claws auth alice codex
 ```
-Requires interactive TTY for OAuth. Breaks when run via `clawctl exec`.
+Requires interactive TTY for OAuth. Breaks when run via `claws exec`.
 Or:
 ```bash
-clawctl auth alice apikey anthropic sk-...
+claws auth alice apikey anthropic sk-...
 ```
 The onboarding prompt blocks on a security warning that defaults to "No" in non-TTY mode.
 
 ### Step 5: Connect Channels
 ```bash
-clawctl channel add alice telegram --token=TOKEN
+claws channel add alice telegram --token=TOKEN
 ```
 This works now (we built it). But:
 - User must already have a bot token
@@ -71,33 +71,33 @@ This works now (we built it). But:
 
 ### Step 6: Start
 ```bash
-clawctl start alice
+claws start alice
 ```
 Works. Health checks. Waits.
 
 ### Step 7: Approve Pairing
 ```bash
-clawctl approve alice telegram CODE
+claws approve alice telegram CODE
 ```
 User must message the bot, see the code, come back to terminal. Works but two-context switching.
 
 ### Step 8: Create a Team
 ```bash
-clawctl group create team
-clawctl create team/bob
-clawctl auth team/bob ...
-clawctl channel add team/bob ...
-clawctl start team/bob
-clawctl approve team/bob ...
-clawctl group shared team --all
+claws group create team
+claws create team/bob
+claws auth team/bob ...
+claws channel add team/bob ...
+claws start team/bob
+claws approve team/bob ...
+claws group shared team --all
 ```
 Repeat steps 3-7 for each agent. **7 commands per agent.**
 
 ### Step 9: Security
 ```bash
-clawctl policy init
-clawctl policy enforce --restart
-clawctl access init
+claws policy init
+claws policy enforce --restart
+claws access init
 ```
 Most users won't know to do this. Security is opt-in, not default.
 
@@ -111,14 +111,14 @@ Currently the user must grasp these concepts:
 
 | Object | What It Is | Discovered Via |
 |--------|-----------|----------------|
-| Instance | A running agent container | `clawctl list` |
-| Group | A collection of instances with shared resources | `clawctl group list` |
+| Instance | A running agent container | `claws list` |
+| Group | A collection of instances with shared resources | `claws group list` |
 | Role | Manager or worker within a group | `--role=` flag on create |
-| Runtime | Which agent software to run | `clawctl runtime list` |
-| Channel | A messaging platform connection | `clawctl channel status` |
-| Policy | Admin security constraints | `clawctl policy show` |
-| Access | Who can run what commands | `clawctl access show` |
-| Task | A unit of work in the manager/worker queue | `clawctl task list` |
+| Runtime | Which agent software to run | `claws runtime list` |
+| Channel | A messaging platform connection | `claws channel status` |
+| Policy | Admin security constraints | `claws policy show` |
+| Access | Who can run what commands | `claws access show` |
+| Task | A unit of work in the manager/worker queue | `claws task list` |
 
 **That's 8 objects.** For a "one-click" experience, users should only need to think about 3:
 1. **Team** — "I want a team of agents"
@@ -138,7 +138,7 @@ Everything else (groups, roles, runtimes, policies, access, tasks) should be han
 curl -sL https://get.clawctl.dev | sh
 
 # Setup (one interactive command)
-clawctl setup
+claws setup
 ```
 
 The `setup` command would:
@@ -160,7 +160,7 @@ One command. Interactive prompts. Safe defaults. Working team at the end.
 ### For Non-Interactive (CI/CD, Scripts)
 
 ```bash
-clawctl setup --non-interactive \
+claws setup --non-interactive \
   --team=research \
   --agent=sarah \
   --auth=codex \
@@ -173,7 +173,7 @@ clawctl setup --non-interactive \
 ### For Existing Users Migrating
 
 ```bash
-clawctl setup --migrate
+claws setup --migrate
 # Discovers existing instances, creates group, applies policy
 ```
 
@@ -200,13 +200,13 @@ clawctl setup --migrate
 
 ### Fixes Needed
 
-`clawctl init` should automatically:
+`claws init` should automatically:
 - Create `policy.json` with secure defaults
 - Create `.access.json` with current user as admin
 - Enable audit logging
 - Print what was configured and why
 
-`clawctl create` should automatically:
+`claws create` should automatically:
 - Set `tools.profile = "coding"` in the config
 - Warn if sandbox is not enabled (not block, just warn)
 
@@ -218,14 +218,14 @@ clawctl setup --migrate
 
 | What User Wants | Commands Required | Should Be |
 |----------------|-------------------|-----------|
-| "Set up a new server" | `init` + `policy init` + `access init` | `clawctl setup` |
-| "Create an agent with Telegram" | `create` + `auth` + `channel add` + `start` | `clawctl create alice --auth=codex --telegram=TOKEN` then `start` |
-| "Create a team" | `group create` + N × (`create` + `auth` + `channel add` + `start`) | `clawctl setup` or `clawctl team create` |
-| "Check everything is okay" | `health` + `audit` + `policy validate` | `clawctl status` (unified) |
+| "Set up a new server" | `init` + `policy init` + `access init` | `claws setup` |
+| "Create an agent with Telegram" | `create` + `auth` + `channel add` + `start` | `claws create alice --auth=codex --telegram=TOKEN` then `start` |
+| "Create a team" | `group create` + N × (`create` + `auth` + `channel add` + `start`) | `claws setup` or `claws team create` |
+| "Check everything is okay" | `health` + `audit` + `policy validate` | `claws status` (unified) |
 
 ### 2. Init Doesn't Do Enough
 
-`clawctl init` creates directories but doesn't:
+`claws init` creates directories but doesn't:
 - Create policy (security)
 - Create access control (who can use this)
 - Enable audit logging
@@ -244,22 +244,22 @@ Each is a separate command requiring the instance name again. Should be chainabl
 ### 4. No Unified Status
 
 To know if everything is okay, user must run:
-- `clawctl list` (instances)
-- `clawctl health` (health probes)
-- `clawctl policy validate` (policy compliance)
-- `clawctl audit` (security audit)
+- `claws list` (instances)
+- `claws health` (health probes)
+- `claws policy validate` (policy compliance)
+- `claws audit` (security audit)
 
-Should be one command: `clawctl status` that shows a unified dashboard.
+Should be one command: `claws status` that shows a unified dashboard.
 
 ### 5. Help is Overwhelming
 
 The help output has **75 lines and 13 sections**. A new user seeing this for the first time is lost. Should be tiered:
 
 ```
-clawctl help           → 5-line quickstart
-clawctl help commands  → full command list
-clawctl help setup     → onboarding guide
-clawctl help security  → security guide
+claws help           → 5-line quickstart
+claws help commands  → full command list
+claws help setup     → onboarding guide
+claws help security  → security guide
 ```
 
 ### 6. No "Getting Started" Flow in the Binary
@@ -267,12 +267,12 @@ clawctl help security  → security guide
 The binary assumes you know what you're doing. There's no `clawctl` (no args) that says:
 
 ```
-Welcome to clawctl — AI agent team manager.
+Welcome to claws — AI agent team manager.
 
 Looks like this is your first time. Run:
-  clawctl setup    — guided setup (recommended)
-  clawctl init     — manual setup (advanced)
-  clawctl help     — see all commands
+  claws setup    — guided setup (recommended)
+  claws init     — manual setup (advanced)
+  claws help     — see all commands
 ```
 
 ---
@@ -281,13 +281,13 @@ Looks like this is your first time. Run:
 
 ### P0: Ship-Blocking for One-Click Vision
 
-1. **`clawctl setup` — guided interactive onboarding**
+1. **`claws setup` — guided interactive onboarding**
    - Combines init + policy + access + create + auth + channel + start
    - Interactive prompts with safe defaults
    - Non-interactive mode for scripting
    - Single command from zero to working agent
 
-2. **`clawctl init` should create policy + access + audit**
+2. **`claws init` should create policy + access + audit**
    - Policy with secure defaults
    - Access control with current user as admin
    - Audit logging enabled
@@ -299,27 +299,27 @@ Looks like this is your first time. Run:
 
 ### P1: Essential UX
 
-4. **`clawctl create` should accept auth and channel inline**
+4. **`claws create` should accept auth and channel inline**
    ```
-   clawctl create alice --auth=codex --telegram=TOKEN
+   claws create alice --auth=codex --telegram=TOKEN
    ```
    Chains create + auth + channel add in one command. Start still separate (explicit).
 
 5. **Unified status command**
    ```
-   clawctl status
+   claws status
    ```
    Shows: instance health, policy compliance, recent activity, warnings — one screen.
 
 6. **Tiered help**
    - `clawctl` (no args) → quickstart
-   - `clawctl help` → concise command list
-   - `clawctl help <topic>` → detailed guide
-   - `clawctl <cmd> --help` → command-specific (already works)
+   - `claws help` → concise command list
+   - `claws help <topic>` → detailed guide
+   - `claws <cmd> --help` → command-specific (already works)
 
 ### P2: Nice to Have
 
-7. **`clawctl team create <name>` shortcut**
+7. **`claws team create <name>` shortcut**
    - Creates group + shared resources in one step
    - Equivalent to `group create` + `group shared --all`
 
@@ -334,14 +334,14 @@ Looks like this is your first time. Run:
 
 ---
 
-## Implementation: `clawctl setup`
+## Implementation: `claws setup`
 
 This is the centerpiece. Here's what it does:
 
 ```
-$ clawctl setup
+$ claws setup
 
-  Welcome to clawctl — AI agent team manager.
+  Welcome to claws — AI agent team manager.
 
   This will set up your server to run a team of AI agents.
   Everything is stored locally. Agents connect to messaging
@@ -386,7 +386,7 @@ $ clawctl setup
 
   Your agent is live!
     Message @sarah_bot on Telegram to test.
-    Approve the pairing code: clawctl approve research/sarah telegram <CODE>
+    Approve the pairing code: claws approve research/sarah telegram <CODE>
 
   Add another agent? [y/N]: n
 
@@ -394,10 +394,10 @@ $ clawctl setup
     research/sarah  :18789  healthy  telegram
 
   Next steps:
-    clawctl list              — see all agents
-    clawctl dashboard         — live status view
-    clawctl audit             — security check
-    clawctl setup             — add more agents
+    claws list              — see all agents
+    claws dashboard         — live status view
+    claws audit             — security check
+    claws setup             — add more agents
 ```
 
 ---
@@ -406,11 +406,11 @@ $ clawctl setup
 
 | # | Change | Priority | Effort |
 |---|--------|----------|--------|
-| 1 | `clawctl setup` interactive onboarding | P0 | Large (4-6hr) |
+| 1 | `claws setup` interactive onboarding | P0 | Large (4-6hr) |
 | 2 | `init` creates policy + access + audit | P0 | Small (30min) |
 | 3 | First-run detection | P0 | Small (30min) |
 | 4 | Inline auth + channel on create | P1 | Medium (2hr) |
-| 5 | Unified `clawctl status` | P1 | Medium (1hr) |
+| 5 | Unified `claws status` | P1 | Medium (1hr) |
 | 6 | Tiered help | P1 | Medium (1hr) |
 | 7 | `team create` shortcut | P2 | Small (30min) |
 | 8 | Default tool profile | P2 | Small (15min) |
