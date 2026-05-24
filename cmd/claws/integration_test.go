@@ -74,6 +74,22 @@ func claws(t *testing.T, root string, args ...string) (string, error) {
 	return string(out), err
 }
 
+// clawsCwd is like claws but runs from a specific cwd — used by template
+// resolver tests that depend on ./templates/ lookup.
+func clawsCwd(t *testing.T, root, cwd string, args ...string) (string, error) {
+	t.Helper()
+	registerDockerCleanup(t, root)
+	cmd := exec.Command(testBinary, args...)
+	cmd.Dir = cwd
+	cmd.Env = append(os.Environ(),
+		"OPENCLAW_ROOT="+root,
+		"CLAWS_BASE_PORT=29789",
+		"CLAWS_SKIP_VALIDATE=1",
+	)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
 // registerDockerCleanup registers a t.Cleanup, exactly once per root, that
 // tears down any Docker compose projects this test created via claws. It
 // reads the port registry at cleanup time and runs `docker compose down -v

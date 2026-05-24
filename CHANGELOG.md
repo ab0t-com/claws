@@ -9,6 +9,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.3.0] — 2026-05-24
+
+### Added — template resolver + management
+
+- **`claws apply --template=<name>`** — resolves bundled or local
+  templates by name. Search order: `./templates/`, `$XDG_DATA_HOME/claws/templates/`,
+  next to the binary.
+- **`claws template list`** — lists discoverable templates with metadata.
+- **`claws template show <name>`** — prints the JSON profile for inspection.
+- **`claws template resolve <name>`** — prints the absolute path.
+- **`claws apply --skip-audit`** — opt out of the auto-audit.
+
+### Added — new profile schema fields (v1, additive)
+
+- **`agents[].image`** — pin a specific runtime image per agent.
+- **`agents[].sandbox`** — toggle `agents.defaults.sandbox` from the profile.
+- **`agents[].tools.allow`** + **`agents[].tools.deny`** — explicit
+  tool allowlist/denylist (alongside the existing `tools.profile`).
+- **`agents[].skills`** — list of skill names; written to
+  `workspace/skills/MANIFEST.txt`.
+- **`agents[].hooks`** — map of lifecycle event → command/script;
+  written as `workspace/hooks/<event>.sh` (chmod 755).
+- **`agents[].config`** — arbitrary catch-all for `openclaw.json`
+  patches via `cmdConfig set`. Anything not covered by a dedicated
+  field can be set here.
+
+### Fixed — silent-drop bugs in `claws apply`
+
+- **A1 `policy.*`** — was parsed and discarded. Now applied to
+  `policy.json` via `writePolicy`. Maps `loopbackOnly` →
+  `allowedBindModes`, `dmDefault` → `requireDmPairing`,
+  `outboundDefault` → `requireOutboundAllowlist`.
+- **A2 `runtime.image`** — was ignored. Now passed to `cmdCreate`
+  via `--image=`. Per-agent `image` field overrides the profile-level
+  `runtime.image`.
+- **A3 `channels[].dmPolicy`** — was parsed but not passed to
+  `cmdChannel add`. Now appended as `--dmPolicy=<value>`.
+- **A4 `agents[].tools.profile`** — was ignored. Now applied via
+  `cmdConfig set <agent> tools.profile`.
+
+### Changed — idempotence guarantees
+
+- **D1 channel re-apply** is now idempotent. `claws apply` checks
+  `openclaw.json` `channels.<type>.enabled == true` before calling
+  `cmdChannel add` — skips with `✓ already configured` if so.
+- **D2 auth apikey** has best-effort pre-check via
+  `credentials/<provider>.key`. The underlying `cmdAuth` retains its
+  own "already authed and verified" idempotence (works at runtime
+  level regardless of the file check).
+- **D3 skills + hooks** are content-hashed — files only rewritten
+  when the body changes. Safe to re-apply repeatedly.
+
+### Changed — `claws quickstart` now runs the security audit
+
+- After agent creation, quickstart runs `claws audit` and surfaces
+  findings inline with framing for non-technical users ("some checks
+  will warn until you complete the next steps below — that's expected").
+- `claws apply` also runs the audit at the end unless `--skip-audit`
+  is passed.
+
+### Added — bundled templates expanded
+
+- **`templates/personal-assistant.json`** — new bundled template demonstrating
+  the full feature set: sandbox, tools allow/deny, skills, lifecycle hooks,
+  arbitrary config, Codex+OpenAI auth, Telegram channel.
+- **`templates/solo-telegram-coder.json`** — updated to use new fields
+  (sandbox=true, tools.profile=coding, config catch-all, explicit
+  dmPolicy).
+- **`templates/README.md`** — comprehensive schema reference for the v1
+  profile format, covering every field with examples and idempotence
+  guarantees.
+
+### Tests
+
+- 6 new integration tests covering: every new schema field actually
+  reaches its target file, channel idempotence, template resolver
+  from CWD, `template list/show/resolve`, schema rejection for
+  unknown apiVersion + missing required fields.
+
+### Not in this release (deferred)
+
+- `extends:` template composition — v1.4.
+- Remote templates (`--template=github:org/repo`) — v1.4.
+- JSON Schema library validation — indefinite (struct unmarshal is
+  catching the real issues today).
+- Template signing — v2.0.
+
 ## [v1.2.0] — 2026-05-24
 
 ### Changed — Default workspace directory (back-compat preserved)

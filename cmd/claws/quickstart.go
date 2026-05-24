@@ -185,6 +185,20 @@ func cmdQuickstart(args []string) error {
 		fmt.Printf("\n  %s⚠ Some environment checks failed — fix them above before proceeding.%s\n", "\033[0;33m", nc)
 	}
 
+	// E1 — security audit on the freshly-created agent. Expected to surface
+	// a handful of "pending auth/channel" warnings on a fresh install; frame
+	// them so non-technical users aren't alarmed.
+	fmt.Println()
+	fmt.Printf("%s==> Security audit%s\n", bold, nc)
+	fmt.Printf("  %s(some checks will warn until you complete steps 1 and 2 below — that's expected)%s\n\n", dim, nc)
+	if err := cmdAudit(nil); err != nil {
+		// Audit exits non-zero if there are FAIL findings. We don't fail the
+		// whole quickstart on that — the next-steps block tells the user
+		// exactly what to do.
+		fmt.Printf("\n  %s⚠ Audit findings above. After you complete the next steps,%s\n", "\033[0;33m", nc)
+		fmt.Printf("  %s  re-run `claws audit` to confirm everything is green.%s\n", "\033[0;33m", nc)
+	}
+
 	fmt.Println()
 	fmt.Printf("%sYour first agent is ready.%s Three things to do next:\n\n", bold, nc)
 

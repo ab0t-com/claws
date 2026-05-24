@@ -112,6 +112,8 @@ func main() {
 		err = cmdQuickstart(args)
 	case "apply":
 		err = cmdApply(args)
+	case "template", "templates":
+		err = cmdTemplate(args)
 	case "version", "--version", "-v":
 		err = cmdVersion(args)
 	case "doctor":

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -77,11 +79,23 @@ type ProfileTeam struct {
 }
 
 type ProfileAgent struct {
-	Name     string             `json:"name"`
-	Role     string             `json:"role,omitempty"`
-	Manager  string             `json:"manager,omitempty"`
-	Auth     *ProfileAuth       `json:"auth,omitempty"`
-	Channels []ProfileChannel   `json:"channels,omitempty"`
+	Name     string                 `json:"name"`
+	Role     string                 `json:"role,omitempty"`
+	Manager  string                 `json:"manager,omitempty"`
+	Image    string                 `json:"image,omitempty"`           // pin to specific runtime image
+	Sandbox  *bool                  `json:"sandbox,omitempty"`         // agents.defaults.sandbox (nil = inherit)
+	Tools    *ProfileTools          `json:"tools,omitempty"`
+	Skills   []string               `json:"skills,omitempty"`          // skill names to enable
+	Hooks    map[string]string      `json:"hooks,omitempty"`           // event → command/script
+	Config   map[string]interface{} `json:"config,omitempty"`          // arbitrary openclaw.json patches
+	Auth     *ProfileAuth           `json:"auth,omitempty"`
+	Channels []ProfileChannel       `json:"channels,omitempty"`
+}
+
+type ProfileTools struct {
+	Profile string   `json:"profile,omitempty"`
+	Allow   []string `json:"allow,omitempty"`
+	Deny    []string `json:"deny,omitempty"`
 }
 
 type ProfileAuth struct {
@@ -150,8 +164,8 @@ func (s *SecretRef) describe() string {
 }
 
 func cmdApply(args []string) error {
-	var file string
-	var yes, dryRun bool
+	var file, templateName string
+	var yes, dryRun, skipAudit bool
 	for _, a := range args {
 		switch {
 		case a == "-h" || a == "--help":
@@ -159,14 +173,29 @@ func cmdApply(args []string) error {
 			return nil
 		case strings.HasPrefix(a, "--file="):
 			file = strings.TrimPrefix(a, "--file=")
+		case strings.HasPrefix(a, "--template="):
+			templateName = strings.TrimPrefix(a, "--template=")
 		case a == "--yes" || a == "-y":
 			yes = true
 		case a == "--dry-run":
 			dryRun = true
+		case a == "--skip-audit":
+			skipAudit = true
 		}
 	}
-	if file == "" {
-		return errorf("--file=<profile.json> required")
+	_ = skipAudit // wired in E2 below
+	if file == "" && templateName == "" {
+		return errorf("either --file=<profile.json> or --template=<name> required")
+	}
+	if file != "" && templateName != "" {
+		return errorf("--file and --template are mutually exclusive")
+	}
+	if templateName != "" {
+		resolved, err := resolveTemplate(templateName)
+		if err != nil {
+			return err
+		}
+		file = resolved
 	}
 
 	data, err := os.ReadFile(file)
@@ -277,6 +306,16 @@ func cmdApply(args []string) error {
 		}
 	}
 
+	// A1 — apply policy block (after init has written defaults, before agents created)
+	if p.Policy != nil {
+		fmt.Printf("\n%s==> applying policy%s\n", bold, nc)
+		if err := applyProfilePolicy(paths, p.Policy); err != nil {
+			fmt.Printf("  %s! policy apply failed: %v (continuing)%s\n", gold, err, nc)
+		} else {
+			fmt.Printf("  %s✓ policy.json updated%s\n", green, nc)
+		}
+	}
+
 	// group (created once per profile)
 	groupDir := paths.Root + "/" + p.Team.Name
 	if _, err := os.Stat(groupDir); err != nil {
@@ -301,14 +340,48 @@ func cmdApply(args []string) error {
 			if ag.Manager != "" {
 				createArgs = append(createArgs, "--manager="+ag.Manager)
 			}
+			// A2 — runtime.image (per-agent override of profile runtime) → --image flag
+			img := ag.Image
+			if img == "" && p.Runtime != nil {
+				img = p.Runtime.Image
+			}
+			if img != "" {
+				createArgs = append(createArgs, "--image="+img)
+			}
 			if err := cmdCreate(createArgs); err != nil {
 				return errorf("create %s: %v", full, err)
 			}
 			fmt.Printf("  %s✓ created%s\n", green, nc)
 		}
 
-		// channels — only attempt if token resolves
+		// A4+B1+B5 — sandbox + tools.profile + tools.allow/deny via cmdConfig set
+		// B4 — arbitrary config catch-all
+		applyAgentConfig(full, &ag, dim, gold, green, nc)
+
+		// B2 — skills
+		if len(ag.Skills) > 0 {
+			if err := applySkills(paths, full, ag.Skills); err != nil {
+				fmt.Printf("  %s! skills: %v%s\n", gold, err, nc)
+			} else {
+				fmt.Printf("  %s✓ skills enabled: %s%s\n", green, strings.Join(ag.Skills, ", "), nc)
+			}
+		}
+
+		// B3 — hooks
+		if len(ag.Hooks) > 0 {
+			if err := applyHooks(paths, full, ag.Hooks); err != nil {
+				fmt.Printf("  %s! hooks: %v%s\n", gold, err, nc)
+			} else {
+				fmt.Printf("  %s✓ hooks written: %d event(s)%s\n", green, len(ag.Hooks), nc)
+			}
+		}
+
+		// channels — D1 idempotence: skip if already enabled
 		for _, ch := range ag.Channels {
+			if channelEnabled(paths, full, ch.Type) {
+				fmt.Printf("  %s✓ channel %s already configured (skipping)%s\n", dim, ch.Type, nc)
+				continue
+			}
 			tokRef := ch.TokenFrom
 			if tokRef == nil {
 				tokRef = ch.BotToken
@@ -326,6 +399,10 @@ func cmdApply(args []string) error {
 					chArgs = []string{"add", full, ch.Type, "--bot-token=" + token, "--app-token=" + appTok}
 				}
 			}
+			// A3 — dmPolicy flag pass-through
+			if ch.DMPolicy != "" {
+				chArgs = append(chArgs, "--dmPolicy="+ch.DMPolicy)
+			}
 			if err := cmdChannel(chArgs); err != nil {
 				fmt.Printf("  %s! channel %s add failed: %v%s\n", gold, ch.Type, err, nc)
 				continue
@@ -333,18 +410,23 @@ func cmdApply(args []string) error {
 			fmt.Printf("  %s✓ channel %s connected%s\n", green, ch.Type, nc)
 		}
 
-		// auth — apikey we can do non-interactively if it resolves
+		// auth — D2 idempotence: skip if apikey already configured for provider
 		if ag.Auth != nil && ag.Auth.FallbackAPIKey != nil {
-			ref := &SecretRef{Env: ag.Auth.FallbackAPIKey.FromEnv, File: ag.Auth.FallbackAPIKey.FromFile}
-			key := ref.resolve()
-			if key != "" {
-				if err := cmdAuth([]string{full, "apikey", ag.Auth.FallbackAPIKey.Provider, key}); err != nil {
-					fmt.Printf("  %s! auth apikey %s failed: %v%s\n", gold, ag.Auth.FallbackAPIKey.Provider, err, nc)
-				} else {
-					fmt.Printf("  %s✓ auth (apikey %s) configured%s\n", green, ag.Auth.FallbackAPIKey.Provider, nc)
+			provider := ag.Auth.FallbackAPIKey.Provider
+			if apikeyConfigured(paths, full, provider) {
+				fmt.Printf("  %s✓ auth (apikey %s) already set (skipping)%s\n", dim, provider, nc)
+			} else {
+				ref := &SecretRef{Env: ag.Auth.FallbackAPIKey.FromEnv, File: ag.Auth.FallbackAPIKey.FromFile}
+				key := ref.resolve()
+				if key != "" {
+					if err := cmdAuth([]string{full, "apikey", provider, key}); err != nil {
+						fmt.Printf("  %s! auth apikey %s failed: %v%s\n", gold, provider, err, nc)
+					} else {
+						fmt.Printf("  %s✓ auth (apikey %s) configured%s\n", green, provider, nc)
+					}
+				} else if ag.Auth.Preferred == "codex" {
+					fmt.Printf("  %s→ next: claws auth %s codex   (OAuth, opens browser)%s\n", dim, full, nc)
 				}
-			} else if ag.Auth.Preferred == "codex" {
-				fmt.Printf("  %s→ next: claws auth %s codex   (OAuth, opens browser)%s\n", dim, full, nc)
 			}
 		} else if ag.Auth != nil && ag.Auth.Preferred == "codex" {
 			fmt.Printf("  %s→ next: claws auth %s codex   (OAuth, opens browser)%s\n", dim, full, nc)
@@ -374,6 +456,170 @@ func cmdApply(args []string) error {
 		}
 	}
 
+	// E2 — auto-audit unless explicitly skipped
+	if !skipAudit {
+		fmt.Printf("\n%s==> Security audit%s\n", bold, nc)
+		if err := cmdAudit(nil); err != nil {
+			fmt.Printf("  %s! audit reported issues (see above) — fix before going live%s\n", gold, nc)
+			// Don't fail the apply — surface but continue.
+		}
+	}
+
 	fmt.Printf("\n%s✓ apply complete%s — %d agent(s)\n\n", green, nc, len(p.Agents))
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// applyProfilePolicy — A1: map ProfilePolicy → Policy + writePolicy.
+// ---------------------------------------------------------------------------
+func applyProfilePolicy(paths Paths, pp *ProfilePolicy) error {
+	if pp == nil {
+		return nil
+	}
+	pol := readPolicy(paths)
+	if pp.LoopbackOnly != nil {
+		if *pp.LoopbackOnly {
+			pol.AllowedBindModes = []string{"loopback"}
+		} else {
+			pol.AllowedBindModes = nil // empty = any
+		}
+	}
+	switch pp.DMDefault {
+	case "pairing", "allowlist":
+		pol.RequireDmPairing = true
+	case "open":
+		pol.RequireDmPairing = false
+	}
+	switch pp.OutboundDefault {
+	case "off":
+		pol.RequireOutboundAllowlist = true
+	case "allowlist":
+		pol.RequireOutboundAllowlist = true
+	case "open":
+		pol.RequireOutboundAllowlist = false
+	}
+	// Always keep audit on for templates that don't say otherwise.
+	pol.AuditLog = true
+	return writePolicy(paths, pol)
+}
+
+// ---------------------------------------------------------------------------
+// applyAgentConfig — A4 + B1 + B4 + B5: per-agent config-set patches.
+// ---------------------------------------------------------------------------
+func applyAgentConfig(full string, ag *ProfileAgent, dim, gold, green, nc string) {
+	// Collect all config keys we want to set into one ordered list for clean output.
+	type kv struct{ k, v string }
+	var sets []kv
+
+	// B1 — sandbox
+	if ag.Sandbox != nil {
+		sets = append(sets, kv{"agents.defaults.sandbox", fmt.Sprintf("%t", *ag.Sandbox)})
+	}
+	// A4 — tools.profile
+	if ag.Tools != nil && ag.Tools.Profile != "" {
+		sets = append(sets, kv{"tools.profile", strconv.Quote(ag.Tools.Profile)})
+	}
+	// B5 — tools.allow / tools.deny
+	if ag.Tools != nil && len(ag.Tools.Allow) > 0 {
+		j, _ := json.Marshal(ag.Tools.Allow)
+		sets = append(sets, kv{"tools.allow", string(j)})
+	}
+	if ag.Tools != nil && len(ag.Tools.Deny) > 0 {
+		j, _ := json.Marshal(ag.Tools.Deny)
+		sets = append(sets, kv{"tools.deny", string(j)})
+	}
+	// B4 — arbitrary config catch-all
+	for k, v := range ag.Config {
+		j, err := json.Marshal(v)
+		if err != nil {
+			fmt.Printf("  %s! config %s: marshal failed: %v%s\n", gold, k, err, nc)
+			continue
+		}
+		sets = append(sets, kv{k, string(j)})
+	}
+
+	for _, s := range sets {
+		if err := cmdConfig([]string{"set", full, s.k, s.v}); err != nil {
+			fmt.Printf("  %s! config set %s: %v%s\n", gold, s.k, err, nc)
+		} else {
+			fmt.Printf("  %s✓ config %s = %s%s\n", green, s.k, s.v, nc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// applySkills — B2: write a skills manifest under the agent's workspace.
+// ---------------------------------------------------------------------------
+func applySkills(paths Paths, full string, skills []string) error {
+	instDir := filepath.Join(paths.Root, full)
+	skillsDir := filepath.Join(instDir, "workspace", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		return err
+	}
+	manifest := filepath.Join(skillsDir, "MANIFEST.txt")
+	body := strings.Join(skills, "\n") + "\n"
+	// Idempotence: only write if content differs
+	if existing, err := os.ReadFile(manifest); err == nil && string(existing) == body {
+		return nil
+	}
+	return os.WriteFile(manifest, []byte(body), 0644)
+}
+
+// ---------------------------------------------------------------------------
+// applyHooks — B3: write hook scripts under the agent's workspace.
+// ---------------------------------------------------------------------------
+func applyHooks(paths Paths, full string, hooks map[string]string) error {
+	instDir := filepath.Join(paths.Root, full)
+	hooksDir := filepath.Join(instDir, "workspace", "hooks")
+	if err := os.MkdirAll(hooksDir, 0755); err != nil {
+		return err
+	}
+	for event, cmd := range hooks {
+		// Validate event name (alphanum + dash, no slashes)
+		if strings.ContainsAny(event, "/\\.") {
+			continue
+		}
+		hookFile := filepath.Join(hooksDir, event+".sh")
+		body := "#!/bin/sh\n# claws-managed hook for event: " + event + "\n" + cmd + "\n"
+		// Idempotence: only write if content differs
+		if existing, err := os.ReadFile(hookFile); err == nil && string(existing) == body {
+			continue
+		}
+		if err := os.WriteFile(hookFile, []byte(body), 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// channelEnabled — D1: pre-check before cmdChannel add.
+// Returns true if the channel is already configured + enabled for this agent.
+// ---------------------------------------------------------------------------
+func channelEnabled(paths Paths, full, channelType string) bool {
+	cfgPath := filepath.Join(paths.Root, full, "openclaw.json")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return false
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return false
+	}
+	channels, _ := cfg["channels"].(map[string]interface{})
+	ch, _ := channels[channelType].(map[string]interface{})
+	enabled, _ := ch["enabled"].(bool)
+	return enabled
+}
+
+// ---------------------------------------------------------------------------
+// apikeyConfigured — D2: pre-check before cmdAuth apikey.
+// Returns true if the credentials/<provider>.key file exists and is non-empty.
+// ---------------------------------------------------------------------------
+func apikeyConfigured(paths Paths, full, provider string) bool {
+	keyFile := filepath.Join(paths.Root, full, "credentials", provider+".key")
+	if info, err := os.Stat(keyFile); err == nil && info.Size() > 0 {
+		return true
+	}
+	return false
 }

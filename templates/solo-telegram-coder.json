@@ -3,8 +3,8 @@
   "kind": "Profile",
   "metadata": {
     "name": "solo-telegram-coder",
-    "version": "1.0.0",
-    "description": "One coding-focused agent on Telegram. Codex OAuth preferred, OpenAI API key fallback.",
+    "version": "1.1.0",
+    "description": "One coding-focused agent on Telegram. Codex OAuth preferred, OPENAI_API_KEY fallback. Sandbox enabled, conservative DM policy.",
     "author": "ab0t",
     "license": "MIT",
     "tags": ["solo", "telegram", "coding"]
@@ -13,6 +13,11 @@
     "name": "openclaw",
     "image": "openclaw:local"
   },
+  "policy": {
+    "loopbackOnly": true,
+    "dmDefault": "pairing",
+    "outboundDefault": "off"
+  },
   "team": {
     "name": "default",
     "shared": true
@@ -20,6 +25,13 @@
   "agents": [
     {
       "name": "agent-1",
+      "sandbox": true,
+      "tools": {
+        "profile": "coding"
+      },
+      "config": {
+        "agents.defaults.maxTokens": 4096
+      },
       "auth": {
         "preferred": "codex",
         "fallbackApiKey": {
