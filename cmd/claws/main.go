@@ -130,6 +130,8 @@ func main() {
 		}
 	case "upgrade":
 		err = cmdUpgrade(args)
+	case "update", "self-update":
+		err = cmdUpdate(args)
 	case "policy":
 		err = cmdPolicy(args)
 	case "audit":
@@ -304,6 +306,7 @@ func printHelp() {
 		}},
 		{"Diagnostics", []string{
 			"version                    Show version and environment",
+			"update [--check]           Update this claws binary to the latest release",
 			"orphans [clean]            List containers not in claws's registry (clean = remove)",
 			"orphans --reverse          List registry entries that have no Docker container",
 			"drift                      Umbrella: orphans + reverse + disk/registry mismatch",

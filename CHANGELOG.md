@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added
+
+- **`claws update`** (and `claws self-update`) — replace the running
+  claws binary with the latest released version. Mirrors what most
+  modern CLI tools provide; matches what `install.sh` already does on
+  the server side. Flags: `--check`, `--dry-run`, `--force`,
+  `--version=vX.Y.Z`. Verifies SHA256 against the published
+  `release/SHA256SUMS` and atomically swaps the binary
+  (rename-over-running-executable; safe on Linux/macOS).
+- **`claws upgrade` (with no args) now points at `claws update`** —
+  the previous error message just printed usage. People naturally
+  type `claws upgrade` expecting to update the CLI itself, so the
+  error now surfaces the right command.
+
+### Why
+
+Before today, the only way to upgrade a claws install was to re-run
+`curl install.sh | bash`. That worked but it's a thing the user has
+to remember and re-find. `claws update` makes the version they're
+running self-aware: `claws update --check` says "you're current" or
+"v1.6.X is available", `claws update` installs it.
+
+### Notes for operators
+
+- If `/usr/local/bin/claws` isn't writable, you'll get a clear "run
+  with sudo" error rather than a cryptic permission failure.
+- `release/VERSION` on `main` is the source of truth for "latest" —
+  same file `install.sh` resolves. Old tarballs remain available via
+  `claws update --version=vX.Y.Z` because the release/ tree is
+  versioned in-repo.
+- Dev builds (e.g. `v1.6.6-dirty`) sort AFTER their base tag in the
+  comparator, so a freshly-rebuilt dev binary is never silently
+  "updated" to the same tag.
 
 ## [v1.6.6] — 2026-05-24
 

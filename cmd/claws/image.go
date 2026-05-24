@@ -106,7 +106,10 @@ func cmdImagePin(args []string) error {
 
 func cmdUpgrade(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: claws upgrade <instance|--all|--group=<name>> [--image=<image:tag>]")
+		// `claws upgrade` operates on AGENT instances. People naturally
+		// type it expecting to update the claws CLI itself — surface the
+		// right command rather than just printing usage.
+		return errorf("usage: claws upgrade <instance|--all|--group=<name>> [--image=<image:tag>]\n\n  To update the claws CLI binary itself, use:\n      claws update")
 	}
 
 	paths := resolvePaths()
