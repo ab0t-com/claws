@@ -33,11 +33,7 @@ type Paths struct {
 }
 
 func resolvePaths() Paths {
-	root := os.Getenv("OPENCLAW_ROOT")
-	if root == "" {
-		home, _ := os.UserHomeDir()
-		root = filepath.Join(home, ".openclaw")
-	}
+	root := defaultRoot()
 
 	// Compose template search order:
 	// 1. OPENCLAW_ROOT/docker-compose.yml (installed by `claws init`)
@@ -87,6 +83,42 @@ func resolvePaths() Paths {
 		SharedDir:       filepath.Join(root, "shared"),
 		ComposeTemplate: compose,
 	}
+}
+
+// defaultRoot resolves the host-side workspace directory for claws.
+//
+// Precedence:
+//   1. CLAWS_ROOT env var (preferred, new in v1.2)
+//   2. OPENCLAW_ROOT env var (legacy, still respected)
+//   3. ~/.claws-workspace if it already exists
+//   4. ~/.openclaw if it has instances (back-compat for users upgrading from v1.1)
+//   5. ~/.claws-workspace (fresh-install default)
+//
+// The container path is independent — claws always mounts the host root to
+// /home/node/.openclaw inside the container (which is what the OpenClaw
+// runtime expects internally).
+func defaultRoot() string {
+	if v := os.Getenv("CLAWS_ROOT"); v != "" {
+		return v
+	}
+	if v := os.Getenv("OPENCLAW_ROOT"); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return "/tmp/claws-workspace"
+	}
+	newDefault := filepath.Join(home, ".claws-workspace")
+	if _, err := os.Stat(newDefault); err == nil {
+		return newDefault
+	}
+	// Back-compat: if a v1.1 install exists at ~/.openclaw with real
+	// content, keep using it so upgrades don't strand existing agents.
+	legacy := filepath.Join(home, ".openclaw")
+	if _, err := os.Stat(filepath.Join(legacy, ".port-registry")); err == nil {
+		return legacy
+	}
+	return newDefault
 }
 
 func basePort() int {

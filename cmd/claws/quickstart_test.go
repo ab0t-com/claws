@@ -7,42 +7,78 @@ import (
 	"testing"
 )
 
-// First-run: quickstart with no args produces default/agent-1 and registers it.
+// First-run: quickstart with no args picks a random personal-assistant
+// name and creates it under default/.
 func TestIntegration_QuickstartFirstRun(t *testing.T) {
 	root := t.TempDir()
 	out, err := claws(t, root, "quickstart")
 	if err != nil {
 		t.Fatalf("quickstart failed: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "default/agent-1 created") &&
-		!strings.Contains(out, "Instance 'default/agent-1' created") {
-		t.Errorf("expected create output, got: %s", out)
+	if !strings.Contains(out, "creating personal assistant: default/") {
+		t.Errorf("expected 'creating personal assistant' line, got:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(root, "default", "agent-1", "instance.env")); err != nil {
-		t.Errorf("agent instance.env missing: %v", err)
+	// Verify one of the assistant names was picked.
+	picked := ""
+	for _, name := range personalAssistantNames {
+		if _, err := os.Stat(filepath.Join(root, "default", name, "instance.env")); err == nil {
+			picked = name
+			break
+		}
+	}
+	if picked == "" {
+		t.Errorf("no instance.env found for any of the curated assistant names under default/")
 	}
 	if _, err := os.Stat(filepath.Join(root, ".port-registry")); err != nil {
 		t.Errorf("port registry missing")
 	}
 }
 
-// Re-run: quickstart is idempotent — every step should report 'already'.
+// Re-run: quickstart is idempotent — picks up the existing PA, never spawns
+// a new random agent on each invocation.
 func TestIntegration_QuickstartIdempotent(t *testing.T) {
 	root := t.TempDir()
 	if _, err := claws(t, root, "quickstart"); err != nil {
 		t.Fatalf("first quickstart failed: %v", err)
 	}
-	out, err := claws(t, root, "quickstart")
-	if err != nil {
-		t.Fatalf("re-run quickstart failed: %v\n%s", err, out)
+	// Re-run a few times; each should report 'already exists', not create new.
+	for i := 0; i < 3; i++ {
+		out, err := claws(t, root, "quickstart")
+		if err != nil {
+			t.Fatalf("re-run %d failed: %v\n%s", i, err, out)
+		}
+		if !strings.Contains(out, "already exists (skipping)") {
+			t.Errorf("re-run %d should report 'already exists', got:\n%s", i, out)
+		}
+		if strings.Contains(out, "creating personal assistant") {
+			t.Errorf("re-run %d should NOT create a new PA, got:\n%s", i, out)
+		}
 	}
-	for _, mustSay := range []string{
-		"already initialized",
-		"already configured",
-		"already exists",
-	} {
-		if !strings.Contains(out, mustSay) {
-			t.Errorf("idempotent re-run did not report %q; output:\n%s", mustSay, out)
+	// Confirm only one agent under default/.
+	entries, _ := os.ReadDir(filepath.Join(root, "default"))
+	agentCount := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			if _, err := os.Stat(filepath.Join(root, "default", e.Name(), "instance.env")); err == nil {
+				agentCount++
+			}
+		}
+	}
+	if agentCount != 1 {
+		t.Errorf("expected exactly 1 agent after multiple quickstart runs, got %d", agentCount)
+	}
+}
+
+// pickAssistantName returns names only from the curated set.
+func TestPickAssistantName(t *testing.T) {
+	allowed := map[string]bool{}
+	for _, n := range personalAssistantNames {
+		allowed[n] = true
+	}
+	for i := 0; i < 100; i++ {
+		n := pickAssistantName()
+		if !allowed[n] {
+			t.Fatalf("pickAssistantName returned %q which is not in the curated set", n)
 		}
 	}
 }

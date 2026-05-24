@@ -2,9 +2,44 @@ package main
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"os"
+	"path/filepath"
 	"strings"
 )
+
+// personalAssistantNames is a curated set of short, gender-neutral,
+// easy-to-type names. Used as the default agent name in `claws quickstart`
+// when no explicit name is given. Anyone on a fresh install gets a
+// "personal assistant" by default rather than `agent-1`.
+var personalAssistantNames = []string{
+	"ada", "ari", "ava", "avery", "bo", "charlie", "ellis",
+	"finn", "grace", "jamie", "jules", "kit", "lex", "max",
+	"milo", "nia", "nova", "pax", "piper", "quinn", "river",
+	"sage", "sky", "tess", "val", "wren", "zane", "zoe",
+}
+
+func pickAssistantName() string {
+	return personalAssistantNames[rand.IntN(len(personalAssistantNames))]
+}
+
+// existingAgentsInGroup returns the agent names registered under a group.
+// Used for quickstart idempotence: if the team already has agents, we
+// reuse the first one for next-step hints rather than creating another.
+func existingAgentsInGroup(paths Paths, team string) []string {
+	entries, err := readRegistry(paths)
+	if err != nil {
+		return nil
+	}
+	prefix := team + "/"
+	var names []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name, prefix) {
+			names = append(names, strings.TrimPrefix(e.Name, prefix))
+		}
+	}
+	return names
+}
 
 const quickstartHelp = `Usage: claws quickstart [team] [agent]
 
@@ -33,7 +68,8 @@ func cmdQuickstart(args []string) error {
 		}
 	}
 
-	team, agent := "default", "agent-1"
+	team := "default"
+	agent := "" // resolved below
 	pos := []string{}
 	for _, a := range args {
 		if !strings.HasPrefix(a, "-") {
@@ -49,10 +85,13 @@ func cmdQuickstart(args []string) error {
 	if err := validateName(team); err != nil {
 		return errorf("invalid team name: %v", err)
 	}
-	if err := validateName(agent); err != nil {
-		return errorf("invalid agent name: %v", err)
+	if agent != "" {
+		if err := validateName(agent); err != nil {
+			return errorf("invalid agent name: %v", err)
+		}
 	}
-	full := team + "/" + agent
+	// agent name + idempotence is resolved at step 4 below, after we know
+	// whether the team already has members.
 
 	const (
 		bold  = "\033[1m"
@@ -100,18 +139,37 @@ func cmdQuickstart(args []string) error {
 	}
 
 	// 4/4 — group + agent
-	groupDir := paths.Root + "/" + team
+	groupDir := filepath.Join(paths.Root, team)
 	if _, err := os.Stat(groupDir); err != nil {
-		// cmdGroup expects "create <name>"
 		if err := cmdGroup([]string{"create", team}); err != nil {
 			return errorf("group create %s failed: %v", team, err)
 		}
 	}
 
+	// Idempotence: if the team already has agents (any), use the first one
+	// for the next-step hints instead of creating a new one. Means re-running
+	// `claws quickstart` is always a no-op rather than spawning a new random
+	// agent each time.
+	existing := existingAgentsInGroup(paths, team)
+	var full string
 	fmt.Printf("  %s[4/4] agent             %s ", bold, nc)
-	if instanceExists(paths, full) {
+	switch {
+	case agent != "" && instanceExists(paths, team+"/"+agent):
+		full = team + "/" + agent
 		fmt.Printf("%s✓ %s already exists (skipping)%s\n", dim, full, nc)
-	} else {
+	case agent == "" && len(existing) > 0:
+		// Reuse the first existing agent in the team.
+		full = team + "/" + existing[0]
+		fmt.Printf("%s✓ %s already exists (skipping)%s\n", dim, full, nc)
+		if len(existing) > 1 {
+			fmt.Printf("  %s  (team also has: %s)%s\n", dim, strings.Join(existing[1:], ", "), nc)
+		}
+	default:
+		if agent == "" {
+			agent = pickAssistantName()
+		}
+		full = team + "/" + agent
+		fmt.Printf("%s→ creating personal assistant: %s%s\n", green, full, nc)
 		if err := cmdCreate([]string{full}); err != nil {
 			return errorf("create failed: %v", err)
 		}

@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.2.0] — 2026-05-24
+
+### Changed — Default workspace directory (back-compat preserved)
+
+- **Host workspace default renamed: `~/.openclaw` → `~/.claws-workspace`.**
+  Avoids collision with anyone running OpenClaw separately at its
+  conventional `~/.openclaw` location. The container mount path
+  (`/home/node/.openclaw` inside the container — what the OpenClaw runtime
+  expects) is unchanged.
+- **New env var `CLAWS_ROOT`** takes precedence over `OPENCLAW_ROOT`.
+  `OPENCLAW_ROOT` is still respected as a legacy alias (no removal planned).
+- **Back-compat for upgrading users:** if `~/.claws-workspace` doesn't exist
+  but `~/.openclaw/.port-registry` does (meaning a v1.1 install with real
+  agents), claws keeps using `~/.openclaw`. Existing fleets are not stranded.
+
+Resolution order: `CLAWS_ROOT` → `OPENCLAW_ROOT` → `~/.claws-workspace`
+(if exists) → `~/.openclaw` (if has instances) → `~/.claws-workspace` (fresh).
+
+### Changed — `claws quickstart` default agent is a random personal assistant
+
+- Default agent name is now a random pick from a curated 28-name set
+  (ada, ari, ava, avery, bo, charlie, ellis, finn, grace, jamie, jules,
+  kit, lex, max, milo, nia, nova, pax, piper, quinn, river, sage, sky,
+  tess, val, wren, zane, zoe) — short, gender-neutral, easy to type.
+- **Stronger idempotence:** re-running `claws quickstart` no longer picks
+  a fresh random name each time. If the team already has any agents,
+  quickstart picks up the first one for next-step hints rather than
+  spawning more. Same end state on every run.
+- Explicit naming still works: `claws quickstart research sarah` →
+  `research/sarah`.
+
+### Tests
+
+- 6 new tests for `defaultRoot()` precedence covering all 5 resolution
+  cases plus the legacy back-compat branch.
+- 1 new test confirming `pickAssistantName()` only returns names from the
+  curated set (100 iterations).
+- Existing quickstart tests updated to assert against the personal-assistant
+  name set + the new idempotence behavior (1 agent after N quickstart runs).
+
 ## [v1.1.0] — 2026-05-24
 
 ### Added — One-click & declarative install
