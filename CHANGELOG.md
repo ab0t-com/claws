@@ -7,7 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — auth fleet helpers (the simple fix for shared-OAuth pain)
+
+After hitting `refresh_token_reused` on team/john (v1.6.13 made it
+visible at startup), we considered the architecturally-clean answer
+(a credential broker daemon — see
+`tickets/credential-broker-2026-05-24/`) but agreed it's
+over-engineered for current scale. This release ships the simple
+answer instead: each agent gets its own OAuth grant, and we make
+that operationally bearable with two helper commands.
+
+### `claws auth fleet <method> [...]`
+
+Fan-out form of `claws auth <name> <method>`. Runs auth for every
+agent (or every agent missing a verified grant) in sequence, with
+a 3-second countdown so a typo isn't irreversible. Mirrors the
+shape of `claws start <team>` from v1.6.10.
+
+```
+$ claws auth fleet codex --missing-only
+This will run 'claws auth <name> codex' for 3 agent(s) in all agents (missing only):
+  • team/sarah
+  • team/john
+  • team/lead
+
+  Starting in 3 seconds — Ctrl-C to cancel.
+  3...   2...   1...
+
+==> claws auth team/sarah codex
+  (OAuth flow)
+==> claws auth team/john codex
+  ...
+==> All 3 agent(s) authed successfully.
+```
+
+Flags: `--group=<team>` (limit to one team), `--missing-only` (skip
+agents whose auth already verifies), `--yes` (skip countdown).
+
+### `claws auth diagnose [--group=<team>]`
+
+Read-only diagnostic. Aggregates state already on the host (audit
+log + `verifyOneInstance` per agent + provider from openclaw.json)
+into one screen with the operator's actual next moves:
+
+```
+NAME               PROVIDER       VERIFY                 LAST AUTH      REMEDIATION
+────────────────── ────────────── ────────────────────── ────────────── ──────────────────────────
+team1/ben          openai-codex   ✓ logs                 3d ago         —
+team/sarah         openai-codex   ✓ logs                 1d ago         —
+team/john          openai-codex   ✗ refresh_token_reused 1d ago         claws auth team/john codex
+team/lead          openai-codex   ? no recent activity   1d ago         claws agent ping team/lead
+
+Risk signals:
+  ⚠ 3 agents authed within 8m for openai-codex (team/sarah, team/john, team/lead).
+    If they share an upstream account, refresh_token_reused will recur.
+    Each agent should have its own OAuth grant:
+      claws auth fleet codex --missing-only
+```
+
+Risk heuristics (cheap, all from existing state):
+
+- **Bunched auth events** — N≥2 agents authed within 15 min of each
+  other for the same provider → "refresh_token_reused will recur if
+  they share an account".
+- **Confirmed reuse pattern** — N≥2 agents currently failing with
+  `refresh_token_reused`-style errors → confirmed shared-grant
+  collision; re-auth each independently.
+
+### Why not the broker (right now)
+
+Documented in `tickets/credential-broker-2026-05-24/` — the broker
+daemon design is correct for v2.x scale (multiple consumers, central
+revocation, audit) but wrong for one operator with ~5 agents on one
+host. Same lift-then-extract policy we use for the hints package:
+build the broker when a second consumer materialises AND the pain
+justifies the cost.
+
+The simple fix in this release is purely additive — `auth fleet`
+and `auth diagnose` don't constrain the broker design later if/when
+we revisit it.
+
+### Tests
+
+- `cmd/claws/auth_diagnose_test.go` — `humanAgo`, `compact`, and
+  `detectRisks` heuristics (bunched-auth, confirmed-reuse, single-agent
+  no-trigger, time-spread-no-trigger).
 
 ## [v1.6.13] — 2026-05-24
 

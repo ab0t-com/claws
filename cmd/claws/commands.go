@@ -1396,7 +1396,7 @@ func cmdExec(args []string) error {
 
 func cmdAuth(args []string) error {
 	if len(args) < 1 {
-		return errorf("usage: claws auth <name> codex|apikey <provider> <key> | claws auth status [name] | claws auth verify <name>")
+		return errorf("usage: claws auth <name> codex|apikey <provider> <key> | claws auth status [name] | claws auth verify <name> | claws auth fleet <method> [...] | claws auth diagnose [--group=<team>]")
 	}
 	// `auth status` and `auth verify` are read-only inspections that live
 	// next to the auth verbs because operators look for "is auth working?"
@@ -1407,6 +1407,12 @@ func cmdAuth(args []string) error {
 	}
 	if args[0] == "verify" {
 		return cmdAuthVerify(args[1:])
+	}
+	if args[0] == "fleet" {
+		return cmdAuthFleet(args[1:])
+	}
+	if args[0] == "diagnose" {
+		return cmdAuthDiagnose(args[1:])
 	}
 	if len(args) < 2 {
 		return errorf("usage: claws auth <name> codex|apikey <provider> <key> | claws auth status [name] | claws auth verify <name>")

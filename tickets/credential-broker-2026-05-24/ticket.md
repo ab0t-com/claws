@@ -1,8 +1,26 @@
 # credential-broker — central OAuth token authority for the agent fleet
 
+> **⚠ DEFERRED 2026-05-24 — over-engineered for current scale.**
+>
+> User feedback after reviewing this design: "this is over engineering …
+> let's just do something simple". For the immediate problem (one
+> operator, ~5 agents, OAuth collisions), the simple answer is
+> **per-agent OAuth grants** — each agent runs its own flow, no
+> sharing, no broker needed. See
+> [`tickets/auth-fleet-helpers-2026-05-24/`](../auth-fleet-helpers-2026-05-24/ticket.md)
+> for what's actually being shipped (v1.6.14): `claws auth fleet codex`
+> and `claws auth diagnose`. No daemon, no module, no new on-disk
+> credential format.
+>
+> **This ticket stays open as the v2.x target.** When a second
+> consumer materialises (sharedwatch, intent-gateway) AND the
+> operational pain at scale justifies the build, revisit. The design
+> below is the right answer at that point. Do not implement
+> speculatively.
+
 **Filed:** 2026-05-24
 **Target:** v2.x (not v1.x — architectural surface change)
-**Status:** Open — design
+**Status:** **DEFERRED** (see banner above)
 **Severity:** High (silent inference failure across the fleet whenever OAuth refresh races)
 **Owner:** TBD
 **Module scope:** New separate Go module (`github.com/ab0t-com/cred-broker` or similar). Used by claws AND by any sibling project that talks to OpenAI / Anthropic / OpenRouter / Codex on the operator's behalf.
