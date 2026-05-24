@@ -6,11 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -435,16 +437,60 @@ func cleanup(dir string, paths Paths, name string) {
 	lockedUnregisterPort(paths, name)
 }
 
+// portInUse reports whether 127.0.0.1:<port> is currently bound by any
+// process. Uses a TCP dial with a tight timeout — much cheaper than
+// shelling to `ss`, and works without any privileges.
+//
+// CLAWS_SKIP_VALIDATE=1 forces "free" (test mode), matching the old
+// behaviour so existing tests that skip port checks don't break.
 func portInUse(port int) bool {
 	if os.Getenv("CLAWS_SKIP_VALIDATE") != "" {
-		return false // skip in test mode
-	}
-	cmd := exec.Command("ss", "-tlnp")
-	out, err := cmd.Output()
-	if err != nil {
 		return false
 	}
-	return strings.Contains(string(out), fmt.Sprintf(":%d ", port))
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err != nil {
+		return false // connection refused / timeout → nothing listening
+	}
+	_ = conn.Close()
+	return true
+}
+
+// identifyPortHolder asks Docker which container (if any) publishes the
+// given host port. Returns the container name + a hint about whether
+// it looks like an openclaw container that's NOT in the claws registry
+// (i.e. an orphan). Returns ("", false, false) when Docker isn't reachable
+// or no container is publishing the port. The third return is true when
+// the holder name matches the expected name for `ownerName` — meaning the
+// caller's own already-running container, not a foreign holder.
+func identifyPortHolder(port int, ownerName string) (containerName string, isOrphan bool, isOwn bool) {
+	// `docker ps --filter publish=<port>` lists containers publishing
+	// that host port. We grab name + the project label so we can decide
+	// whether it's an orphan.
+	cmd := exec.Command("docker", "ps", "-a",
+		"--filter", fmt.Sprintf("publish=%d", port),
+		"--format", "{{.Names}}")
+	out, err := cmd.Output()
+	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+		return "", false, false
+	}
+	containerName = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+
+	// Is it OUR container? Format: openclaw-<group>-<name>-openclaw-gateway-1
+	// (compose normalises slashes in the project name to dashes).
+	if ownerName != "" {
+		expected := "openclaw-" + strings.ReplaceAll(ownerName, "/", "-") + "-openclaw-gateway-1"
+		if containerName == expected {
+			return containerName, false, true
+		}
+	}
+
+	// Orphan check: matches our naming convention (openclaw-* + -gateway-1)
+	// but doesn't correspond to a registered instance.
+	if strings.HasPrefix(containerName, "openclaw-") && strings.HasSuffix(containerName, "-openclaw-gateway-1") {
+		isOrphan = true
+	}
+	return containerName, isOrphan, false
 }
 
 // ---------------------------------------------------------------------------
@@ -487,14 +533,39 @@ func cmdStart(args []string) error {
 		return err
 	}
 
+	// Pre-flight port check. The agent's assigned port may be held by a
+	// foreign container (typically an orphan from a prior test workspace).
+	// Without this check we'd hand control to `docker compose up` which
+	// surfaces the conflict as a cryptic Docker error mid-startup; the
+	// agent ends up in a half-broken state and the operator has to read
+	// the docker daemon error to figure out what happened.
+	//
+	// Identify the holder and surface a precise next-step instead. Never
+	// auto-kill — the operator decides what to do.
+	port := readEnvValue(filepath.Join(instanceDir(paths, name), "instance.env"), "OPENCLAW_GATEWAY_PORT")
+	portNum, atoiErr := strconv.Atoi(port)
+	if atoiErr == nil && portInUse(portNum) {
+		holder, isOrphan, isOwn := identifyPortHolder(portNum, name)
+		if !isOwn {
+			switch {
+			case isOrphan:
+				return errorf("port %d is held by orphan container '%s' (not in claws registry).\n  Remove it: claws orphans clean %s\n  See all:    claws orphans", portNum, holder, holder)
+			case holder != "":
+				return errorf("port %d is held by container '%s' (another claws agent — port allocation drift).\n  Diagnose: claws drift", portNum, holder)
+			default:
+				return errorf("port %d is held by a non-Docker process.\n  Investigate: ss -tlnp | grep :%d\n  Won't auto-kill; remove or reconfigure the holder, then retry.", portNum, portNum)
+			}
+		}
+		// isOwn: our own container is already up. `docker compose up -d`
+		// is idempotent, so falling through is safe.
+	}
+
 	info(fmt.Sprintf("Starting instance '%s'...", name))
 	if err := dcRun(paths, name, "up", "-d", gatewayService(paths, name)); err != nil {
 		return err
 	}
 
 	// Wait for health
-	dir := instanceDir(paths, name)
-	port := readEnvValue(filepath.Join(dir, "instance.env"), "OPENCLAW_GATEWAY_PORT")
 	rt := mustResolveRuntime(paths, name)
 	url := fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint)
 

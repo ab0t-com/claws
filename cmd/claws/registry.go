@@ -54,6 +54,21 @@ func readRegistry(paths Paths) ([]RegistryEntry, error) {
 	return entries, scanner.Err()
 }
 
+// nextIndex finds the lowest free index for a new agent.
+//
+// "Free" means BOTH conditions:
+//
+//   1. Not already in the registry, AND
+//   2. The host port it would compute to (basePort + index*portStep) is
+//      not currently bound by some other process / container.
+//
+// The second check prevents the bug where an orphan container is sitting
+// on the port that would otherwise be allocated to a fresh agent — the
+// agent would be created and immediately fail to start. By skipping
+// externally-held ports here, the new agent gets a guaranteed-free port
+// from the start. We cap the scan at a sensible upper bound so a
+// pathological "thousands of held ports" situation surfaces as an error
+// rather than spinning.
 func nextIndex(paths Paths) (int, error) {
 	entries, err := readRegistry(paths)
 	if err != nil {
@@ -63,11 +78,20 @@ func nextIndex(paths Paths) (int, error) {
 	for _, e := range entries {
 		used[e.Index] = true
 	}
-	for i := 0; ; i++ {
-		if !used[i] {
-			return i, nil
+	const maxIndex = 10000
+	for i := 0; i < maxIndex; i++ {
+		if used[i] {
+			continue
 		}
+		if portInUse(portForIndex(i)) {
+			// Port is held by something we don't manage (orphan, foreign
+			// process, etc). Skipping rather than failing — the operator
+			// can investigate later via `claws orphans` or `ss -tlnp`.
+			continue
+		}
+		return i, nil
 	}
+	return 0, fmt.Errorf("no free port index found in [0, %d) — too many in-use ports?", maxIndex)
 }
 
 func registerPort(paths Paths, index int, name string) error {

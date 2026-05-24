@@ -7,7 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — port collision safety
+
+Hit live by the user: `claws start team` succeeded for `team/john` and
+`team/lead` but failed for `team/sarah` with a cryptic Docker error
+("port 18789 is already allocated"). Root cause: an orphaned
+container from an earlier test workspace was holding port 18789 —
+the same port the registry had assigned to sarah. claws was happy to
+hand sarah a port that wasn't actually free, then hand control to
+Docker which discovered the conflict and produced a confusing error
+mid-startup.
+
+User feedback verbatim: *"don't kill ports until you know what's on
+them — how can we make it safer?"*
+
+### Two-part fix
+
+**1. Smart port allocation (`nextIndex`).** Previously walked the
+registry's own assignments and returned the lowest unused index.
+Now ALSO probes the host port that index would compute to — if
+something external is bound there (TCP-dial succeeds), the index is
+skipped. A fresh agent gets a guaranteed-free port from creation
+onward; the collision that hit sarah can no longer happen for newly
+created agents.
+
+**2. Start-time preflight (`cmdStart`).** Before calling
+`docker compose up`, probes the agent's assigned port:
+
+- **Free** → proceed normally.
+- **Held by our own container** (`openclaw-<team>-<agent>-openclaw-gateway-1`
+  matches) → continue; `docker compose up -d` is idempotent.
+- **Held by an openclaw-prefixed container NOT in the registry** →
+  abort with `port 18789 is held by orphan container '<name>' (not
+  in claws registry). Remove it: claws orphans clean <name>`.
+- **Held by another claws agent** (port allocation drift) → abort
+  with pointer to `claws drift`.
+- **Held by a non-Docker process** → abort with pointer to
+  `ss -tlnp | grep :<port>`.
+
+**Never auto-kill.** Every conflict path surfaces the holder + the
+exact remediation command. Operator decides.
+
+### Performance
+
+`portInUse` switched from shelling to `ss -tlnp` to a 200ms TCP dial
+of `127.0.0.1:<port>`. Faster, no subprocess, no parsing, no privilege
+requirement. `CLAWS_SKIP_VALIDATE=1` honored as before.
+
+### New helpers
+
+- `identifyPortHolder(port, ownerName)` — queries
+  `docker ps --filter publish=<port>` and classifies the result:
+  `(name, isOrphan, isOwn)`. Pure read, never mutates.
+- `portInUse(port)` — TCP-dial based, 200ms timeout.
+
+### Tests
+
+- `cmd/claws/ports_test.go` — exercises both directions of
+  `portInUse` (held vs. free), `CLAWS_SKIP_VALIDATE` override,
+  and the new "skip held ports" path in `nextIndex`.
+- Existing `registry_test.go` tests now opt out of live probing
+  via `t.Setenv("CLAWS_SKIP_VALIDATE", "1")` in `testPaths()` —
+  most don't care about host port state.
 
 ## [v1.6.10] — 2026-05-24
 

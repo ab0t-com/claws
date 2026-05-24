@@ -8,6 +8,11 @@ import (
 
 func testPaths(t *testing.T) Paths {
 	t.Helper()
+	// Skip live port probing by default — tests using testPaths don't
+	// care about what's actually bound on the host's ports. Tests that
+	// want to exercise port probing (e.g. TestNextIndex_SkipsHeldPort)
+	// override this themselves.
+	t.Setenv("CLAWS_SKIP_VALIDATE", "1")
 	tmp := t.TempDir()
 	return Paths{
 		Root:            tmp,
