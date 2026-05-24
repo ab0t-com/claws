@@ -620,6 +620,39 @@ func cmdStart(args []string) error {
 	if !healthy {
 		warn("Health check didn't pass in 30s — check: claws logs " + name)
 	}
+
+	// Auth verification. The container can be "healthy" the moment the
+	// gateway is listening — well before any model call has been made.
+	// Silent broken-auth states (expired Codex OAuth, OpenAI rate-limit,
+	// revoked refresh token) only surface when an inference is requested.
+	// Running verify here catches them at startup with the exact fix
+	// command, instead of the operator finding out hours later via
+	// "agent isn't replying".
+	//
+	// Only verify when the start actually succeeded — if we never reached
+	// healthy, the agent isn't going to be issuing inference calls anyway.
+	if healthy {
+		v := verifyOneInstance(paths, name)
+		switch {
+		case v.Verified:
+			info(fmt.Sprintf("Auth verified (%s)", v.Strategy))
+		case v.Strategy == "skipped":
+			// Inconclusive — we tried but no positive OR negative signal
+			// yet (e.g. fresh container, no inference traffic). Don't
+			// warn; just mention so the operator knows it wasn't checked.
+			info("Auth not verified yet — run `claws agent ping " + name + "` to confirm")
+		default:
+			// strategy=logs|endpoint|readyz with Verified=false → real failure.
+			warn("Auth check FAILED — agent won't respond until fixed")
+			if v.Error != "" {
+				fmt.Printf("  Detail: %s\n", v.Error)
+			}
+			if v.FixCommand != "" {
+				fmt.Printf("  Fix:    %s\n", v.FixCommand)
+			}
+		}
+	}
+
 	// "Next:" hints — same suggestions whether health passed or not (in
 	// both cases the operator wants ping + logs; the hint provider keys
 	// off AgentName, not the outcome).

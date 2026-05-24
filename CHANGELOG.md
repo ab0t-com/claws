@@ -7,7 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws start` now verifies auth after the container reports healthy
+
+User hit this: `claws start team` declared all 3 agents started
+cleanly, but `team/john` was silently broken at the model layer
+(OpenAI Codex OAuth refresh_token_reused — token had been
+invalidated by another consumer). The container was "healthy" in
+Docker's sense (gateway listening, port responding) but the agent
+couldn't actually answer any message.
+
+### Fix
+
+After the Docker healthcheck passes, `cmdStart` now runs
+`verifyOneInstance` (same check `claws auth verify` does) and
+surfaces one of three outcomes:
+
+- **`✓ Auth verified (logs)`** — at least one recent successful
+  inference observed in logs.
+- **`Auth not verified yet — run \`claws agent ping <name>\` to
+  confirm`** — inconclusive (no positive OR negative signal in the
+  last 5 minutes; fresh container or quiet agent).
+- **`WARNING: Auth check FAILED — agent won't respond until fixed`**
+  — recent auth error found in logs, with `Detail:` showing the
+  error and `Fix:` showing the exact command (typically
+  `claws auth <name> codex` or `claws auth <name> apikey <provider>
+  <key>`).
+
+### Why this matters
+
+The container can report `health=healthy` the moment the gateway is
+listening — well before any model call has been made. Without this
+check, broken auth surfaces hours later as "agent isn't replying".
+Now it surfaces at startup with the exact remediation command,
+in the same place the operator just typed `claws start`.
+
+### Background on the `refresh_token_reused` error class
+
+OAuth refresh is single-use by design: when you exchange refresh_token_A
+for a new access token, the server issues refresh_token_B and revokes A.
+If two consumers share the same credential file (mounted dir, copied
+auth.json, host CLI sharing tokens with the agent), one wins each
+refresh round and the rest get the reuse alarm + revoked chain.
+
+Workaround: give each agent its own independent Codex OAuth via
+`claws auth <name> codex` (runs the OAuth flow scoped to that
+agent's container). A future `claws auth diagnose <name>` would
+detect shared credential dirs proactively (filed for follow-up).
 
 ## [v1.6.12] — 2026-05-24
 
