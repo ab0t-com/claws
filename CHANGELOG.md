@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.4] — 2026-05-24
+
+Non-technical user pass — closes the "I need to copy a 46-char Telegram
+token from my phone to an SSH session" friction point. Project owner
+directive: "our users are non-technical, our goal is to hold their
+hand and make it as easy as possible."
+
+### Added — `claws paste-secret <name>`
+
+Ephemeral local HTTP listener that bridges phone → server for any
+secret value. Use case: BotFather replies with a 46-char token on your
+phone; you don't want to email it to yourself, install Telegram Desktop,
+or type it character-by-character.
+
+```
+$ claws paste-secret telegram.token
+
+  Open on your phone:
+      http://192.168.1.42:8765/aBc3K9p
+  Enter this code on the page:
+      417-302
+  Listening on 0.0.0.0:8765 for 5m0s ... (Ctrl-C to cancel)
+```
+
+User taps the URL on their phone → sees a mobile-friendly form
+(textarea + code field) → pastes the token + enters the 6-digit code
+→ submits → server writes `/tmp/claws-secrets/telegram.token`, exits.
+
+**Security model:**
+- 7-char random URL token (28 bits of entropy) — unguessable on a LAN
+- 6-digit code shown on terminal must echo from the phone (defends
+  against someone with the URL but not terminal access)
+- Single-use — server exits after the first successful paste
+- 5-minute auto-expire (configurable via `--timeout=<dur>`)
+- `--bind=127.0.0.1` mode requires SSH port-forward (no LAN exposure)
+- HTTP-only — fine for ephemeral local-network paste; URL+code ARE the
+  secret. HTTPS would need cert generation that's out of scope for this.
+
+**Flags:** `--secrets-dir=<path>` (default `/tmp/claws-secrets`),
+`--port=<n>` (default 8765), `--bind=<addr>` (default `0.0.0.0`),
+`--timeout=<dur>` (default 5m).
+
+### Enhanced — `claws setup`
+
+Two integrations make the wizard truly hand-holding:
+
+1. **Step 1 (prereqs)**: if `openclaw:local` not present, offers to
+   run `claws image bootstrap --yes` inline. Clear "this takes 5-10
+   minutes, one time only" framing.
+2. **Step 6 (channel)**: when picking a non-WhatsApp channel, asks how
+   the user wants to enter the bot token:
+   ```
+   How do you want to enter the bot token?
+     1. Paste here  (good if you've got the token in your clipboard)
+     2. Phone-paste (open a URL on your phone, paste there — easier from BotFather)
+   ```
+   Picking 2 invokes `paste-secret` inline; the wizard reads the
+   resulting file and continues.
+
+### Tests
+
+- 3 new tests: helper randomness/shape, invalid-name rejection,
+  end-to-end POST round-trip (wrong-code rejected, right-code accepted,
+  file written, server exits).
+- Full suite remains green.
+
+### Internals
+
+- `paste-secret` command in `cmd/claws/paste_secret.go`. ~280 LOC,
+  net/http only (no new deps).
+- LAN IP discovery walks `net.Interfaces()` for the URL hint.
+- Mobile-friendly form: viewport meta, large touch targets, monospace
+  textarea for the token (which is mixed-case + symbols).
+
+### Docs
+
+- `docs/goal-instant-claw.md` updated to lead with `claws setup` as
+  the primary path; the manual two-paste flow remains documented as
+  the power-user alternative.
+
+### Why this matters
+
+A non-technical user who's never SSH'd before could conceivably do:
+
+```bash
+ssh me@my-server
+claws setup
+# answers prompts; when it asks "how do you want to enter the bot token",
+# picks "phone-paste"; opens the URL on their phone; pastes from BotFather;
+# enters the 6-digit code shown on the SSH terminal; bot is online.
+```
+
+No multi-device clipboard juggling. No file editing. No knowledge of
+`--secrets-dir`, `apply`, or `chmod`. The whole flow fits in one
+terminal session + one phone tap.
+
 ## [v1.6.3] — 2026-05-24
 
 Adds the team variant of the say-GO demo.

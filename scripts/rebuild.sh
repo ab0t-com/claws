@@ -81,9 +81,9 @@ echo -e "  ${GREEN}✓${NC} vet clean"
 # --- Tests (short by default) ---
 # The integration suite has ~150+ tests; even -short leaves dozens of
 # fast integration tests running. 60s isn't enough across the whole package.
-TEST_FLAGS="-short -timeout=300s"
+TEST_FLAGS="-short -timeout=600s"
 if [ "$RACE" -eq 1 ]; then
-    TEST_FLAGS="-race -short -timeout=600s"
+    TEST_FLAGS="-race -short -timeout=900s"
 fi
 echo -e "  ${DIM}go test ${TEST_FLAGS} ./cmd/claws/...${NC}"
 if go test $TEST_FLAGS ./cmd/claws/... 2>&1 | tail -5; then

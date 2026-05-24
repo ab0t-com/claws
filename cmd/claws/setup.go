@@ -103,7 +103,25 @@ func cmdSetup(args []string) error {
 	if _, err := exec.Command("docker", "image", "inspect", image).Output(); err == nil {
 		fmt.Printf("    %s✓%s Image %s found\n", green, nc, image)
 	} else {
-		warn(fmt.Sprintf("Image '%s' not found — build or pull it before starting agents", image))
+		// v1.6.4: offer to bootstrap the image inline. Non-technical users
+		// shouldn't have to know what `claws image bootstrap` is.
+		fmt.Printf("    %s!%s Image '%s' not found\n", "\033[0;33m", nc, image)
+		if !nonInteractive {
+			fmt.Println()
+			fmt.Println("    This image is the AI runtime — every agent runs inside it.")
+			fmt.Println("    Building takes 5-10 minutes the first time; future runs are instant.")
+			ans := strings.ToLower(prompt("    Build openclaw:local now? (Y/n)", "y"))
+			if ans == "y" || ans == "yes" {
+				fmt.Println()
+				if err := cmdImageBootstrap([]string{"--yes"}); err != nil {
+					return errorf("image bootstrap failed: %v", err)
+				}
+			} else {
+				warn("agents won't start without the image — run `claws image bootstrap --yes` later")
+			}
+		} else {
+			warn("Image not present and --non-interactive set — run `claws image bootstrap --yes` first")
+		}
 	}
 
 	// Disk space
@@ -372,9 +390,34 @@ func cmdSetup(args []string) error {
 				channelTokens = channelTokens[1:]
 			} else if !nonInteractive {
 				if currentChannel != "whatsapp" {
-					fmt.Printf("    Bot token: ")
-					line, _ := reader.ReadString('\n')
-					token = strings.TrimSpace(line)
+					// v1.6.4: tokens are 46+ chars from BotFather/etc — typing
+					// them into SSH is painful. Offer the paste-secret bridge:
+					// open a URL on phone, paste there, server receives.
+					fmt.Println()
+					fmt.Println("    How do you want to enter the bot token?")
+					fmt.Println("      1. Paste here  (good if you've got the token in your clipboard)")
+					fmt.Println("      2. Phone-paste (open a URL on your phone, paste there — easier from BotFather)")
+					how := prompt("    Choice", "1")
+					if how == "2" {
+						secretName := currentChannel + ".token"
+						secretsDir := "/tmp/claws-secrets"
+						_ = os.MkdirAll(secretsDir, 0700)
+						fmt.Println()
+						fmt.Printf("    Starting paste-secret listener for %s ...\n", secretName)
+						fmt.Println("    Open the URL printed below on your phone, enter the code, paste the token.")
+						fmt.Println()
+						if err := cmdPasteSecret([]string{secretName, "--secrets-dir=" + secretsDir, "--timeout=10m"}); err != nil {
+							warn(fmt.Sprintf("paste-secret failed: %v — falling back to inline paste", err))
+						} else {
+							// Read it back
+							token = readSecretFile(filepath.Join(secretsDir, secretName))
+						}
+					}
+					if token == "" {
+						fmt.Printf("    Paste token here: ")
+						line, _ := reader.ReadString('\n')
+						token = strings.TrimSpace(line)
+					}
 				}
 			}
 

@@ -1,5 +1,13 @@
 # GOAL — say "GO", have a claw on your phone
 
+> **v1.6.4 update:** `claws setup` is now the single command to run.
+> It walks you through everything — including building the openclaw
+> image inline and bridging your phone token via `claws paste-secret`
+> when you don't want to type a 46-char string into SSH. The
+> "paste-two-tokens manually" flow below remains valid for power users.
+
+# GOAL — say "GO", have a claw on your phone
+
 **Status:** target for v1.6.2 (patch bump)
 **Filed:** 2026-05-24
 

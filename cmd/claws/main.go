@@ -94,6 +94,8 @@ func main() {
 		} else {
 			err = errorf("usage: claws agent <ping> <name>")
 		}
+	case "paste-secret":
+		err = cmdPasteSecret(args)
 	case "storage":
 		err = cmdStorage(args)
 	case "migrate":
