@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.11] — 2026-05-24
+
 ### Fixed — port collision safety
 
 Hit live by the user: `claws start team` succeeded for `team/john` and
