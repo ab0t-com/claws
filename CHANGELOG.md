@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.14] — 2026-05-24
+
 ### Added — auth fleet helpers (the simple fix for shared-OAuth pain)
 
 After hitting `refresh_token_reused` on team/john (v1.6.13 made it
