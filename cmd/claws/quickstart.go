@@ -176,18 +176,48 @@ func cmdQuickstart(args []string) error {
 		fmt.Printf("  %s✓ %s created%s\n", green, full, nc)
 	}
 
+	// Environment check — surface any docker/image/disk issues before the
+	// user goes hunting for bot tokens.
 	fmt.Println()
-	fmt.Printf("%sYour first agent is ready.%s Two things to do next:\n\n", bold, nc)
+	fmt.Printf("%s==> Environment check%s\n", bold, nc)
+	doctorErr := cmdDoctor(nil)
+	if doctorErr != nil {
+		fmt.Printf("\n  %s⚠ Some environment checks failed — fix them above before proceeding.%s\n", "\033[0;33m", nc)
+	}
+
+	fmt.Println()
+	fmt.Printf("%sYour first agent is ready.%s Three things to do next:\n\n", bold, nc)
+
 	fmt.Println("  1. Authenticate (pick one):")
 	fmt.Printf("     claws auth %s codex                # OpenAI Codex OAuth (opens browser)\n", full)
-	fmt.Printf("     claws auth %s apikey openai sk-…   # or API key\n\n", full)
+	fmt.Printf("     claws auth %s apikey openai sk-…   # or your API key\n", full)
+	fmt.Printf("     claws auth %s apikey anthropic sk-ant-…\n\n", full)
+
 	fmt.Println("  2. Connect a channel (pick one):")
 	fmt.Printf("     claws channel add %s telegram --token=<bot-token>\n", full)
 	fmt.Printf("     claws channel add %s discord  --token=<bot-token>\n", full)
 	fmt.Printf("     claws channel add %s slack    --bot-token=<t> --app-token=<t>\n\n", full)
-	fmt.Printf("  Then: claws start %s\n\n", full)
-	fmt.Printf("  %sRe-run safe.%s `claws quickstart` again is a no-op.\n\n", dim, nc)
 
+	fmt.Println("  3. Verify + start:")
+	fmt.Printf("     claws audit                          # security audit (after auth + channel)\n")
+	fmt.Printf("     claws start %s\n\n", full)
+
+	// Token sources — close the "where do I get these?" gap.
+	fmt.Printf("  %sNeed a bot token?%s\n", bold, nc)
+	fmt.Println("    Telegram:  t.me/BotFather             → /newbot → copy token         (~2 min)")
+	fmt.Println("    Discord:   discord.com/developers/applications → New Application → Bot  (~5 min)")
+	fmt.Println("    Slack:     api.slack.com/apps         → Create New App → OAuth & Permissions  (~10 min)")
+	fmt.Println("    WhatsApp:  no token needed (QR scan via `claws channel add … whatsapp`)")
+	tokenGuide := ""
+	if home, _ := os.UserHomeDir(); home != "" {
+		tokenGuide = filepath.Join(home, ".local", "share", "claws", "html", "channels-guide.html")
+		if _, err := os.Stat(tokenGuide); err == nil {
+			fmt.Printf("    Full guide: %s\n", tokenGuide)
+		}
+	}
+	fmt.Println()
+
+	fmt.Printf("  %sRe-run safe.%s `claws quickstart` again is a no-op.\n\n", dim, nc)
 	return nil
 }
 
