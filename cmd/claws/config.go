@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Version is set at build time via -ldflags "-X main.Version=..."
@@ -252,6 +253,18 @@ func info(msg string)  { fmt.Printf("\033[0;32m==> %s\033[0m\n", msg) }
 func warn(msg string)  { fmt.Printf("\033[0;33m==> WARNING: %s\033[0m\n", msg) }
 func errorf(format string, a ...any) error {
 	return fmt.Errorf(format, a...)
+}
+
+// countdown sleeps for n seconds, ticking once per second to stderr so
+// an operator who wasn't paying attention sees "3... 2... 1..." and has
+// time to Ctrl-C. SIGINT during the sleep kills the process naturally
+// (default Go signal handling); no special wiring needed.
+func countdown(n int) {
+	for i := n; i > 0; i-- {
+		fmt.Fprintf(os.Stderr, "  %d... ", i)
+		time.Sleep(time.Second)
+	}
+	fmt.Fprintln(os.Stderr)
 }
 
 // hasFlag checks if a flag is present in args.

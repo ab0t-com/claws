@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added
+
+- **`claws start <team>` Just Works.** Previously you had to type
+  `claws start --group=<team>` or `claws team start <team>`; the bare
+  form errored with `instance 'team' does not exist — run: claws
+  create team` (a misleading "fix" that would corrupt the registry if
+  followed). Now claws detects that `<name>` matches a team, prints
+  the member list, counts down `3... 2... 1...` to stderr so an
+  accidental typo isn't irreversible, and then fans out via the
+  existing group path. Ctrl-C during the countdown aborts cleanly.
+
+      $ claws start super-team
+      'super-team' is a team with 1 agent(s). Starting all in 3 seconds — Ctrl-C to cancel.
+        • super-team/agent-1
+        3...   2...   1...
+      ==> Starting instance 'super-team/agent-1'...
+
+- **`countdown(n)` helper** in `cmd/claws/config.go` — reusable for
+  any future "fan out across the fleet" command that wants a
+  reversibility window before acting. SIGINT during the sleep kills
+  the process via Go's default signal handling.
+
+### Not yet covered (separate think)
+
+- `claws stop <team>` / `claws restart <team>` — same pattern would
+  apply but the blast radius warrants a stronger guard (longer
+  countdown? interactive confirmation?). Filed for the next iteration.
+- `claws status <team>` / `claws health <team>` — read-only, would
+  just fan out with no countdown. Trivially extensible.
 
 ## [v1.6.9] — 2026-05-24
 

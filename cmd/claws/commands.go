@@ -468,7 +468,22 @@ func cmdStart(args []string) error {
 	if name == "" {
 		return errorf("usage: claws start <name> | claws start --group=<name>")
 	}
+	// If the name doesn't match an instance, check whether it matches a
+	// team (group). `claws start team` is what most operators reach for —
+	// they don't want to learn `--group=`. Fan out automatically with a
+	// 3-second countdown so an accidental typo isn't irreversible.
 	if err := requireInstance(paths, name); err != nil {
+		entries, _ := readRegistry(paths)
+		members := filterEntriesByGroup(entries, name)
+		if len(members) > 0 {
+			fmt.Printf("'%s' is a team with %d agent(s). Starting all in 3 seconds — Ctrl-C to cancel.\n",
+				name, len(members))
+			for _, m := range members {
+				fmt.Printf("  • %s\n", m.Name)
+			}
+			countdown(3)
+			return runOnGroup(paths, name, "Starting", cmdStart, args)
+		}
 		return err
 	}
 
