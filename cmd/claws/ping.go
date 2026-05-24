@@ -3,12 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // cmdAgentPing — single-screen "is this agent responding" check.
@@ -71,31 +69,47 @@ Examples:
 
 	fmt.Printf("%sclaws agent ping%s %s\n\n", bold, nc, full)
 
-	// 2. /healthz on 127.0.0.1:<port>
-	url := "http://127.0.0.1:" + port + "/healthz"
-	client := &http.Client{Timeout: 3 * time.Second}
-	if resp, err := client.Get(url); err == nil {
-		if resp.StatusCode == 200 {
-			mark("gateway", true, "/healthz 200 OK on :"+port)
-		} else {
-			mark("gateway", false, fmt.Sprintf("/healthz %d on :%s", resp.StatusCode, port))
+	// 2. /healthz — use Docker's HEALTHCHECK verdict (the gateway binds
+	// to container-internal 127.0.0.1, so host probes get connection
+	// reset). Falls back to in-container probe when the image declares
+	// no HEALTHCHECK.
+	switch containerHealth(paths, full) {
+	case "healthy":
+		mark("gateway", true, "container reports healthy on :"+port)
+	case "starting":
+		mark("gateway", false, "container HEALTHCHECK still in start-period — wait or claws logs "+full)
+	case "unhealthy":
+		mark("gateway", false, "container HEALTHCHECK failing — claws logs "+full)
+	case "none":
+		// No HEALTHCHECK in image → fall through to in-container probe.
+		pr := containerProbe(paths, full, "/healthz")
+		switch {
+		case !pr.Reachable:
+			mark("gateway", false, fmt.Sprintf("couldn't probe /healthz — container down? (claws start %s)", full))
+		case pr.Status == 200:
+			mark("gateway", true, "/healthz 200 OK (in-container probe)")
+		default:
+			mark("gateway", false, fmt.Sprintf("/healthz %d (in-container probe)", pr.Status))
 		}
-		resp.Body.Close()
-	} else {
-		mark("gateway", false, fmt.Sprintf("/healthz unreachable on :%s — is the container running? (claws start %s)", port, full))
+	default:
+		// "" — container not running, or docker not reachable.
+		mark("gateway", false, fmt.Sprintf("container not running — claws start %s", full))
 	}
 
-	// 3. /readyz
-	readyURL := "http://127.0.0.1:" + port + "/readyz"
-	if resp, err := client.Get(readyURL); err == nil {
-		if resp.StatusCode == 200 {
-			mark("readyz", true, "/readyz 200 — agent ready to receive")
-		} else {
-			mark("readyz", false, fmt.Sprintf("/readyz %d — agent up but not ready", resp.StatusCode))
-		}
-		resp.Body.Close()
-	} else {
-		mark("readyz", false, "/readyz unreachable (gateway down or no readyz endpoint)")
+	// 3. /readyz — also in-container probe. No way to reach the gateway
+	// from the host with the current runtime bind config.
+	pr := containerProbe(paths, full, "/readyz")
+	switch {
+	case !pr.Reachable:
+		mark("readyz", false, "couldn't probe /readyz (container not running)")
+	case pr.Status == 200:
+		mark("readyz", true, "/readyz 200 — agent ready to receive")
+	case pr.Status == 404:
+		// /readyz isn't a required endpoint — some runtime versions
+		// don't ship one. Treat absent as "no signal" rather than fail.
+		mark("readyz", true, "/readyz not implemented in this runtime (skipped)")
+	default:
+		mark("readyz", false, fmt.Sprintf("/readyz %d — agent up but not ready", pr.Status))
 	}
 
 	// 4. Auth verify — reuse the 3-strategy chain.

@@ -110,6 +110,105 @@ func containerStatus(paths Paths, name string) string {
 	return trimSpace(out)
 }
 
+// itoaPort renders a port int as decimal string. Local helper to keep
+// this file free of strconv imports — port is always non-negative.
+func itoaPort(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var buf [6]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(buf[i:])
+}
+
+// probeResult is the outcome of a containerProbe call.
+//
+// Reachable=false means the probe couldn't run at all (container missing,
+// docker unreachable, node missing inside the image, etc). The caller
+// should treat this as inconclusive — distinct from "got a response
+// indicating failure".
+type probeResult struct {
+	Reachable bool
+	Status    int    // HTTP status code (0 if !Reachable or probe errored)
+	Body      []byte // response body, truncated to 64 KiB
+}
+
+// containerProbe runs an HTTP GET against the gateway INSIDE the
+// container via `docker exec`. Required because the openclaw runtime
+// binds to container-internal 127.0.0.1, which the host's port mapping
+// can't reach. The probe uses node's built-in fetch (always present in
+// the runtime image — it's what the Docker HEALTHCHECK uses too), so
+// no extra binary install in the container.
+//
+// Endpoints are looked up against the runtime's declared gateway port
+// from instance.env. A nil/empty endpoint returns Reachable=false.
+func containerProbe(paths Paths, name, endpoint string) probeResult {
+	if endpoint == "" {
+		return probeResult{}
+	}
+	container := resolveContainerName(paths, name)
+	if container == "" {
+		return probeResult{}
+	}
+	// IMPORTANT: use the runtime's container-internal port, NOT
+	// OPENCLAW_GATEWAY_PORT (which is the host-side port mapping).
+	// Each agent's host port differs (18789, 18889, 19089, …) but the
+	// runtime always binds 18789 inside the container. Probing the
+	// host-port number from inside the container would ECONNREFUSED for
+	// every agent except the one whose host port happens to equal the
+	// internal port (typically index 0).
+	rt := mustResolveRuntime(paths, name)
+	internalPort := rt.InternalPort
+	if internalPort == 0 {
+		internalPort = 18789 // safety fallback matching the runtime default
+	}
+	// Single-line node script: fetch, print "<status>\n<body>" to stdout,
+	// exit 0 regardless of HTTP status (we encode the result in stdout).
+	// catch() exits non-zero so a transport-level failure surfaces.
+	//
+	// Uses console.log (which adds its own newline) instead of an
+	// explicit '\n' escape — node's TypeScript-mode -e evaluator
+	// mis-parses backslash-n inside single-quoted JS strings,
+	// breaking the literal across two lines and producing a SyntaxError.
+	script := `fetch('http://127.0.0.1:` + itoaPort(internalPort) + endpoint +
+		`').then(async r=>{const t=await r.text();console.log(r.status);process.stdout.write(t);process.exit(0);})` +
+		`.catch(e=>{process.stderr.write(String(e&&e.message||e));process.exit(1);})`
+	cmd := exec.Command("docker", "exec", container, "node", "-e", script)
+	out, err := cmd.Output()
+	if err != nil {
+		// docker exec failed (container down / node missing / network error)
+		return probeResult{}
+	}
+	// Parse "STATUS\n<body>" — split on first newline.
+	nl := -1
+	for i, b := range out {
+		if b == '\n' {
+			nl = i
+			break
+		}
+	}
+	if nl < 0 {
+		return probeResult{Reachable: true}
+	}
+	status := 0
+	for _, b := range out[:nl] {
+		if b < '0' || b > '9' {
+			break
+		}
+		status = status*10 + int(b-'0')
+	}
+	body := out[nl+1:]
+	if len(body) > 64*1024 {
+		body = body[:64*1024]
+	}
+	return probeResult{Reachable: true, Status: status, Body: body}
+}
+
 // containerHealth returns Docker's healthcheck verdict for an instance's
 // gateway container, as reported by `docker inspect`. One of:
 //

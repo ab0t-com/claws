@@ -501,7 +501,7 @@ func verifyOneInstance(paths Paths, name string) authVerifyResult {
 		return res
 	}
 	// Strategy B — /readyz with failing[] containing auth-related entries.
-	if conclusion := tryReadyzAuth(port, rt); conclusion != nil {
+	if conclusion := tryReadyzAuth(paths, name, rt); conclusion != nil {
 		res.Strategy = "readyz"
 		res.LatencyMs = conclusion.LatencyMs
 		res.Verified = conclusion.Verified
@@ -571,24 +571,32 @@ func tryAuthCheckEndpoint(port string, rt Runtime) (bool, int, error) {
 // related subsystem names. Returns nil if the result is inconclusive
 // (couldn't reach /readyz, or failing[] is empty, or the failing entries
 // aren't recognisably auth-related).
-func tryReadyzAuth(port string, rt Runtime) *authVerifyResult {
+//
+// Uses containerProbe (docker exec inside the container) because the
+// host-side port mapping doesn't reach the gateway when it binds to
+// container-internal 127.0.0.1. The `port` and `rt` params from the
+// original signature are unused now but preserved for callers; only
+// rt.ReadyEndpoint is consulted (via containerProbe parameter).
+func tryReadyzAuth(paths Paths, name string, rt Runtime) *authVerifyResult {
 	if rt.ReadyEndpoint == "" {
 		return nil
 	}
-	url := fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.ReadyEndpoint)
-	client := &http.Client{Timeout: 3 * time.Second}
 	start := time.Now()
-	resp, err := client.Get(url)
-	if err != nil {
+	pr := containerProbe(paths, name, rt.ReadyEndpoint)
+	if !pr.Reachable {
 		return nil
 	}
-	defer resp.Body.Close()
 	latency := int(time.Since(start) / time.Millisecond)
+	if pr.Status != 200 && pr.Status != 503 {
+		// Anything other than 200 (ready) or 503 (with body explaining
+		// failing[]) is inconclusive — fall through to log scan.
+		return nil
+	}
 	var body struct {
 		Ready   bool     `json:"ready"`
 		Failing []string `json:"failing"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(pr.Body, &body); err != nil {
 		return nil
 	}
 	if body.Ready {

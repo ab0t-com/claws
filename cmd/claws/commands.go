@@ -2266,29 +2266,43 @@ func probeInstance(paths Paths, name string) instanceHealth {
 
 	rt := mustResolveRuntime(paths, name)
 
-	// Liveness
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.HealthEndpoint))
-	if err == nil && resp.StatusCode == 200 {
+	// Liveness — trust Docker's HEALTHCHECK verdict (runs inside the
+	// container where 127.0.0.1:<internal-port> actually reaches the
+	// gateway). Fall back to in-container probe if no HEALTHCHECK
+	// declared in the image.
+	switch containerHealth(paths, name) {
+	case "healthy":
 		h.Live = true
-		resp.Body.Close()
-	} else {
-		if resp != nil {
-			resp.Body.Close()
+	case "starting":
+		// Container declares HEALTHCHECK but it hasn't transitioned yet.
+		// Treat as "down" for the immediate verdict — operator can re-run.
+		h.Verdict = "down"
+		return h
+	case "unhealthy":
+		h.Verdict = "down"
+		return h
+	case "none":
+		// No HEALTHCHECK → in-container probe.
+		pr := containerProbe(paths, name, rt.HealthEndpoint)
+		if !pr.Reachable || pr.Status != 200 {
+			h.Verdict = "down"
+			return h
 		}
+		h.Live = true
+	default:
 		h.Verdict = "down"
 		return h
 	}
 
-	// Readiness
+	// Readiness — in-container probe (same reason as liveness).
 	if rt.ReadyEndpoint != "" {
-		resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", port, rt.ReadyEndpoint))
-		if err == nil {
-			defer resp.Body.Close()
+		pr := containerProbe(paths, name, rt.ReadyEndpoint)
+		if pr.Reachable && len(pr.Body) > 0 {
 			var body struct {
 				Ready   bool     `json:"ready"`
 				Failing []string `json:"failing"`
 			}
-			if json.NewDecoder(resp.Body).Decode(&body) == nil {
+			if json.Unmarshal(pr.Body, &body) == nil {
 				h.Ready = body.Ready
 				h.Failing = body.Failing
 			}
