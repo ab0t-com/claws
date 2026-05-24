@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.12] — 2026-05-24
+
 ### Fixed — `claws start` no longer falsely warns "health check didn't pass"
 
 User hit it: `claws start team` reported all 3 agents as failing the
