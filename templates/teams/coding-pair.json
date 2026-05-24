@@ -1,0 +1,66 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "coding-pair",
+    "version": "1.0.0",
+    "description": "Pair programming team: implementer + reviewer agents sharing one workspace. Implementer writes code, reviewer critiques via the task queue. Both reachable on Telegram (separate bots).",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["teams", "coding", "pair-programming", "telegram"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": {
+    "loopbackOnly": true,
+    "dmDefault": "pairing",
+    "outboundDefault": "off"
+  },
+  "team": { "name": "pair", "shared": true },
+  "agents": [
+    {
+      "name": "implementer",
+      "sandbox": true,
+      "tools": { "profile": "coding", "allow": ["read", "edit", "bash", "memory"] },
+      "skills": ["git-utils", "test-runner", "memory"],
+      "hooks": {
+        "onStart": "echo \"implementer online\" >> $WORKSPACE/memory/lifecycle.log"
+      },
+      "config": {
+        "agents.defaults.maxTokens": 8192,
+        "agents.defaults.persona": "implementer"
+      },
+      "auth": {
+        "preferred": "codex",
+        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+      },
+      "channels": [{
+        "type": "telegram",
+        "tokenFrom": { "env": "TELEGRAM_BOT_TOKEN_IMPLEMENTER" },
+        "dmPolicy": "pairing"
+      }]
+    },
+    {
+      "name": "reviewer",
+      "sandbox": true,
+      "tools": { "profile": "coding", "allow": ["read", "memory"], "deny": ["edit", "bash"] },
+      "skills": ["code-review-checklist", "memory", "test-runner"],
+      "hooks": {
+        "onMessage": "echo \"review request: $MSG_SUMMARY\" >> $WORKSPACE/memory/reviews.log"
+      },
+      "config": {
+        "agents.defaults.maxTokens": 6144,
+        "agents.defaults.persona": "code-reviewer"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+      },
+      "channels": [{
+        "type": "telegram",
+        "tokenFrom": { "env": "TELEGRAM_BOT_TOKEN_REVIEWER" },
+        "dmPolicy": "pairing"
+      }]
+    }
+  ],
+  "postSetup": ["audit"]
+}

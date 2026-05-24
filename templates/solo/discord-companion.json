@@ -1,0 +1,47 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "discord-companion",
+    "version": "1.0.0",
+    "description": "Discord bot for a single small server. Allowlist by guild ID, moderation-aware tools, audit on, replies in-channel.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["solo", "discord", "community", "moderation"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": {
+    "loopbackOnly": true,
+    "dmDefault": "allowlist",
+    "outboundDefault": "allowlist"
+  },
+  "team": { "name": "default", "shared": true },
+  "agents": [{
+    "name": "companion",
+    "sandbox": true,
+    "tools": {
+      "profile": "support",
+      "allow": ["read", "edit", "memory", "web-search"],
+      "deny": ["bash", "exec"]
+    },
+    "skills": ["memory", "web-search", "moderation-helpers"],
+    "hooks": {
+      "onStart":   "echo \"[$(date -u +%FT%TZ)] companion online\" >> $WORKSPACE/memory/lifecycle.log",
+      "onMessage": "echo \"[$(date -u +%FT%TZ)] msg from $SENDER\" >> $WORKSPACE/memory/messages.log"
+    },
+    "config": {
+      "agents.defaults.maxTokens": 4096,
+      "agents.defaults.persona": "discord-companion"
+    },
+    "auth": {
+      "preferred": "apikey",
+      "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+    },
+    "channels": [{
+      "type": "discord",
+      "tokenFrom": { "env": "DISCORD_BOT_TOKEN" },
+      "dmPolicy": "allowlist"
+    }]
+  }],
+  "postSetup": ["audit"]
+}

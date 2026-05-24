@@ -9,6 +9,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.4.0] — 2026-05-24
+
+### Added — Hook register on Runtime adapter
+
+- **`Runtime.SupportedHookEvents`**, **`Runtime.HooksDir`**, and
+  **`Runtime.HookFileExt`** — adapters now declare their lifecycle hook
+  contract. `applyHooks` consults the runtime; events not in the
+  supported set print a warning but still write (some runtimes may
+  silently ignore unknown events, others may panic — operator's call).
+- OpenClaw runtime declares: events
+  `onStart, onMessage, onIdle, onError, onShutdown`,
+  `HooksDir="hooks"`, `HookFileExt=".sh"`.
+
+### Added — Namespaced templates
+
+- **`claws apply --template=solo/telegram-coder`** — namespaced lookup
+  resolves a single specific template.
+- **`claws apply --template=telegram-coder`** — bare-name lookup
+  searches recursively across namespace dirs; errors clearly with
+  qualified suggestions if multiple namespaces have the same name.
+- **`claws template list`** — groups output by namespace
+  (`solo/`, `teams/`, `specialty/`, plus `(flat)` for top-level).
+- Flat-layout templates still resolve for back-compat (no breaking
+  change to v1.3 templates dir).
+- Path-traversal and absolute-path names rejected at resolve time.
+
+### Added — URL-loaded resources for skills + hooks
+
+- **`SkillRef`** and **`HookRef`** types: each accepts either a bare
+  string (legacy) or an object with `name`, `from`, `fromUrl`, `sha256`.
+- **`fromUrl`** — fetches the resource at apply-time, writes to the
+  agent's workspace. HTTPS-only (refuses `http://`, `file://`, etc.).
+- **`sha256`** — when declared, body is verified against the digest;
+  mismatch fails apply.
+- **Cache** at `${XDG_CACHE_HOME:-~/.cache}/claws/fetched/<sha-or-url-hash>`.
+  Cache hits skip the download.
+- **Warning** printed at apply-time if a `fromUrl` is used without a
+  `sha256` pin — fetch still succeeds but operator is told.
+- 4 MB body cap, 30s timeout.
+
+### Added — 6 new real-world bundled templates (+ 3 relocated)
+
+Relocated under `templates/solo/`:
+- `solo/solo.json` (was `solo.json`)
+- `solo/telegram-coder.json` (was `solo-telegram-coder.json`)
+- `solo/personal-assistant.json` (was `personal-assistant.json`)
+
+New:
+- **`solo/discord-companion.json`** — Discord bot for a small server,
+  allowlist by guild ID, moderation-aware tools, in-channel replies.
+- **`solo/whatsapp-family.json`** — WhatsApp helper for a family,
+  allowlist by phone number, calendar + reminders + shopping-list
+  skills, QR-scan auth.
+- **`teams/research-trio.json`** — manager + lit-review + data-analysis
+  workers. Shared workspace, task queue, Slack on manager only.
+  Demonstrates manager/worker role topology + per-agent personas.
+- **`teams/coding-pair.json`** — implementer + reviewer agents on
+  separate Telegram bots, shared workspace, reviewer is tool-restricted
+  (no edit/bash).
+- **`specialty/oncall-rotation.json`** — Slack-facing oncall agent.
+  Receives PagerDuty webhooks, posts structured handoffs, tracks acks.
+  Declares a `warnings:` block (loopbackOnly=false for webhook ingress).
+- **`specialty/knowledge-base.json`** — RAG-style librarian. No public
+  channel (tunnel-only), read-only tools, web-search + file-watch +
+  embedding-index skills, large maxTokens.
+
+### Tests
+
+- 3 fetcher tests (HTTPS validation, sha256 verify happy path + bad-sha
+  rejection, cache hit skip).
+- 5 resolver tests (namespaced, bare unambiguous, bare ambiguous error,
+  flat back-compat, traversal rejected).
+- 1 list test (namespace grouping).
+- All 9 bundled templates validated via `claws apply --dry-run`.
+
+### Not in this release
+
+- `extends:` template composition — separate v1.5 ticket.
+- Remote templates (`--template=github:org/repo`) — separate v1.5 ticket.
+
 ## [v1.3.0] — 2026-05-24
 
 ### Added — template resolver + management

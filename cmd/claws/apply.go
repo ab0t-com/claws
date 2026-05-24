@@ -85,11 +85,94 @@ type ProfileAgent struct {
 	Image    string                 `json:"image,omitempty"`           // pin to specific runtime image
 	Sandbox  *bool                  `json:"sandbox,omitempty"`         // agents.defaults.sandbox (nil = inherit)
 	Tools    *ProfileTools          `json:"tools,omitempty"`
-	Skills   []string               `json:"skills,omitempty"`          // skill names to enable
-	Hooks    map[string]string      `json:"hooks,omitempty"`           // event → command/script
+	Skills   []SkillRef             `json:"skills,omitempty"`          // strings OR ResourceRefs (custom unmarshal)
+	Hooks    map[string]HookRef     `json:"hooks,omitempty"`           // event → string OR ResourceRef
 	Config   map[string]interface{} `json:"config,omitempty"`          // arbitrary openclaw.json patches
 	Auth     *ProfileAuth           `json:"auth,omitempty"`
 	Channels []ProfileChannel       `json:"channels,omitempty"`
+}
+
+// SkillRef accepts either a bare string ("calendar") or a full object form
+// ({"name": "...", "from": "...", "fromUrl": "...", "sha256": "..."}).
+type SkillRef struct {
+	Name    string `json:"name,omitempty"`
+	From    string `json:"from,omitempty"`
+	FromURL string `json:"fromUrl,omitempty"`
+	Sha256  string `json:"sha256,omitempty"`
+}
+
+// UnmarshalJSON lets SkillRef accept a bare string for back-compat.
+func (s *SkillRef) UnmarshalJSON(data []byte) error {
+	// Try bare string first.
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		s.Name = str
+		return nil
+	}
+	// Object form — use a dummy type to avoid infinite recursion.
+	type alias SkillRef
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*s = SkillRef(a)
+	return nil
+}
+
+// HookRef accepts either a bare string command OR an object with
+// command/from/fromUrl/sha256.
+type HookRef struct {
+	Command string `json:"command,omitempty"`
+	From    string `json:"from,omitempty"`
+	FromURL string `json:"fromUrl,omitempty"`
+	Sha256  string `json:"sha256,omitempty"`
+}
+
+func (h *HookRef) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		h.Command = str
+		return nil
+	}
+	type alias HookRef
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*h = HookRef(a)
+	return nil
+}
+
+// resolveContent returns the raw body for a SkillRef or HookRef, fetching
+// from URL or reading from disk as needed. Returns the value, a label
+// describing the source, and any error.
+func resolveSkillContent(s SkillRef) ([]byte, string, error) {
+	switch {
+	case s.FromURL != "":
+		body, err := fetchResource(s.FromURL, s.Sha256)
+		return body, "url:" + s.FromURL, err
+	case s.From != "":
+		body, err := os.ReadFile(s.From)
+		return body, "file:" + s.From, err
+	case s.Name != "":
+		// Bare name → inline reference, no body needed (manifest only).
+		return nil, "name:" + s.Name, nil
+	}
+	return nil, "", errorf("skill must have one of: name, from, fromUrl")
+}
+
+func resolveHookContent(h HookRef) ([]byte, string, error) {
+	switch {
+	case h.FromURL != "":
+		body, err := fetchResource(h.FromURL, h.Sha256)
+		return body, "url:" + h.FromURL, err
+	case h.From != "":
+		body, err := os.ReadFile(h.From)
+		return body, "file:" + h.From, err
+	case h.Command != "":
+		return []byte(h.Command), "inline", nil
+	}
+	return nil, "", errorf("hook must have one of: command, from, fromUrl")
 }
 
 type ProfileTools struct {
@@ -363,7 +446,17 @@ func cmdApply(args []string) error {
 			if err := applySkills(paths, full, ag.Skills); err != nil {
 				fmt.Printf("  %s! skills: %v%s\n", gold, err, nc)
 			} else {
-				fmt.Printf("  %s✓ skills enabled: %s%s\n", green, strings.Join(ag.Skills, ", "), nc)
+				var sNames []string
+				for _, sk := range ag.Skills {
+					if sk.Name != "" {
+						sNames = append(sNames, sk.Name)
+					} else if sk.FromURL != "" {
+						sNames = append(sNames, "url:"+filepath.Base(sk.FromURL))
+					} else if sk.From != "" {
+						sNames = append(sNames, "file:"+filepath.Base(sk.From))
+					}
+				}
+				fmt.Printf("  %s✓ skills enabled: %s%s\n", green, strings.Join(sNames, ", "), nc)
 			}
 		}
 
@@ -548,17 +641,60 @@ func applyAgentConfig(full string, ag *ProfileAgent, dim, gold, green, nc string
 }
 
 // ---------------------------------------------------------------------------
-// applySkills — B2: write a skills manifest under the agent's workspace.
+// applySkills — B2 + Phase 3: write skills manifest + materialise any
+// ResourceRef-backed skill files under the agent's workspace.
 // ---------------------------------------------------------------------------
-func applySkills(paths Paths, full string, skills []string) error {
+func applySkills(paths Paths, full string, skills []SkillRef) error {
 	instDir := filepath.Join(paths.Root, full)
 	skillsDir := filepath.Join(instDir, "workspace", "skills")
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		return err
 	}
+
+	var names []string
+	for _, s := range skills {
+		name := s.Name
+		if name == "" {
+			// Derive from URL or path if not set.
+			switch {
+			case s.FromURL != "":
+				name = filepath.Base(s.FromURL)
+			case s.From != "":
+				name = filepath.Base(s.From)
+			default:
+				continue
+			}
+			name = strings.TrimSuffix(name, filepath.Ext(name))
+		}
+		names = append(names, name)
+
+		// Materialise the content if there is any (URL or local file).
+		if s.FromURL != "" || s.From != "" {
+			if s.FromURL != "" && s.Sha256 == "" {
+				fmt.Printf("    \033[0;33m! skill %q: no sha256 declared for %s — fetch without integrity check\033[0m\n", name, s.FromURL)
+			}
+			body, src, err := resolveSkillContent(s)
+			if err != nil {
+				fmt.Printf("    \033[0;33m! skill %q (%s): %v\033[0m\n", name, src, err)
+				continue
+			}
+			ext := filepath.Ext(s.From)
+			if ext == "" {
+				ext = ".md"
+			}
+			out := filepath.Join(skillsDir, name+ext)
+			if existing, err := os.ReadFile(out); err == nil && string(existing) == string(body) {
+				continue
+			}
+			if err := os.WriteFile(out, body, 0644); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Manifest of declared skill names — keeps the v1.3 behavior.
 	manifest := filepath.Join(skillsDir, "MANIFEST.txt")
-	body := strings.Join(skills, "\n") + "\n"
-	// Idempotence: only write if content differs
+	body := strings.Join(names, "\n") + "\n"
 	if existing, err := os.ReadFile(manifest); err == nil && string(existing) == body {
 		return nil
 	}
@@ -566,23 +702,60 @@ func applySkills(paths Paths, full string, skills []string) error {
 }
 
 // ---------------------------------------------------------------------------
-// applyHooks — B3: write hook scripts under the agent's workspace.
+// applyHooks — B3 + Phase 3: write hook scripts under the agent's workspace,
+// respecting the runtime adapter's declared HooksDir / HookFileExt /
+// SupportedHookEvents, and resolving HookRef bodies from inline / file / URL.
 // ---------------------------------------------------------------------------
-func applyHooks(paths Paths, full string, hooks map[string]string) error {
+func applyHooks(paths Paths, full string, hooks map[string]HookRef) error {
+	rt, err := resolveRuntime(paths, full)
+	if err != nil {
+		// Unknown runtime — fall back to openclaw defaults.
+		rt = openclawRuntime()
+	}
+	if rt.HooksDir == "" {
+		// Runtime doesn't support hooks.
+		return errorf("runtime %q does not declare a HooksDir — hooks not supported", rt.Name)
+	}
+	ext := rt.HookFileExt
+	if ext == "" {
+		ext = ".sh"
+	}
+	// Build the allowed-events set for quick lookup (empty = accept anything).
+	allowed := map[string]bool{}
+	for _, e := range rt.SupportedHookEvents {
+		allowed[e] = true
+	}
+
 	instDir := filepath.Join(paths.Root, full)
-	hooksDir := filepath.Join(instDir, "workspace", "hooks")
+	hooksDir := filepath.Join(instDir, "workspace", rt.HooksDir)
 	if err := os.MkdirAll(hooksDir, 0755); err != nil {
 		return err
 	}
-	for event, cmd := range hooks {
-		// Validate event name (alphanum + dash, no slashes)
+	for event, ref := range hooks {
 		if strings.ContainsAny(event, "/\\.") {
 			continue
 		}
-		hookFile := filepath.Join(hooksDir, event+".sh")
-		body := "#!/bin/sh\n# claws-managed hook for event: " + event + "\n" + cmd + "\n"
-		// Idempotence: only write if content differs
-		if existing, err := os.ReadFile(hookFile); err == nil && string(existing) == body {
+		if len(allowed) > 0 && !allowed[event] {
+			fmt.Printf("    \033[0;33m! hook event %q not in runtime %q SupportedHookEvents — writing anyway, may be ignored at runtime\033[0m\n", event, rt.Name)
+		}
+		if ref.FromURL != "" && ref.Sha256 == "" {
+			fmt.Printf("    \033[0;33m! hook %q: no sha256 declared for %s — fetch without integrity check\033[0m\n", event, ref.FromURL)
+		}
+		raw, src, err := resolveHookContent(ref)
+		if err != nil {
+			fmt.Printf("    \033[0;33m! hook %q (%s): %v\033[0m\n", event, src, err)
+			continue
+		}
+		hookFile := filepath.Join(hooksDir, event+ext)
+		// Wrap inline commands in a shebang + comment header; pass through
+		// fetched/file-loaded bodies as-is (they may already be full scripts).
+		var body string
+		if ref.Command != "" {
+			body = "#!/bin/sh\n# claws-managed hook for event: " + event + " (runtime: " + rt.Name + ", source: " + src + ")\n" + string(raw) + "\n"
+		} else {
+			body = string(raw)
+		}
+		if existing, err := os.ReadFile(hookFile); err == nil && existing != nil && string(existing) == body {
 			continue
 		}
 		if err := os.WriteFile(hookFile, []byte(body), 0755); err != nil {

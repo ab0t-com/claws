@@ -82,6 +82,13 @@ type Runtime struct {
 	ConfigGetCmd    []string `json:"configGetCmd,omitempty"`    // e.g., ["config", "get"]
 	ConfigSetCmd    []string `json:"configSetCmd,omitempty"`    // e.g., ["config", "set"]
 
+	// Hook register (v1.4) — declares the lifecycle hook contract.
+	// Templates and `claws apply` use this to know where to materialise
+	// hook scripts and which event names this runtime recognises.
+	HooksDir            string   `json:"hooksDir,omitempty"`            // workspace-relative dir, e.g. "hooks"
+	HookFileExt         string   `json:"hookFileExt,omitempty"`         // e.g. ".sh"
+	SupportedHookEvents []string `json:"supportedHookEvents,omitempty"` // e.g. ["onStart","onMessage","onIdle","onError","onShutdown"]
+
 	// Capabilities — what features this runtime supports
 	Capabilities RuntimeCapabilities `json:"capabilities"`
 }
@@ -151,6 +158,14 @@ func openclawRuntime() Runtime {
 		AuthApiKeyCmd:   []string{"onboard", "--mode", "headless"},
 		ConfigGetCmd:    []string{"config", "get"},
 		ConfigSetCmd:    []string{"config", "set"},
+
+		// Hook contract — openclaw runtime scans workspace/hooks/<event>.sh
+		// on startup and invokes the matching script on each lifecycle event.
+		HooksDir:    "hooks",
+		HookFileExt: ".sh",
+		SupportedHookEvents: []string{
+			"onStart", "onMessage", "onIdle", "onError", "onShutdown",
+		},
 
 		Capabilities: RuntimeCapabilities{
 			Channels: true,

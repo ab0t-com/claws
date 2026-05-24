@@ -59,42 +59,135 @@ func templateSearchPaths() []string {
 
 // resolveTemplate finds a template by name and returns its absolute path.
 // Empty name → error. Unknown name → error listing the directories searched.
+//
+// Naming forms:
+//   - "telegram-coder"        — bare name; recursive search, ambiguity errors
+//   - "solo/telegram-coder"   — namespaced; resolves only that path
+//   - "solo/telegram-coder.json" — extension stripped
+//
+// Search order across templateSearchPaths(); first match per name wins.
 func resolveTemplate(name string) (string, error) {
 	if name == "" {
 		return "", errorf("template name required")
 	}
-	// Strip .json suffix if user added it, then re-add.
 	name = strings.TrimSuffix(name, ".json")
-	if strings.ContainsAny(name, "/\\") {
-		return "", errorf("template name must not contain path separators: %q", name)
+	if strings.Contains(name, "\\") || strings.HasPrefix(name, "/") || strings.Contains(name, "..") {
+		return "", errorf("invalid template name: %q", name)
 	}
 
+	// Namespaced form: try the exact path under each search dir.
+	if strings.Contains(name, "/") {
+		var searched []string
+		for _, dir := range templateSearchPaths() {
+			searched = append(searched, dir)
+			path := filepath.Join(dir, name+".json")
+			if _, err := os.Stat(path); err == nil {
+				return path, nil
+			}
+		}
+		return "", errorf("template %q not found. Searched:\n  %s",
+			name, strings.Join(searched, "\n  "))
+	}
+
+	// Bare name: walk each search dir recursively. Collect ALL matches so we
+	// can error clearly on ambiguity. First-priority search dir wins on ties.
+	var hits []string
 	var searched []string
 	for _, dir := range templateSearchPaths() {
 		searched = append(searched, dir)
-		path := filepath.Join(dir, name+".json")
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
+		// Direct hit at the top level (back-compat for flat layout).
+		direct := filepath.Join(dir, name+".json")
+		if _, err := os.Stat(direct); err == nil {
+			hits = append(hits, direct)
+		}
+		// Recursive walk one level deep (namespace dirs).
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			nested := filepath.Join(dir, e.Name(), name+".json")
+			if _, err := os.Stat(nested); err == nil {
+				hits = append(hits, nested)
+			}
+		}
+		// If we found at least one in this search dir, prefer it (priority order).
+		if len(hits) > 0 {
+			break
 		}
 	}
-	return "", errorf("template %q not found. Searched:\n  %s",
-		name, strings.Join(searched, "\n  "))
+
+	switch len(hits) {
+	case 0:
+		return "", errorf("template %q not found. Searched:\n  %s",
+			name, strings.Join(searched, "\n  "))
+	case 1:
+		return hits[0], nil
+	default:
+		var qualified []string
+		for _, h := range hits {
+			// Display as namespace/name relative to the search dir.
+			for _, dir := range templateSearchPaths() {
+				if rel, err := filepath.Rel(dir, h); err == nil && !strings.HasPrefix(rel, "..") {
+					qualified = append(qualified, strings.TrimSuffix(rel, ".json"))
+					break
+				}
+			}
+		}
+		return "", errorf("template name %q is ambiguous. Matches:\n  %s\nUse the namespaced form (e.g. claws apply --template=<namespace>/%s)",
+			name, strings.Join(qualified, "\n  "), name)
+	}
 }
 
 // templateInfo summarises a discoverable template for `claws template list`.
 type templateInfo struct {
 	Name        string
+	Namespace   string // "" if flat, e.g. "solo", "teams"
 	Path        string
 	Version     string
 	Description string
 	Tags        []string
 }
 
+// QualifiedName returns "namespace/name" or just "name" for flat templates.
+func (t templateInfo) QualifiedName() string {
+	if t.Namespace == "" {
+		return t.Name
+	}
+	return t.Namespace + "/" + t.Name
+}
+
 // listTemplates walks every search path and returns a deduplicated list,
-// preferring the highest-priority path on name collisions.
+// preferring the highest-priority path on name collisions. Searches both
+// flat (templates/foo.json) and namespaced (templates/<ns>/foo.json) layouts.
 func listTemplates() []templateInfo {
 	seen := map[string]bool{}
 	var out []templateInfo
+
+	addOne := func(path, name, namespace string) {
+		// Dedup key includes namespace so solo/foo and foo aren't conflated.
+		key := name
+		if namespace != "" {
+			key = namespace + "/" + name
+		}
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		info := templateInfo{Name: name, Path: path, Namespace: namespace}
+		if data, err := os.ReadFile(path); err == nil {
+			var p Profile
+			if err := json.Unmarshal(data, &p); err == nil {
+				info.Version = p.Metadata.Version
+				info.Description = p.Metadata.Description
+				info.Tags = p.Metadata.Tags
+			}
+		}
+		out = append(out, info)
+	}
 
 	for _, dir := range templateSearchPaths() {
 		entries, err := os.ReadDir(dir)
@@ -102,32 +195,34 @@ func listTemplates() []templateInfo {
 			continue
 		}
 		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			if e.IsDir() {
+				// Recurse one level for namespace dirs.
+				nsEntries, err := os.ReadDir(filepath.Join(dir, e.Name()))
+				if err != nil {
+					continue
+				}
+				for _, nse := range nsEntries {
+					if nse.IsDir() || !strings.HasSuffix(nse.Name(), ".json") {
+						continue
+					}
+					addOne(filepath.Join(dir, e.Name(), nse.Name()),
+						strings.TrimSuffix(nse.Name(), ".json"), e.Name())
+				}
 				continue
 			}
-			name := strings.TrimSuffix(e.Name(), ".json")
-			if seen[name] {
-				continue // earlier search path won
+			if !strings.HasSuffix(e.Name(), ".json") {
+				continue
 			}
-			seen[name] = true
-
-			path := filepath.Join(dir, e.Name())
-			info := templateInfo{Name: name, Path: path}
-
-			// Try to read metadata for richer output. Best-effort.
-			if data, err := os.ReadFile(path); err == nil {
-				var p Profile
-				if err := json.Unmarshal(data, &p); err == nil {
-					info.Version = p.Metadata.Version
-					info.Description = p.Metadata.Description
-					info.Tags = p.Metadata.Tags
-				}
-			}
-			out = append(out, info)
+			addOne(filepath.Join(dir, e.Name()), strings.TrimSuffix(e.Name(), ".json"), "")
 		}
 	}
 
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Namespace != out[j].Namespace {
+			return out[i].Namespace < out[j].Namespace
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out
 }
 
@@ -159,17 +254,26 @@ func cmdTemplate(args []string) error {
 			dim  = "\033[0;90m"
 			nc   = "\033[0m"
 		)
-		fmt.Printf("%s%-28s %-10s %s%s\n", bold, "NAME", "VERSION", "DESCRIPTION", nc)
+		fmt.Printf("%s%-36s %-10s %s%s\n", bold, "NAME", "VERSION", "DESCRIPTION", nc)
+		currentNS := "__nope__"
 		for _, t := range templates {
+			if t.Namespace != currentNS {
+				currentNS = t.Namespace
+				label := currentNS
+				if label == "" {
+					label = "(flat)"
+				}
+				fmt.Printf("\n%s%s%s/\n", dim, label, nc)
+			}
 			desc := t.Description
-			if len(desc) > 56 {
-				desc = desc[:55] + "…"
+			if len(desc) > 48 {
+				desc = desc[:47] + "…"
 			}
 			ver := t.Version
 			if ver == "" {
 				ver = "—"
 			}
-			fmt.Printf("%-28s %-10s %s\n", t.Name, ver, desc)
+			fmt.Printf("  %-34s %-10s %s\n", t.QualifiedName(), ver, desc)
 		}
 		fmt.Printf("\n%sApply one:%s claws apply --template=<name>\n", dim, nc)
 		return nil
