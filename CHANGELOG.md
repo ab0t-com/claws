@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.15] — 2026-05-24
+
+_(no changes documented)_
+
 ## [v1.6.14] — 2026-05-24
 
 ### Added — auth fleet helpers (the simple fix for shared-OAuth pain)
