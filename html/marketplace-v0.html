@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>claws — Template Marketplace</title>
+  <meta name="description" content="Curated and community templates for one-click claws agent and team deployments. From a solo Telegram bot to a multi-tenant agency fleet — declaratively, idempotently, MIT-licensed.">
+  <meta name="theme-color" content="#fafafa">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦞</text></svg>">
+  <style>
+    :root {
+      --white: #fafafa;
+      --off-white: #f4f2ef;
+      --cream: #edeae4;
+      --warm-gray: #c8c3ba;
+      --mid-gray: #8a8580;
+      --charcoal: #3a3632;
+      --ink: #1a1714;
+      --dark-bg: #141210;
+      --dark-surface: #1e1c18;
+      --dark-border: #2e2a24;
+      --dark-text: #e8e4de;
+      --dark-muted: #9a958e;
+      --coral: #e8634a;
+      --coral-soft: #f09080;
+      --coral-deep: #c44e38;
+      --sage: #7da67d;
+      --sage-soft: #a3c4a3;
+      --gold: #c8a86e;
+      --gold-soft: #dfc99a;
+      --max-width: 1080px;
+      --section-pad: clamp(50px, 8vw, 100px);
+      --border-thick: 3px;
+      --font-display: 'Georgia', 'Times New Roman', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+    a { color: var(--coral); text-decoration: none; }
+    a:hover { color: var(--coral-deep); text-decoration: underline; text-underline-offset: 3px; }
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 clamp(20px, 4vw, 40px);
+    }
+
+    /* --- Header --- */
+    header {
+      padding: var(--section-pad) 0 40px;
+      border-bottom: var(--border-thick) solid var(--ink);
+    }
+    .crumb {
+      font-size: 0.85rem;
+      color: var(--mid-gray);
+      margin-bottom: 16px;
+      letter-spacing: 0.02em;
+    }
+    .crumb a { color: var(--mid-gray); text-decoration: underline; text-underline-offset: 2px; }
+    .crumb a:hover { color: var(--coral); }
+    header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    header .lead {
+      margin-top: 20px;
+      font-size: 1.15rem;
+      color: var(--mid-gray);
+      max-width: 720px;
+      line-height: 1.7;
+    }
+    .meta-row {
+      margin-top: 28px;
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      font-size: 0.88rem;
+      color: var(--mid-gray);
+    }
+    .meta-row strong { color: var(--ink); }
+
+    /* --- Filter pills --- */
+    .filters {
+      padding: 28px 0 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      display: inline-block;
+      padding: 8px 18px;
+      border: 2px solid var(--cream);
+      border-radius: 100px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--charcoal);
+      cursor: pointer;
+      background: var(--white);
+      transition: all 0.15s;
+    }
+    .pill:hover { border-color: var(--ink); }
+    .pill.active { background: var(--ink); color: var(--white); border-color: var(--ink); }
+    .pill .count { color: var(--mid-gray); font-weight: 400; margin-left: 6px; }
+    .pill.active .count { color: var(--warm-gray); }
+
+    /* --- Section --- */
+    section {
+      padding: 60px 0;
+      border-bottom: 1.5px solid var(--cream);
+    }
+    section:last-of-type { border-bottom: none; }
+
+    h2.section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--mid-gray);
+      font-size: 1.05rem;
+      margin-bottom: 36px;
+      max-width: 720px;
+    }
+
+    /* --- Template grid --- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 22px;
+    }
+
+    /* --- Template card --- */
+    .card {
+      background: var(--white);
+      border: 2px solid var(--cream);
+      border-radius: 12px;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.18s;
+      position: relative;
+    }
+    .card:hover { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(26, 23, 20, 0.08); }
+    .card[data-soon="true"] { opacity: 0.65; }
+    .card[data-soon="true"]:hover { transform: none; border-color: var(--cream); box-shadow: none; }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .card-name {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    .card-author {
+      font-size: 0.78rem;
+      color: var(--mid-gray);
+      margin-bottom: 12px;
+      letter-spacing: 0.02em;
+    }
+    .card-author code { background: transparent; padding: 0; border: 0; font-size: 0.78rem; color: var(--charcoal); }
+
+    /* --- Badge --- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .badge-verified { background: #e8f5e9; color: #2e7d32; }
+    .badge-community { background: var(--off-white); color: var(--mid-gray); border: 1px solid var(--cream); }
+    .badge-soon { background: #fff3e0; color: #b8860b; }
+
+    .card-desc {
+      font-size: 0.93rem;
+      color: var(--charcoal);
+      line-height: 1.6;
+      margin: 4px 0 18px;
+      flex-grow: 1;
+    }
+
+    /* --- Card facts --- */
+    .facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .fact {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 11px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      background: var(--off-white);
+      color: var(--charcoal);
+      border: 1px solid var(--cream);
+    }
+    .fact strong { font-weight: 700; color: var(--ink); }
+
+    /* --- Install command --- */
+    .cmd {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+      margin-bottom: 14px;
+    }
+    .cmd .c { color: var(--dark-muted); }
+    .cmd .h { color: var(--coral-soft); }
+
+    .card-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      padding-top: 4px;
+    }
+    .card-foot a { font-weight: 600; }
+
+    /* --- Code blocks (inline) --- */
+    code {
+      font-family: var(--font-mono);
+      background: var(--off-white);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.86em;
+      border: 1px solid var(--cream);
+    }
+
+    /* --- Profile JSON preview --- */
+    .json-preview {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: 24px 28px;
+      border-radius: 10px;
+      margin: 24px 0;
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .json-preview .k { color: #b3d4ff; }
+    .json-preview .s { color: #a3c4a3; }
+    .json-preview .n { color: #f09080; }
+    .json-preview .c { color: var(--dark-muted); font-style: italic; }
+
+    /* --- Tip --- */
+    .tip {
+      background: #f0f7f0;
+      border-left: 4px solid var(--sage);
+      padding: 16px 22px;
+      margin: 22px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.93rem;
+    }
+    .tip strong { color: var(--sage); }
+
+    /* --- Dark section --- */
+    .dark {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+      padding: var(--section-pad) 0;
+      border-bottom: none;
+    }
+    .dark h2 { color: var(--dark-text); }
+    .dark .subtitle { color: var(--dark-muted); }
+    .dark code { background: var(--dark-surface); border-color: var(--dark-border); color: var(--dark-text); }
+    .dark a { color: var(--coral-soft); }
+    .dark a:hover { color: var(--coral); }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      background: var(--coral);
+      color: var(--white);
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+      transition: background 0.15s;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--coral-deep); color: var(--white); text-decoration: none; }
+    .btn-ghost { background: transparent; color: var(--dark-text); border: 2px solid var(--dark-border); }
+    .btn-ghost:hover { background: var(--dark-surface); color: var(--dark-text); border-color: var(--dark-muted); }
+
+    .cta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 24px; }
+
+    /* --- Footer --- */
+    footer {
+      padding: 40px 0 var(--section-pad);
+      text-align: center;
+      color: var(--mid-gray);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--coral); text-decoration: underline; text-underline-offset: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="crumb">🦞 <a href="landing.html">claws</a> &middot; Template Marketplace</div>
+    <h1>Templates for one-click claw deployments</h1>
+    <p class="lead">
+      Declarative JSON profiles you apply with a single command. From a solo Telegram
+      bot to a multi-tenant agency fleet &mdash; idempotent, auditable, MIT-licensed.
+      Bring your own runtime (OpenClaw today, more soon).
+    </p>
+    <div class="meta-row">
+      <span><strong>9</strong> templates</span>
+      <span><strong>1</strong> runtime supported &middot; <em>more coming</em></span>
+      <span><strong>MIT</strong> licensed</span>
+      <span><a href="https://github.com/ab0t-com/claws">github.com/ab0t-com/claws</a></span>
+    </div>
+  </div>
+</header>
+
+<!-- ================================================================ -->
+<!-- HOW IT WORKS -->
+<!-- ================================================================ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">How it works</h2>
+    <p class="subtitle">
+      A template is a JSON profile describing the desired state &mdash; runtime, team,
+      agents, channels, policy. <code>claws apply</code> reconciles your host to match.
+      Same template works for one-shot EC2 provisioning and for interactive laptop setup.
+    </p>
+
+    <div class="json-preview"><span class="c">// solo-telegram-coder/profile.json</span>
+{
+  <span class="k">"apiVersion"</span>: <span class="s">"claws.ab0t.com/v1"</span>,
+  <span class="k">"kind"</span>: <span class="s">"Profile"</span>,
+  <span class="k">"metadata"</span>: { <span class="k">"name"</span>: <span class="s">"solo-telegram-coder"</span>, <span class="k">"version"</span>: <span class="s">"1.2.0"</span> },
+  <span class="k">"runtime"</span>: { <span class="k">"name"</span>: <span class="s">"openclaw"</span>, <span class="k">"image"</span>: <span class="s">"openclaw:local"</span> },
+  <span class="k">"policy"</span>: { <span class="k">"loopbackOnly"</span>: <span class="n">true</span>, <span class="k">"dmDefault"</span>: <span class="s">"pairing"</span> },
+  <span class="k">"team"</span>: { <span class="k">"name"</span>: <span class="s">"default"</span> },
+  <span class="k">"agents"</span>: [
+    {
+      <span class="k">"name"</span>: <span class="s">"agent-1"</span>,
+      <span class="k">"auth"</span>: { <span class="k">"preferred"</span>: <span class="s">"codex"</span> },
+      <span class="k">"channels"</span>: [
+        { <span class="k">"type"</span>: <span class="s">"telegram"</span>, <span class="k">"tokenFrom"</span>: { <span class="k">"env"</span>: <span class="s">"TELEGRAM_BOT_TOKEN"</span> } }
+      ]
+    }
+  ],
+  <span class="k">"postSetup"</span>: [<span class="s">"audit"</span>, <span class="s">"verify --all"</span>, <span class="s">"start --all"</span>]
+}</div>
+
+    <div class="tip">
+      <strong>Secrets stay local.</strong> Profiles reference <code>tokenFrom.env</code>,
+      <code>tokenFrom.file</code>, or <code>tokenFrom.command</code> &mdash; never inline.
+      Publishable templates contain no credentials.
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- FILTERS + TEMPLATE GRID -->
+<!-- ================================================================ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Browse templates</h2>
+    <p class="subtitle">Filter by use case. All templates are MIT-licensed.</p>
+
+    <div class="filters">
+      <button class="pill active" data-filter="all">All <span class="count">9</span></button>
+      <button class="pill" data-filter="solo">Solo <span class="count">4</span></button>
+      <button class="pill" data-filter="team">Teams <span class="count">2</span></button>
+      <button class="pill" data-filter="enterprise">Enterprise <span class="count">2</span></button>
+      <button class="pill" data-filter="sandbox">Sandbox <span class="count">1</span></button>
+    </div>
+
+    <div class="grid" id="grid" style="margin-top: 28px;">
+
+      <!-- solo -->
+      <div class="card" data-cat="solo">
+        <div class="card-head">
+          <span class="card-name">solo</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v1.0.0</div>
+        <p class="card-desc">Bare minimum &mdash; one agent, no channel, no auth. The default for <code>claws quickstart</code>. Add channels and auth as next steps.</p>
+        <div class="facts">
+          <span class="fact"><strong>1</strong> agent</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">no channel</span>
+          <span class="fact">~30s</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=solo</span></div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="https://github.com/ab0t-com/claws/tree/main/templates/solo" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- solo-telegram-coder -->
+      <div class="card" data-cat="solo">
+        <div class="card-head">
+          <span class="card-name">solo-telegram-coder</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v1.2.0</div>
+        <p class="card-desc">Personal coding bot on Telegram. OAuth via OpenAI Codex. Tool profile pre-set to <code>coding</code>. Pairing DM policy.</p>
+        <div class="facts">
+          <span class="fact"><strong>1</strong> agent</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">📡 Telegram</span>
+          <span class="fact">Codex OAuth</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=solo-telegram-coder</span> \
+    --secrets-dir=/etc/claws/secrets</div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- solo-discord -->
+      <div class="card" data-cat="solo">
+        <div class="card-head">
+          <span class="card-name">solo-discord</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v1.1.0</div>
+        <p class="card-desc">Personal assistant on Discord. Handles DMs and a single server. Conservative defaults &mdash; allowlist by user ID, audit on.</p>
+        <div class="facts">
+          <span class="fact"><strong>1</strong> agent</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">📡 Discord</span>
+          <span class="fact">allowlist</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=solo-discord</span></div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- personal-assistant -->
+      <div class="card" data-cat="solo">
+        <div class="card-head">
+          <span class="card-name">personal-assistant</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v0.9.0</div>
+        <p class="card-desc">Always-on personal AI on Telegram with memory enabled. Sarah-style: long-running session, MEMORY.md, USER.md, daily heartbeat checks.</p>
+        <div class="facts">
+          <span class="fact"><strong>1</strong> agent</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">📡 Telegram</span>
+          <span class="fact">memory</span>
+          <span class="fact">heartbeat</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=personal-assistant</span></div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- team-research -->
+      <div class="card" data-cat="team">
+        <div class="card-head">
+          <span class="card-name">team-research</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v1.0.0</div>
+        <p class="card-desc">Manager + 2 worker agents with task queue. Shared workspace. Slack channel for the manager only. Workers receive tasks via filesystem.</p>
+        <div class="facts">
+          <span class="fact"><strong>3</strong> agents</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">📡 Slack</span>
+          <span class="fact">manager+worker</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=team-research</span> \
+    --secrets-dir=/etc/claws/secrets</div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- team-support -->
+      <div class="card" data-cat="team">
+        <div class="card-head">
+          <span class="card-name">team-support</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v1.0.0</div>
+        <p class="card-desc">Public-facing customer support team. Allowlist enforced, audit on, tool profile = <code>support</code>. Multi-channel (Telegram + Slack handoff).</p>
+        <div class="facts">
+          <span class="fact"><strong>2-3</strong> agents</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">📡 Telegram+Slack</span>
+          <span class="fact">allowlist</span>
+          <span class="fact">audit</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=team-support</span></div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- agency-multi-tenant -->
+      <div class="card" data-cat="enterprise">
+        <div class="card-head">
+          <span class="card-name">agency-multi-tenant</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v0.8.0</div>
+        <p class="card-desc">N isolated teams &mdash; one group per client. Per-tenant policy enforcement, per-tenant allowlist + audit log. Configure clients via a YAML side-file.</p>
+        <div class="facts">
+          <span class="fact"><strong>N</strong> teams</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">per-tenant policy</span>
+          <span class="fact">isolated audit</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=agency-multi-tenant</span> \
+    --tenants=./clients.json</div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- enterprise -->
+      <div class="card" data-cat="enterprise">
+        <div class="card-head">
+          <span class="card-name">enterprise</span>
+          <span class="badge badge-verified">✓ Verified</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v0.7.0</div>
+        <p class="card-desc">Compliance-leaning defaults. Full RBAC + policy enforce + scheduled backups + audit pipeline to syslog/Splunk. Tested against SOC2 control hints.</p>
+        <div class="facts">
+          <span class="fact">configurable</span>
+          <span class="fact">openclaw</span>
+          <span class="fact">RBAC</span>
+          <span class="fact">backups</span>
+          <span class="fact">audit pipeline</span>
+        </div>
+        <div class="cmd">$ claws apply <span class="h">--template=enterprise</span> \
+    --file=./overrides.json --yes</div>
+        <div class="card-foot">
+          <a href="#">Try it →</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+      <!-- devbox -->
+      <div class="card" data-cat="sandbox" data-soon="true">
+        <div class="card-head">
+          <span class="card-name">devbox</span>
+          <span class="badge badge-soon">Coming soon</span>
+        </div>
+        <div class="card-author">by <code>ab0t</code> &middot; v0.1.0-preview</div>
+        <p class="card-desc">Single agent inside an <code>ab0t-sandbox</code> dev environment. Code execution allowed, ephemeral filesystem, per-session reset. Ships when the sandbox runtime is GA.</p>
+        <div class="facts">
+          <span class="fact"><strong>1</strong> agent</span>
+          <span class="fact">ab0t-sandbox</span>
+          <span class="fact">code exec</span>
+          <span class="fact">ephemeral</span>
+        </div>
+        <div class="cmd"><span class="c"># ships in v1.3</span>
+$ claws apply <span class="h">--template=devbox</span></div>
+        <div class="card-foot">
+          <a href="#" style="color: var(--mid-gray);">Roadmap ↗</a>
+          <a href="#" style="color: var(--mid-gray);">Source ↗</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- TWO MODES -->
+<!-- ================================================================ -->
+<div class="dark">
+  <div class="container">
+    <h2 class="section-title">Same templates, two journeys</h2>
+    <p class="subtitle">
+      Whatever runs in cloud-init also runs on your laptop. The difference is whether
+      you ship secrets ahead of time or get prompted for them.
+    </p>
+
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 26px; margin-top: 28px;">
+
+      <div class="card" style="background: var(--dark-surface); border-color: var(--dark-border); color: var(--dark-text);">
+        <div class="card-head">
+          <span class="card-name" style="color: var(--dark-text);">Zero-touch (cloud)</span>
+          <span class="badge badge-verified">EC2-ready</span>
+        </div>
+        <p class="card-desc" style="color: var(--dark-muted);">For cloud-init, Dockerfile, k8s jobs, CI smoke tests. No prompts. Exits 0 only if everything verified healthy.</p>
+        <div class="cmd" style="background: var(--dark-bg); border: 1px solid var(--dark-border);"><span class="c"># EC2 user_data</span>
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+claws apply <span class="h">--template=solo-telegram-coder</span> \
+            <span class="h">--secrets-dir=</span>/etc/claws/secrets \
+            <span class="h">--yes --verify</span></div>
+      </div>
+
+      <div class="card" style="background: var(--dark-surface); border-color: var(--dark-border); color: var(--dark-text);">
+        <div class="card-head">
+          <span class="card-name" style="color: var(--dark-text);">Interactive (laptop)</span>
+          <span class="badge badge-community">Smart defaults</span>
+        </div>
+        <p class="card-desc" style="color: var(--dark-muted);">For developers trying claws for the first time. Prompts only for what only you can answer &mdash; the OAuth click and the bot token.</p>
+        <div class="cmd" style="background: var(--dark-bg); border: 1px solid var(--dark-border);"><span class="c"># Just run it</span>
+$ claws quickstart
+
+<span class="c"># or explicit template</span>
+$ claws quickstart <span class="h">--template=team-research</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- SUBMIT YOUR OWN -->
+<!-- ================================================================ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Submit your own template</h2>
+    <p class="subtitle">
+      Built a useful claws configuration? Share it. We curate community submissions and
+      promote good ones to verified status. Templates are MIT-licensed by default.
+    </p>
+
+    <h3 style="margin-top: 36px;">In 3 steps</h3>
+    <ol style="margin: 16px 0 24px 24px; line-height: 2;">
+      <li>Author your <code>profile.json</code> against the <a href="#">v1 schema</a>.</li>
+      <li>Add a <code>README.md</code> (use case, prereqs) and <code>secrets.example.env</code> listing required env vars.</li>
+      <li>Open a PR to <a href="https://github.com/ab0t-com/claws-templates">ab0t-com/claws-templates</a>. We validate against the schema, dogfood it on a fresh EC2, then merge.</li>
+    </ol>
+
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/ab0t-com/claws-templates/blob/main/CONTRIBUTING.md">Contribution guide →</a>
+      <a class="btn" href="https://github.com/ab0t-com/claws-templates/issues/new?template=template-submission.md" style="background: var(--ink);">Open submission issue</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      claws &mdash; AI agent control plane &middot;
+      <a href="landing.html">Home</a> &middot;
+      <a href="team-guide.html">Team Guide</a> &middot;
+      <a href="channels-guide.html">Channels</a> &middot;
+      <a href="https://github.com/ab0t-com/claws">GitHub</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Filter pill behavior — pure DOM, no deps
+  const pills = document.querySelectorAll('.pill');
+  const cards = document.querySelectorAll('#grid .card');
+  pills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const filter = pill.dataset.filter;
+      cards.forEach(card => {
+        card.style.display = (filter === 'all' || card.dataset.cat === filter) ? '' : 'none';
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
