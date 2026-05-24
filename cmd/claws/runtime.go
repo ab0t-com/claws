@@ -89,9 +89,20 @@ type Runtime struct {
 	HookFileExt         string   `json:"hookFileExt,omitempty"`         // e.g. ".sh"
 	SupportedHookEvents []string `json:"supportedHookEvents,omitempty"` // e.g. ["onStart","onMessage","onIdle","onError","onShutdown"]
 
-	// Cron register (v1.5) — declares where periodic jobs land + format.
-	CronDir    string `json:"cronDir,omitempty"`    // workspace-relative, e.g. "cron"
-	CronFormat string `json:"cronFormat,omitempty"` // "crontab" | "systemd-timer" | "json"
+	// Hooks/skills scope (v1.6) — where claws writes them.
+	//   "team":  <team>/shared/hooks (or skills) — runtime mounts RO at /shared-hooks (or /bundled-skills)
+	//   "agent": <instance>/workspace/hooks (or skills) — per-agent only
+	//   "both":  write to both paths
+	HooksScope  string `json:"hooksScope,omitempty"`  // default: "team"
+	SkillsScope string `json:"skillsScope,omitempty"` // default: "team"
+
+	// Cron register (v1.5 + corrected in v1.6) — declares the cron contract.
+	// CronDir/CronFormat tell us where jobs go and in what shape.
+	//   "claws-jobs.json": <instance>/cron/jobs.json + cron/runs/*.jsonl
+	//                       (the runtime's prompt-the-agent model)
+	//   "crontab":         <instance>/<CronDir>/claws.crontab (legacy v1.5)
+	CronDir    string `json:"cronDir,omitempty"`    // e.g. "cron" (instance-relative — NOT workspace-relative for jobs.json)
+	CronFormat string `json:"cronFormat,omitempty"` // "claws-jobs.json" | "crontab" | "systemd-timer"
 
 	// Capabilities — what features this runtime supports
 	Capabilities RuntimeCapabilities `json:"capabilities"`
@@ -174,11 +185,19 @@ func openclawRuntime() Runtime {
 			"onStart", "onMessage", "onIdle", "onError", "onShutdown",
 		},
 
-		// Cron contract (v1.5) — periodic jobs land here in standard
-		// crontab format. The runtime image may consume them via a
-		// builtin cron daemon or via an operator-installed cron.
+		// Hooks/Skills scope (v1.6) — match what the live openclaw
+		// runtime mounts. shared/hooks → /shared-hooks RO; shared/skills
+		// → /bundled-skills RO. Per-agent paths would be ignored by the
+		// runtime (verified against ~/.openclaw/team/sarah's compose override).
+		HooksScope:  "team",
+		SkillsScope: "team",
+
+		// Cron contract (v1.6) — runtime image consumes JSON jobs from
+		// <instance>/cron/jobs.json (NOT workspace/cron/claws.crontab as
+		// v1.5 wrote). Each job is a "send this prompt to the agent on a
+		// schedule" entry — see worklog for the full job shape.
 		CronDir:    "cron",
-		CronFormat: "crontab",
+		CronFormat: "claws-jobs.json",
 
 		Capabilities: RuntimeCapabilities{
 			Channels: true,

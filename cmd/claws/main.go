@@ -69,7 +69,23 @@ func main() {
 	case "group":
 		err = cmdGroup(args)
 	case "team":
-		err = cmdTeam(args)
+		// v1.6: intercept `team tree` for the new topology renderer.
+		// Existing `team show` keeps its table-style listing.
+		if len(args) > 0 && args[0] == "tree" {
+			err = cmdTeamTree(args[1:])
+		} else {
+			err = cmdTeam(args)
+		}
+	case "cron":
+		err = cmdCron(args)
+	case "fleet":
+		err = cmdFleet(args)
+	case "id":
+		err = cmdID(args)
+	case "by-id":
+		err = cmdByID(args)
+	case "contract":
+		err = cmdContract(args)
 	case "storage":
 		err = cmdStorage(args)
 	case "migrate":

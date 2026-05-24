@@ -9,6 +9,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.0] — 2026-05-24
+
+**Contract alignment + fleet operator visibility + agent UUIDs.**
+
+This release fixes silent feature failures in v1.5 (cron / hooks / skills
+were written to paths the runtime didn't read), gives operators a clear
+view into the data claws already writes, and introduces stable per-agent
+UUIDs for cross-system integration.
+
+### Fixed (silent v1.5 bugs)
+
+- **Cron jobs now actually fire.** v1.5 wrote `workspace/cron/claws.crontab`
+  in crontab format; the runtime image actually reads `<instance>/cron/jobs.json`
+  in its own JSON format. v1.6 writes the runtime's shape, with each
+  `agents[].cron[]` entry becoming a `{kind: systemEvent, text: ...}`
+  payload the runtime dispatches as a prompt to the agent.
+- **Hooks now actually run.** v1.5 wrote `<instance>/workspace/hooks/<event>.sh`
+  per-agent; the runtime mounts `<team>/shared/hooks/` RO at
+  `/home/node/.openclaw/shared-hooks`. v1.6 writes team-scoped by default.
+- **Skills now actually mount.** Same scope mismatch — v1.5 wrote
+  per-agent; runtime expects team-shared. v1.6 writes
+  `<team>/shared/skills/` by default.
+- **Per-agent paths still supported** via opt-in `Runtime.HooksScope =
+  "agent" | "both"` (default `"team"`), same for `SkillsScope`. Only
+  matters for non-openclaw runtimes.
+
+### Added — Cron schema enhancement
+
+- **`agents[].cron[].prompt`** — natural-language system event sent to
+  the agent on each fire. Most natural mapping to the runtime's payload
+  model. Legacy `command/hook/exec` continue to work and get wrapped as
+  best-effort text payloads.
+
+### Added — Migration helpers
+
+- **`claws migrate cron`** — converts any legacy v1.5
+  `workspace/cron/claws.crontab` to the new `cron/jobs.json` shape.
+  Idempotent. Doesn't delete the legacy file (operator removes after verifying).
+- **`claws migrate uuids`** — populates `CLAWS_INSTANCE_UUID` in every
+  existing agent's `instance.env` (and mirrors to `openclaw.json meta.id`).
+  Idempotent.
+- **`claws migrate all`** — runs both.
+
+### Added — Fleet/team operator visibility
+
+- **`claws team tree <team>`** — ASCII topology renderer:
+  ```
+  org/
+  └── lead (manager)
+      ├── alpha-lead (manager)
+      │   ├── alpha-worker-1 (worker) (peers: alpha-worker-2)
+      │   └── alpha-worker-2 (worker) (peers: alpha-worker-1)
+      └── beta-lead (manager)
+          ├── beta-worker-1 (worker)
+          └── beta-worker-2 (worker)
+  ```
+  With `--json` for tooling.
+- **`claws cron list <agent>`** — runtime cron state: jobs + schedule +
+  next-run + last-run + last-status. Reads `<instance>/cron/jobs.json`.
+- **`claws cron tail <agent>`** — streams `cron/runs/*.jsonl` events
+  newline-delimited (poll-based, 2s).
+- **`claws fleet doctor`** — runs `claws doctor` + `audit` + `drift` +
+  `orphans` in sequence with sectioned output and a summary. Exits
+  non-zero on any failure.
+- **`claws contract show [<runtime>]`** — prints the runtime adapter's
+  declared contract (capabilities, hook/cron/skills paths and formats,
+  mount points). Use this to verify "this runtime supports X" before
+  writing a template that depends on X.
+- **`claws contract list`** — list all registered runtimes.
+
+### Added — Agent UUIDs (stable cross-system identifier)
+
+- **Every new agent gets a UUID** at create time, stored in
+  `instance.env` as `CLAWS_INSTANCE_UUID` and mirrored to
+  `openclaw.json meta.id`. UUID v4, randomly generated.
+- **`claws id <name>`** — print the UUID (script-friendly, one line).
+- **`claws by-id <uuid>`** — reverse lookup → `team/name`.
+- **Existing agents** get UUIDs via `claws migrate uuids` (idempotent).
+
+### Added — Runtime adapter additions (Phase A-D)
+
+- **`Runtime.HooksScope`** (`"team" | "agent" | "both"`, default `"team"`)
+- **`Runtime.SkillsScope`** (same)
+- **`Runtime.CronFormat`** can now be `"claws-jobs.json"` (v1.6, openclaw)
+  or `"crontab"` (v1.5 legacy, for non-openclaw runtimes that prefer it).
+- OpenClaw runtime updated: declares `HooksScope=team`, `SkillsScope=team`,
+  `CronFormat=claws-jobs.json` (matches the live runtime image's actual contract).
+
+### Tests
+
+- 7 new unit tests for cron schedule conversion and payload shaping.
+- 1 new test for legacy crontab parser (used by `migrate cron`).
+- Updated v1.5 tests to assert the new v1.6 paths (jobs.json,
+  team-shared hooks/skills).
+- Full suite green.
+
+### Honest notes
+
+- **The events injection block (`agents[].events`)** still writes to
+  `openclaw.json events.*` via `cmdConfig set`, but whether the runtime
+  exposes an actual HTTP endpoint is **unverified** — `claws contract
+  show` now flags this with a warning.
+- **Sidecar declarations** (`agents[].sidecars[]`) remain
+  configure-only: claws writes the integration JSON; the operator
+  installs sharedwatch / intent-gateway separately.
+
+### Migration guide (v1.5 → v1.6)
+
+If you applied templates with cron / hooks / skills under v1.5:
+
+```bash
+# 1. Update claws
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+
+# 2. Convert cron jobs to the new format (per-agent legacy crontab → jobs.json)
+claws migrate cron
+
+# 3. Populate UUIDs for existing agents
+claws migrate uuids
+
+# 4. Re-apply your templates so hooks/skills land at the new team-scoped paths
+claws apply --template=<your-template>
+
+# 5. Verify
+claws contract show
+claws team tree <your-team>
+claws cron list <your-agent>
+claws fleet doctor
+```
+
+### Not in this release
+
+- `extends:` template composition — still v1.7+.
+- Remote `--template=github:org/repo` — still v1.7+.
+- Sidecar one-click installer — still v1.7+.
+
 ## [v1.5.0] — 2026-05-24
 
 ### Added — Cron section in templates

@@ -219,12 +219,18 @@ func cmdCreate(args []string) error {
 		}
 	}
 
+	// v1.6 — agent UUID generated at create time. Stable for the agent's
+	// lifetime; cross-system references (intent-gateway, sharedwatch, audit
+	// chain) can use this rather than the renameable name.
+	instanceUUID := randomUUIDv4()
+
 	// Write instance.env (image already resolved above for policy check)
 	envContent := fmt.Sprintf(`# Instance: %s
 # Created: %s
 # Port index: %d
 
 INSTANCE_NAME=%s
+CLAWS_INSTANCE_UUID=%s
 OPENCLAW_CONFIG_DIR=%s
 OPENCLAW_WORKSPACE_DIR=%s/workspace
 OPENCLAW_GATEWAY_PORT=%d
@@ -239,7 +245,7 @@ CLAUDE_AI_SESSION_KEY=
 CLAUDE_WEB_SESSION_KEY=
 CLAUDE_WEB_COOKIE=
 `, name, time.Now().UTC().Format("2006-01-02 15:04:05 UTC"), index,
-		name, dir, dir, gatewayPort, bridgePort, token, bindMode, hostBind(bindMode), image, runtimeName)
+		name, instanceUUID, dir, dir, gatewayPort, bridgePort, token, bindMode, hostBind(bindMode), image, runtimeName)
 
 	if err := os.WriteFile(envFile, []byte(envContent), credentialFileMode); err != nil {
 		cleanup(dir, paths, name)

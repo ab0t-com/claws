@@ -102,13 +102,19 @@ type ProfileAgent struct {
 //   - 5-field crontab:        "0 9 * * 1"          (9am every Monday)
 //   - @-aliases:              "@hourly", "@daily", "@weekly", "@monthly", "@reboot"
 //   - duration:               "every 30m"          (Go duration syntax after the word "every")
-// Exactly one of Command / Hook / Exec must be set.
+// Exactly one of Prompt / Command / Hook / Exec must be set.
+//
+// Action semantics depend on the runtime. The OpenClaw runtime treats every
+// cron event as a "send this prompt to the agent" — so `prompt` is the
+// natural fit. `command/hook/exec` are wrapped as best-effort text payloads
+// for runtimes that interpret literally.
 type ProfileCronJob struct {
 	Name     string   `json:"name"`                  // unique within the agent
 	Schedule string   `json:"schedule"`              // see above
-	Command  string   `json:"command,omitempty"`     // inline shell command
-	Hook     string   `json:"hook,omitempty"`        // reference an event in agents[].hooks
-	Exec     []string `json:"exec,omitempty"`        // exec form (no shell interpretation)
+	Prompt   string   `json:"prompt,omitempty"`      // v1.6 — natural-language system-event text
+	Command  string   `json:"command,omitempty"`     // inline shell command (wrapped as prompt)
+	Hook     string   `json:"hook,omitempty"`        // reference an event in agents[].hooks (wrapped)
+	Exec     []string `json:"exec,omitempty"`        // exec form (wrapped)
 	Timezone string   `json:"timezone,omitempty"`    // e.g. "UTC", "Pacific/Auckland"
 	Enabled  *bool    `json:"enabled,omitempty"`     // default true
 }
@@ -360,6 +366,9 @@ func cmdApply(args []string) error {
 				return errorf("agent %q cron %q: %v", ag.Name, cj.Name, err)
 			}
 			n := 0
+			if cj.Prompt != "" {
+				n++
+			}
 			if cj.Command != "" {
 				n++
 			}
@@ -370,7 +379,7 @@ func cmdApply(args []string) error {
 				n++
 			}
 			if n != 1 {
-				return errorf("agent %q cron %q: exactly one of command/hook/exec required", ag.Name, cj.Name)
+				return errorf("agent %q cron %q: exactly one of prompt/command/hook/exec required", ag.Name, cj.Name)
 			}
 			if cj.Hook != "" {
 				if _, ok := ag.Hooks[cj.Hook]; !ok {
@@ -750,15 +759,39 @@ func applyAgentConfig(full string, ag *ProfileAgent, dim, gold, green, nc string
 }
 
 // ---------------------------------------------------------------------------
-// applySkills — B2 + Phase 3: write skills manifest + materialise any
-// ResourceRef-backed skill files under the agent's workspace.
+// applySkills — B2 + Phase 3 + v1.6 scope fix: skills are mounted by the
+// runtime from <team>/shared/skills RO at /home/node/.openclaw/bundled-skills.
+// Per-agent workspace/skills (v1.5 default) was silently ignored.
+//
+// SkillsScope on the runtime declares the destination:
+//   "team"  → <team>/shared/skills/                  (v1.6 default for openclaw)
+//   "agent" → <instance>/workspace/skills/           (v1.5 legacy)
+//   "both"  → both paths
 // ---------------------------------------------------------------------------
 func applySkills(paths Paths, full string, skills []SkillRef) error {
-	instDir := filepath.Join(paths.Root, full)
-	skillsDir := filepath.Join(instDir, "workspace", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		return err
+	rt, err := resolveRuntime(paths, full)
+	if err != nil {
+		rt = openclawRuntime()
 	}
+	scope := rt.SkillsScope
+	if scope == "" {
+		scope = "team"
+	}
+	team, _ := splitFull(full)
+	var skillsDirs []string
+	if scope == "team" || scope == "both" {
+		skillsDirs = append(skillsDirs, filepath.Join(paths.Root, team, "shared", "skills"))
+	}
+	if scope == "agent" || scope == "both" {
+		skillsDirs = append(skillsDirs, filepath.Join(paths.Root, full, "workspace", "skills"))
+	}
+	for _, d := range skillsDirs {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return err
+		}
+	}
+	// Use the first dir for the "primary" location messages; write to all.
+	skillsDir := skillsDirs[0]
 
 	var names []string
 	for _, s := range skills {
@@ -791,55 +824,100 @@ func applySkills(paths Paths, full string, skills []SkillRef) error {
 			if ext == "" {
 				ext = ".md"
 			}
-			out := filepath.Join(skillsDir, name+ext)
-			if existing, err := os.ReadFile(out); err == nil && string(existing) == string(body) {
-				continue
-			}
-			if err := os.WriteFile(out, body, 0644); err != nil {
-				return err
+			for _, dir := range skillsDirs {
+				out := filepath.Join(dir, name+ext)
+				if existing, err := os.ReadFile(out); err == nil && string(existing) == string(body) {
+					continue
+				}
+				if err := os.WriteFile(out, body, 0644); err != nil {
+					return err
+				}
 			}
 		}
 	}
 
-	// Manifest of declared skill names — keeps the v1.3 behavior.
-	manifest := filepath.Join(skillsDir, "MANIFEST.txt")
+	// Manifest of declared skill names — written to all scope dirs.
 	body := strings.Join(names, "\n") + "\n"
-	if existing, err := os.ReadFile(manifest); err == nil && string(existing) == body {
-		return nil
+	for _, dir := range skillsDirs {
+		manifest := filepath.Join(dir, "MANIFEST.txt")
+		if existing, err := os.ReadFile(manifest); err == nil && string(existing) == body {
+			continue
+		}
+		if err := os.WriteFile(manifest, []byte(body), 0644); err != nil {
+			return err
+		}
 	}
-	return os.WriteFile(manifest, []byte(body), 0644)
+	_ = skillsDir // used in messages
+	return nil
 }
 
 // ---------------------------------------------------------------------------
-// applyHooks — B3 + Phase 3: write hook scripts under the agent's workspace,
-// respecting the runtime adapter's declared HooksDir / HookFileExt /
-// SupportedHookEvents, and resolving HookRef bodies from inline / file / URL.
+// applyHooks — B3 + Phase 3 + v1.6 scope fix: write hook scripts where the
+// runtime actually reads them. OpenClaw runtime mounts <team>/shared/hooks
+// RO at /home/node/.openclaw/shared-hooks, so per-agent workspace/hooks
+// (v1.5 default) was silently ignored.
+//
+// HooksScope on the runtime declares the intended destination:
+//   "team"  → <team>/shared/hooks/<event>.sh       (v1.6 default for openclaw)
+//   "agent" → <instance>/workspace/<HooksDir>/<event>.sh   (v1.5 legacy)
+//   "both"  → write to both paths
 // ---------------------------------------------------------------------------
 func applyHooks(paths Paths, full string, hooks map[string]HookRef) error {
 	rt, err := resolveRuntime(paths, full)
 	if err != nil {
-		// Unknown runtime — fall back to openclaw defaults.
 		rt = openclawRuntime()
 	}
 	if rt.HooksDir == "" {
-		// Runtime doesn't support hooks.
 		return errorf("runtime %q does not declare a HooksDir — hooks not supported", rt.Name)
 	}
 	ext := rt.HookFileExt
 	if ext == "" {
 		ext = ".sh"
 	}
-	// Build the allowed-events set for quick lookup (empty = accept anything).
 	allowed := map[string]bool{}
 	for _, e := range rt.SupportedHookEvents {
 		allowed[e] = true
 	}
-
-	instDir := filepath.Join(paths.Root, full)
-	hooksDir := filepath.Join(instDir, "workspace", rt.HooksDir)
-	if err := os.MkdirAll(hooksDir, 0755); err != nil {
-		return err
+	scope := rt.HooksScope
+	if scope == "" {
+		scope = "team" // v1.6 default — matches openclaw runtime contract
 	}
+
+	team, _ := splitFull(full)
+	var destDirs []string
+	if scope == "team" || scope == "both" {
+		// Team-shared dir mounted into the container as /shared-hooks
+		destDirs = append(destDirs, filepath.Join(paths.Root, team, "shared", "hooks"))
+	}
+	if scope == "agent" || scope == "both" {
+		destDirs = append(destDirs, filepath.Join(paths.Root, full, "workspace", rt.HooksDir))
+	}
+	for _, d := range destDirs {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return err
+		}
+	}
+
+	writeHook := func(name string, body []byte) error {
+		var firstErr error
+		for _, d := range destDirs {
+			out := filepath.Join(d, name+ext)
+			if existing, err := os.ReadFile(out); err == nil && string(existing) == string(body) {
+				continue
+			}
+			if err := os.WriteFile(out, body, 0755); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
+	}
+
+	_ = writeHook // silence lint until the next loop uses it
+
+	// We rebuild the per-event loop below to call writeHook.
+	hooksDir := destDirs[0] // legacy compat for inline error messages
+	_ = hooksDir // referenced only in legacy error paths
+
 	for event, ref := range hooks {
 		if strings.ContainsAny(event, "/\\.") {
 			continue
@@ -855,19 +933,13 @@ func applyHooks(paths Paths, full string, hooks map[string]HookRef) error {
 			fmt.Printf("    \033[0;33m! hook %q (%s): %v\033[0m\n", event, src, err)
 			continue
 		}
-		hookFile := filepath.Join(hooksDir, event+ext)
-		// Wrap inline commands in a shebang + comment header; pass through
-		// fetched/file-loaded bodies as-is (they may already be full scripts).
-		var body string
+		var body []byte
 		if ref.Command != "" {
-			body = "#!/bin/sh\n# claws-managed hook for event: " + event + " (runtime: " + rt.Name + ", source: " + src + ")\n" + string(raw) + "\n"
+			body = []byte("#!/bin/sh\n# claws-managed hook for event: " + event + " (runtime: " + rt.Name + ", source: " + src + ", scope: " + scope + ")\n" + string(raw) + "\n")
 		} else {
-			body = string(raw)
+			body = raw
 		}
-		if existing, err := os.ReadFile(hookFile); err == nil && existing != nil && string(existing) == body {
-			continue
-		}
-		if err := os.WriteFile(hookFile, []byte(body), 0755); err != nil {
+		if err := writeHook(event, body); err != nil {
 			return err
 		}
 	}
@@ -941,8 +1013,9 @@ func validateCronSchedule(s string) error {
 	return nil
 }
 
-// applyCron writes the agent's cron jobs to <instance>/workspace/<runtime.CronDir>/<name>.crontab
-// (or single combined crontab depending on runtime CronFormat).
+// applyCron dispatches to the right writer based on the runtime's CronFormat.
+// v1.6: "claws-jobs.json" is the runtime's actual contract; "crontab" is the
+// v1.5 legacy format kept for runtimes that expect it.
 func applyCron(paths Paths, full string, ag ProfileAgent) error {
 	rt, err := resolveRuntime(paths, full)
 	if err != nil {
@@ -951,6 +1024,19 @@ func applyCron(paths Paths, full string, ag ProfileAgent) error {
 	if !rt.Capabilities.Cron {
 		return errorf("runtime %q does not declare Cron capability", rt.Name)
 	}
+	switch rt.CronFormat {
+	case "", "claws-jobs.json":
+		return applyCronJobsJSON(paths, full, ag)
+	case "crontab":
+		return applyCronCrontab(paths, full, ag, rt)
+	default:
+		return errorf("runtime %q declares unknown CronFormat %q", rt.Name, rt.CronFormat)
+	}
+}
+
+// applyCronCrontab — v1.5 legacy format. Kept for non-openclaw runtimes that
+// expect crontab files in <instance>/workspace/<CronDir>/claws.crontab.
+func applyCronCrontab(paths Paths, full string, ag ProfileAgent, rt Runtime) error {
 	dir := rt.CronDir
 	if dir == "" {
 		dir = "cron"
@@ -959,8 +1045,6 @@ func applyCron(paths Paths, full string, ag ProfileAgent) error {
 	if err := os.MkdirAll(cronDir, 0755); err != nil {
 		return err
 	}
-	// Format: combined crontab file. Each line: SCHEDULE COMMAND
-	// (crontab convention is space-separated; quote command if needed by your daemon).
 	var lines []string
 	lines = append(lines, "# claws-managed cron — agent: "+full)
 	lines = append(lines, "# Edit by editing the template profile and re-running `claws apply`.")
@@ -972,11 +1056,13 @@ func applyCron(paths Paths, full string, ag ProfileAgent) error {
 		}
 		var cmd string
 		switch {
+		case cj.Prompt != "":
+			cmd = "echo " + strconv.Quote(cj.Prompt)
 		case cj.Command != "":
 			cmd = cj.Command
 		case cj.Hook != "":
 			if rt.HooksDir != "" {
-				cmd = "sh /workspace/" + rt.HooksDir + "/" + cj.Hook + (rt.HookFileExt)
+				cmd = "sh /workspace/" + rt.HooksDir + "/" + cj.Hook + rt.HookFileExt
 			} else {
 				cmd = "# hook " + cj.Hook + " (runtime has no HooksDir)"
 			}
@@ -992,7 +1078,6 @@ func applyCron(paths Paths, full string, ag ProfileAgent) error {
 	}
 	body := strings.Join(lines, "\n") + "\n"
 	out := filepath.Join(cronDir, "claws.crontab")
-	// Idempotence: skip write if content matches
 	if existing, err := os.ReadFile(out); err == nil && string(existing) == body {
 		return nil
 	}

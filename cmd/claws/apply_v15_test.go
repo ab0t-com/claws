@@ -40,7 +40,8 @@ func TestValidateCronSchedule(t *testing.T) {
 	}
 }
 
-// Apply with cron writes crontab; hook reference resolves to runtime's HooksDir.
+// v1.6 — apply with cron writes <instance>/cron/jobs.json in the runtime's
+// JSON shape (NOT workspace/cron/claws.crontab as v1.5 did).
 func TestIntegration_ApplyCron(t *testing.T) {
 	root := t.TempDir()
 	profile := filepath.Join(root, "cron.json")
@@ -52,8 +53,9 @@ func TestIntegration_ApplyCron(t *testing.T) {
     "name": "a",
     "hooks": {"onIdle": "echo idle"},
     "cron": [
-      {"name": "daily",  "schedule": "@daily",       "command": "echo daily"},
+      {"name": "daily",  "schedule": "@daily",       "prompt":  "Daily summary please"},
       {"name": "beat",   "schedule": "every 30m",    "hook":    "onIdle"},
+      {"name": "shell",  "schedule": "@hourly",      "command": "echo do-it"},
       {"name": "off",    "schedule": "@hourly",      "command": "echo off", "enabled": false}
     ]
   }]
@@ -63,20 +65,43 @@ func TestIntegration_ApplyCron(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply failed: %v\n%s", err, out)
 	}
-	crontab, err := os.ReadFile(filepath.Join(root, "ct", "a", "workspace", "cron", "claws.crontab"))
+	jobsData, err := os.ReadFile(filepath.Join(root, "ct", "a", "cron", "jobs.json"))
 	if err != nil {
-		t.Fatalf("crontab not written: %v", err)
+		t.Fatalf("v1.6 jobs.json not written at <instance>/cron/jobs.json: %v", err)
 	}
-	body2 := string(crontab)
-	if !strings.Contains(body2, "@daily echo daily") {
-		t.Errorf("crontab missing daily entry: %s", body2)
+	var jf CronJobsFile
+	if err := json.Unmarshal(jobsData, &jf); err != nil {
+		t.Fatalf("jobs.json malformed: %v\n%s", err, jobsData)
 	}
-	if !strings.Contains(body2, "every 30m sh /workspace/hooks/onIdle.sh") {
-		t.Errorf("hook reference not resolved correctly: %s", body2)
+	if jf.Version != 1 {
+		t.Errorf("expected version=1, got %d", jf.Version)
 	}
-	if !strings.Contains(body2, "DISABLED: off") {
-		t.Errorf("disabled job not marked: %s", body2)
+	if len(jf.Jobs) != 4 {
+		t.Fatalf("expected 4 jobs, got %d", len(jf.Jobs))
 	}
+	byName := map[string]CronJob{}
+	for _, j := range jf.Jobs {
+		byName[j.Name] = j
+	}
+	if j := byName["daily"]; j.Schedule.Kind != "every" || j.Schedule.EveryMs != 86400000 {
+		t.Errorf("daily schedule wrong: %+v", j.Schedule)
+	}
+	if j := byName["daily"]; j.Payload.Text != "Daily summary please" {
+		t.Errorf("daily prompt wrong: %q", j.Payload.Text)
+	}
+	if j := byName["beat"]; j.Schedule.EveryMs != 1800000 {
+		t.Errorf("beat schedule wrong: %+v", j.Schedule)
+	}
+	if j := byName["beat"]; !strings.Contains(j.Payload.Text, "lifecycle hook: onIdle") {
+		t.Errorf("hook reference not in payload: %q", j.Payload.Text)
+	}
+	if j := byName["shell"]; !strings.Contains(j.Payload.Text, "Execute shell command") {
+		t.Errorf("shell command not wrapped as systemEvent: %q", j.Payload.Text)
+	}
+	if j := byName["off"]; j.Enabled {
+		t.Errorf("disabled job should have enabled=false")
+	}
+	_ = out
 }
 
 // Bad cron schedule is rejected at apply.

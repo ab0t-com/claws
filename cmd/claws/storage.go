@@ -572,8 +572,13 @@ func cmdStorageStatus(args []string) error {
 // ---------------------------------------------------------------------------
 
 func cmdMigrate(args []string) error {
+	// v1.6+: data migrations (cron, uuids, all) routed via cmdMigrateData.
+	// Storage migration retains its original `claws migrate <instance> --to s3` form.
+	if isDataMigration(args) {
+		return cmdMigrateData(args)
+	}
 	if len(args) < 1 {
-		return errorf("usage: claws migrate <name> --to s3 [--cleanup]")
+		return errorf("usage: claws migrate <name> --to s3 [--cleanup]   OR   claws migrate <cron|uuids|all>")
 	}
 	paths := resolvePaths()
 	name := args[0]

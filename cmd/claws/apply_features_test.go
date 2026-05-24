@@ -71,18 +71,18 @@ func TestIntegration_ApplyAppliesAllSchemaFields(t *testing.T) {
 		t.Errorf("agent config missing memory.enabled=true:\n%s", cfg)
 	}
 
-	// B2 — skills manifest
-	manifest, err := os.ReadFile(filepath.Join(root, "ft", "a", "workspace", "skills", "MANIFEST.txt"))
+	// B2 — skills manifest (v1.6: team-shared at <team>/shared/skills/)
+	manifest, err := os.ReadFile(filepath.Join(root, "ft", "shared", "skills", "MANIFEST.txt"))
 	if err != nil {
-		t.Errorf("skills manifest not written: %v", err)
+		t.Errorf("v1.6 team-shared skills manifest not written: %v", err)
 	} else if !strings.Contains(string(manifest), "calendar") {
 		t.Errorf("skills manifest missing 'calendar': %s", string(manifest))
 	}
 
-	// B3 — hooks
-	hookData, err := os.ReadFile(filepath.Join(root, "ft", "a", "workspace", "hooks", "onStart.sh"))
+	// B3 — hooks (v1.6: team-shared at <team>/shared/hooks/)
+	hookData, err := os.ReadFile(filepath.Join(root, "ft", "shared", "hooks", "onStart.sh"))
 	if err != nil {
-		t.Errorf("hook onStart.sh not written: %v", err)
+		t.Errorf("v1.6 team-shared hook onStart.sh not written: %v", err)
 	} else if !strings.Contains(string(hookData), "echo booted") {
 		t.Errorf("hook script missing command: %s", string(hookData))
 	}
