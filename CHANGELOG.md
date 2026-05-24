@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.13] — 2026-05-24
+
 ### Added — `claws start` now verifies auth after the container reports healthy
 
 User hit this: `claws start team` declared all 3 agents started
