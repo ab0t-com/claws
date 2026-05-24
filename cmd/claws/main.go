@@ -86,6 +86,14 @@ func main() {
 		err = cmdByID(args)
 	case "contract":
 		err = cmdContract(args)
+	case "agent":
+		// v1.6.1: `claws agent ping <name>` is the only subcommand today.
+		// Reserved namespace for future per-agent operator commands.
+		if len(args) > 0 && args[0] == "ping" {
+			err = cmdAgentPing(args[1:])
+		} else {
+			err = errorf("usage: claws agent <ping> <name>")
+		}
 	case "storage":
 		err = cmdStorage(args)
 	case "migrate":
@@ -111,7 +119,13 @@ func main() {
 	case "token":
 		err = cmdToken(args)
 	case "image":
-		err = cmdImage(args)
+		// v1.6.1: intercept `image bootstrap` for the new day-one image setup.
+		// All other `image` subcommands (list, pull, pin) stay on cmdImage.
+		if len(args) > 0 && args[0] == "bootstrap" {
+			err = cmdImageBootstrap(args[1:])
+		} else {
+			err = cmdImage(args)
+		}
 	case "upgrade":
 		err = cmdUpgrade(args)
 	case "policy":

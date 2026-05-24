@@ -9,6 +9,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.1] — 2026-05-24
+
+Patch release — three day-one friction fixes for new users. Each one
+closes a concrete failure mode an audit surfaced. No schema changes,
+no breaking changes; pure additive UX.
+
+### Added — `claws agent ping <name>`
+
+Single-screen "is my agent responding?" command. Combines
+`/healthz` + `/readyz` + auth-verify chain + recent-log tail into
+one read-only check with a clear pass/fail summary and per-failure
+fix command. Exits non-zero on any check failure so it composes
+with shell pipelines.
+
+Replaces the previous "grep across multiple log files and guess"
+workflow with one command.
+
+### Added — Missing-env detection in `claws apply`
+
+`claws apply` now pre-checks every `tokenFrom.env` / `tokenFrom.file` /
+`fallbackApiKey.fromEnv` reference at parse-time. If any are
+unresolved, **fails loud before any state mutates** with a table:
+
+```
+cannot apply profile "solo-telegram-coder": 2 secret(s) not resolvable
+
+  WHERE                                              SOURCE                         GET ONE AT
+  agents[0].auth.fallbackApiKey (openai)             env:OPENAI_API_KEY             https://platform.openai.com/api-keys
+  agents[0].channels[0].telegram tokenFrom           env:TELEGRAM_BOT_TOKEN         https://t.me/BotFather (/newbot)
+
+Fix one of these ways:
+  export OPENAI_API_KEY=<value>
+  export TELEGRAM_BOT_TOKEN=<value>
+```
+
+Provider URLs hard-coded for OpenAI / Anthropic / Google / Groq /
+OpenRouter (auth) and BotFather / Discord-dev / Slack-apps (channels).
+
+Flags:
+- `--allow-missing` keeps the v1.6.0 silent-skip behavior.
+- `--dry-run` bypasses the check (inspection mode).
+- `command:` references are not pre-checked (they exec dynamically).
+
+This was the **single most common silent failure** in v1.6.0 — apply
+exited 0 with no auth and no channels because env vars weren't set,
+leaving the user with an agent that never responded.
+
+### Added — `claws image bootstrap`
+
+New command. One step from "fresh host" to "openclaw:local image
+present". Three modes ordered fastest → slowest:
+
+1. **Already present** — no-op.
+2. **Pull** — if `--source=<image:tag>` or `OPENCLAW_IMAGE_SOURCE`
+   env is set, `docker pull` from it (then tag as `openclaw:local`).
+3. **Build from source** — `git clone github.com/openclaw/openclaw`
+   (overridable via `--source-repo=`) + `docker build -t openclaw:local`.
+   Requires `--yes` because the first build is 5-10 minutes.
+
+Idempotent: re-running when the image already exists is a no-op.
+`git pull --ff-only` on repeat builds instead of full clone.
+
+Closes the "I followed install.sh and `claws doctor` says no image
+and now what" gap.
+
+### Tests
+
+- 4 new tests for missing-env detection: rejection on missing,
+  `--allow-missing` escape hatch, `--dry-run` bypass, provider hint
+  lookup table.
+- `claws agent ping` smoke-tested via a created-but-not-started
+  agent (correctly reports 4 failing checks with fix commands).
+- `claws image bootstrap` smoke-tested: idempotent skip when present.
+
+### Internals
+
+- `readEnvFile` helper for parsing `instance.env` cleanly (used by
+  `agent ping`; previously every caller did ad-hoc parsing).
+- New `agent` command namespace (reserved for future per-agent
+  operator commands; only `ping` today).
+- New `image bootstrap` subcommand under the existing `image` namespace.
+
 ## [v1.6.0] — 2026-05-24
 
 **Contract alignment + fleet operator visibility + agent UUIDs.**

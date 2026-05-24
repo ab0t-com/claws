@@ -294,7 +294,7 @@ func (s *SecretRef) describe() string {
 
 func cmdApply(args []string) error {
 	var file, templateName string
-	var yes, dryRun, skipAudit bool
+	var yes, dryRun, skipAudit, allowMissing bool
 	for _, a := range args {
 		switch {
 		case a == "-h" || a == "--help":
@@ -310,6 +310,8 @@ func cmdApply(args []string) error {
 			dryRun = true
 		case a == "--skip-audit":
 			skipAudit = true
+		case a == "--allow-missing":
+			allowMissing = true
 		}
 	}
 	_ = skipAudit // wired in E2 below
@@ -391,6 +393,15 @@ func cmdApply(args []string) error {
 	// v1.5 — topology validation: cycle detection on manager chains, peers reference existing agents
 	if err := validateTopology(p.Agents); err != nil {
 		return err
+	}
+	// v1.6.1 — pre-check every secret reference. Fail loud at parse-time if
+	// any required env/file is missing, listing exactly what to set. The old
+	// behavior (silently skip the step that needed the missing secret) was
+	// the #1 day-one footgun. Opt back in via --allow-missing.
+	if !dryRun && !allowMissing {
+		if err := checkSecretsResolvable(p); err != nil {
+			return err
+		}
 	}
 
 	const (
@@ -678,6 +689,140 @@ func cmdApply(args []string) error {
 
 	fmt.Printf("\n%s✓ apply complete%s — %d agent(s)\n\n", green, nc, len(p.Agents))
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// checkSecretsResolvable — v1.6.1: pre-flight for every Env/File secret ref
+// in the profile. Fails loud at parse-time rather than silently skipping
+// the step at apply-time (the #1 day-one silent failure of v1.5/v1.6.0).
+//
+// Skips `command:` refs — those are dynamic and run at apply-time.
+// ---------------------------------------------------------------------------
+func checkSecretsResolvable(p Profile) error {
+	type missing struct {
+		field    string // human-readable "where" (e.g. "agents[0].channels[0].telegram tokenFrom")
+		source   string // "env:OPENAI_API_KEY" or "file:/etc/claws/..."
+		hint     string // provider URL or remediation
+	}
+	var miss []missing
+
+	check := func(field string, ref *SecretRef, hint string) {
+		if ref == nil {
+			return
+		}
+		switch {
+		case ref.Env != "":
+			if os.Getenv(ref.Env) == "" {
+				miss = append(miss, missing{field, "env:" + ref.Env, hint})
+			}
+		case ref.File != "":
+			if _, err := os.Stat(ref.File); err != nil {
+				miss = append(miss, missing{field, "file:" + ref.File, hint})
+			}
+		}
+	}
+
+	for ai, ag := range p.Agents {
+		// auth.fallbackApiKey.fromEnv / fromFile
+		if ag.Auth != nil && ag.Auth.FallbackAPIKey != nil {
+			provider := ag.Auth.FallbackAPIKey.Provider
+			ref := &SecretRef{Env: ag.Auth.FallbackAPIKey.FromEnv, File: ag.Auth.FallbackAPIKey.FromFile}
+			check(fmt.Sprintf("agents[%d].auth.fallbackApiKey (%s)", ai, provider),
+				ref, providerHint(provider))
+		}
+		// channels[].tokenFrom / botTokenFrom / appTokenFrom
+		for ci, ch := range ag.Channels {
+			check(fmt.Sprintf("agents[%d].channels[%d].%s tokenFrom", ai, ci, ch.Type),
+				ch.TokenFrom, channelHint(ch.Type))
+			check(fmt.Sprintf("agents[%d].channels[%d].%s botTokenFrom", ai, ci, ch.Type),
+				ch.BotToken, channelHint(ch.Type))
+			check(fmt.Sprintf("agents[%d].channels[%d].%s appTokenFrom", ai, ci, ch.Type),
+				ch.AppToken, channelHint(ch.Type))
+		}
+		// skills[].from (file only — URL pre-fetched separately)
+		for si, sk := range ag.Skills {
+			if sk.From != "" {
+				ref := &SecretRef{File: sk.From}
+				check(fmt.Sprintf("agents[%d].skills[%d] from", ai, si), ref, "")
+			}
+		}
+		// hooks[].from
+		for ev, hk := range ag.Hooks {
+			if hk.From != "" {
+				ref := &SecretRef{File: hk.From}
+				check(fmt.Sprintf("agents[%d].hooks.%s from", ai, ev), ref, "")
+			}
+		}
+	}
+
+	if len(miss) == 0 {
+		return nil
+	}
+
+	const (
+		bold = "\033[1m"
+		red  = "\033[0;31m"
+		dim  = "\033[0;90m"
+		gold = "\033[0;33m"
+		nc   = "\033[0m"
+	)
+	var b strings.Builder
+	fmt.Fprintf(&b, "%scannot apply profile %q: %d secret(s) not resolvable%s\n\n",
+		red, p.Metadata.Name, len(miss), nc)
+	fmt.Fprintf(&b, "  %s%-50s %-30s %s%s\n", bold, "WHERE", "SOURCE", "GET ONE AT", nc)
+	for _, m := range miss {
+		hint := m.hint
+		if hint == "" {
+			hint = "(set this env var or create this file)"
+		}
+		fmt.Fprintf(&b, "  %-50s %-30s %s\n", m.field, m.source, hint)
+	}
+	fmt.Fprintf(&b, "\n%sFix one of these ways:%s\n", bold, nc)
+	for _, m := range miss {
+		if strings.HasPrefix(m.source, "env:") {
+			fmt.Fprintf(&b, "  %sexport %s=<value>%s\n", dim, strings.TrimPrefix(m.source, "env:"), nc)
+		} else {
+			fmt.Fprintf(&b, "  %secho <value> > %s && chmod 600 %s%s\n",
+				dim, strings.TrimPrefix(m.source, "file:"), strings.TrimPrefix(m.source, "file:"), nc)
+		}
+	}
+	fmt.Fprintf(&b, "\nOr re-run with %s--allow-missing%s to skip steps with unresolved secrets.\n", gold, nc)
+	return errorf("%s", b.String())
+}
+
+// providerHint returns the canonical "where do I get this key" URL for
+// each known auth provider. Empty if we don't know.
+func providerHint(provider string) string {
+	switch strings.ToLower(provider) {
+	case "openai":
+		return "https://platform.openai.com/api-keys"
+	case "anthropic":
+		return "https://console.anthropic.com/settings/keys"
+	case "google", "gemini":
+		return "https://aistudio.google.com/app/apikey"
+	case "groq":
+		return "https://console.groq.com/keys"
+	case "openrouter":
+		return "https://openrouter.ai/keys"
+	}
+	return ""
+}
+
+// channelHint returns where to create a bot for each known channel type.
+func channelHint(channel string) string {
+	switch strings.ToLower(channel) {
+	case "telegram":
+		return "https://t.me/BotFather (/newbot)"
+	case "discord":
+		return "https://discord.com/developers/applications"
+	case "slack":
+		return "https://api.slack.com/apps"
+	case "whatsapp":
+		return "no token — QR scan via `claws channel add … whatsapp`"
+	case "signal":
+		return "signal-cli — see channels-guide.html"
+	}
+	return ""
 }
 
 // ---------------------------------------------------------------------------
