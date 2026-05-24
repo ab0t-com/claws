@@ -284,15 +284,46 @@ func cmdSetup(args []string) error {
 
 		fullName := teamName + "/" + currentAgent
 
-		// Create instance via cmdCreate (quiet mode — setup handles its own output)
-		quietCreate = true
-		createArgs := []string{fullName}
-		if err := cmdCreate(createArgs); err != nil {
-			quietCreate = false
-			return errorf("failed to create agent: %v", err)
+		// v1.6.8: handle the "agent already exists" case instead of bombing.
+		// Non-technical users hit this when they re-run `claws setup` after
+		// a previous run (or when they have live agents on the host already
+		// — like the user who hit this on super-team/agent-1). Offer reuse
+		// rather than forcing them to remember `claws remove --purge`.
+		paths := resolvePaths()
+		reuseExisting := false
+		if requireInstance(paths, fullName) == nil {
+			if nonInteractive {
+				return errorf("agent '%s' already exists. Either remove it (claws remove %s --purge) or pick a different --agent= name.", fullName, fullName)
+			}
+			fmt.Printf("    %s!%s Agent '%s' already exists.\n", "\033[0;33m", nc, fullName)
+			fmt.Println("    1. Reuse it (configure auth + channel for the existing agent)")
+			fmt.Println("    2. Pick a different name")
+			fmt.Println("    3. Cancel setup")
+			switch prompt("Choice", "1") {
+			case "1":
+				reuseExisting = true
+				fmt.Printf("    %s✓%s Reusing '%s'\n", green, nc, currentAgent)
+			case "2":
+				// Re-prompt for a fresh name. Loop back to step 4.
+				agentNum--
+				agentName = "" // clear so the prompt fires again
+				continue
+			default:
+				return errorf("setup cancelled")
+			}
 		}
-		quietCreate = false
-		fmt.Printf("    %s✓%s Agent '%s' created\n", green, nc, currentAgent)
+
+		if !reuseExisting {
+			// Create instance via cmdCreate (quiet mode — setup handles its own output)
+			quietCreate = true
+			createArgs := []string{fullName}
+			if err := cmdCreate(createArgs); err != nil {
+				quietCreate = false
+				return errorf("failed to create agent: %v", err)
+			}
+			quietCreate = false
+			fmt.Printf("    %s✓%s Agent '%s' created\n", green, nc, currentAgent)
+		}
 		fmt.Println()
 
 		// Step 5: Auth

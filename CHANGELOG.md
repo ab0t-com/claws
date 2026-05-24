@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed
+
+- **`claws setup` no longer hard-fails when an agent name already exists.**
+  Previously step 4 would bomb with `failed to create agent: instance
+  'X/Y' already exists` and abandon the wizard — a non-starter for
+  someone re-running setup or who already has live agents on the host.
+  Now offers three choices: reuse it (skip to auth + channel),
+  pick a different name (re-prompts), or cancel cleanly.
+- Non-interactive mode prints a clearer error pointing at the exact
+  `claws remove <name> --purge` or `--agent=<other>` recovery commands.
 
 ## [v1.6.7] — 2026-05-24
 
