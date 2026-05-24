@@ -25,7 +25,7 @@ contract, not the schema, not the LOC count — the lived experience of
 Everything we shipped — install.sh, quickstart, apply, templates,
 cron, hooks, sidecars, topology, UUIDs, fleet ops, contract show — is
 infrastructure. None of it matters if a new user can't get from
-`curl install.sh | sh` to **a bot that responds on Telegram** in
+`curl install.sh | bash` to **a bot that responds on Telegram** in
 under 5 minutes.
 
 The current happy path requires:
@@ -88,7 +88,7 @@ responding on Telegram in **under 5 minutes wall-clock** (excluding
 the OpenAI signup + Telegram BotFather time):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
 claws image bootstrap --yes        # ~5 min the first time (build)
 ./scripts/setup-secrets.sh         # ~10 seconds
 $EDITOR /tmp/claws-secrets/openai.key

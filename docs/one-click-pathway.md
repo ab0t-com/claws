@@ -285,7 +285,7 @@ Two edits:
 
 ```bash
 # One-time per machine
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
 claws image bootstrap --yes
 bash <(curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/setup-secrets.sh)
 $EDITOR /tmp/claws-secrets/openai.key

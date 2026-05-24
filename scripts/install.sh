@@ -2,8 +2,8 @@
 # claws installer
 #
 # Remote (release):
-#   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh -s -- --version=v1.0.0
+#   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash -s -- --version=v1.0.0
 #
 # Local (running from an extracted release tarball, next to ./claws):
 #   ./install.sh
@@ -22,6 +22,30 @@
 #   - No 'curl | sudo sh' coercion: sudo only escalates when actually needed
 #   - --dry-run prints the exact commands that would run
 #   - Refuses to overwrite an existing newer binary unless --force
+
+# --- POSIX-safe bash check (must come BEFORE `set -o pipefail` which is bash-only) ---
+# When users do `curl … | sh`, sh (often dash on Ubuntu) interprets the script
+# and bombs on bash features like `set -o pipefail`. Detect that, re-exec under
+# bash if we can (and have a real file), else print a clear instruction.
+if [ -z "${BASH_VERSION:-}" ]; then
+    if [ -f "$0" ] && [ -r "$0" ] && command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+    cat >&2 <<'EOF'
+ERROR: install.sh requires bash, but was invoked via `sh` (often dash).
+
+Re-run with `bash`:
+
+    curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
+
+If bash isn't installed on this system, install it first:
+
+    Ubuntu/Debian:  sudo apt install -y bash
+    macOS:          brew install bash    (system bash 3.2 is too old)
+EOF
+    exit 1
+fi
+
 set -euo pipefail
 
 # =====================================================================
@@ -65,7 +89,33 @@ for arg in "$@"; do
         --force)       FORCE=1 ;;
         --local-dev)   LOCAL_DEV=1 ;;
         -h|--help)
-            sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+            # When piped (curl|bash), $0 is "bash" and sed has nothing to read.
+            # Print the help block inline instead.
+            cat <<'HELP'
+claws installer
+
+Remote (release):
+  curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash -s -- --version=v1.0.0
+
+Local (running from an extracted release tarball, next to ./claws):
+  ./install.sh
+
+Local-dev (running from a fresh git clone with Go installed):
+  CLAWS_LOCAL_DEV=1 ./scripts/install.sh
+  # or just run:  ./scripts/rebuild.sh
+
+Install location:
+  --dir=/custom/path                # explicit
+  else /usr/local/bin if writable, else $HOME/.local/bin
+
+Compliance / safety:
+  - HTTPS only, fail on any HTTP error (-f)
+  - SHA256 verification of downloaded tarball against SHA256SUMS
+  - No 'curl | sudo sh' coercion: sudo only escalates when actually needed
+  - --dry-run prints the exact commands that would run
+  - Refuses to overwrite an existing newer binary unless --force
+HELP
             exit 0
             ;;
         *) die "unknown flag: $arg (use --help)" ;;

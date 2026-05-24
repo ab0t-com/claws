@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.5] — 2026-05-24
+
+Install path hotfix — `curl install.sh | sh` was failing on Ubuntu
+because the script uses bash features (`set -o pipefail`) that dash
+(Ubuntu's `/bin/sh`) doesn't support. First-time users hit
+`sh: 25: set: Illegal option -o pipefail` and bounced.
+
+### Fixed
+
+- **`scripts/install.sh` — detect shell at startup** and re-exec under
+  bash, or fail with a clear actionable error message if bash isn't
+  available. Three invocation paths now all work:
+  - `curl … | bash` — recommended, works as before.
+  - `curl … | sh` — re-execs under bash if available; otherwise prints
+    install instructions for getting bash. No more cryptic dash error.
+  - `./install.sh` — direct execution, works as before.
+- **`--help` no longer breaks under `curl | bash`** — it was reading
+  `$0` to slice the docstring out of the script header, but `$0` is
+  literally `bash` when piped. Replaced with an inline heredoc.
+
+### Docs
+
+- README, CHANGELOG, `docs/goal-instant-claw.md`, and
+  `docs/one-click-pathway.md` all now say `| bash` instead of `| sh`.
+- `install.sh` header comment updated to recommend `| bash`.
+
+### Why this matters
+
+A non-technical user can't recover from `sh: 25: set: Illegal option
+-o pipefail` — they have to know that Ubuntu's `/bin/sh` is dash and
+that `set -o pipefail` is bash-only. The right behavior is for the
+script to deal with it transparently.
+
 ## [v1.6.4] — 2026-05-24
 
 Non-technical user pass — closes the "I need to copy a 46-char Telegram
@@ -425,7 +458,7 @@ If you applied templates with cron / hooks / skills under v1.5:
 
 ```bash
 # 1. Update claws
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
 
 # 2. Convert cron jobs to the new format (per-agent legacy crontab → jobs.json)
 claws migrate cron

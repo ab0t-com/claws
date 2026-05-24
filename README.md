@@ -8,10 +8,10 @@ Multi-instance manager for [OpenClaw](https://github.com/openclaw/openclaw). Run
 
 ```bash
 # Recommended — pinned release with checksum verification:
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
 
 # Or specify a version:
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | sh -s -- --version=v1.0.0
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash -s -- --version=v1.0.0
 ```
 
 The installer downloads the latest GitHub release, verifies the SHA256 against `SHA256SUMS`, and installs to `/usr/local/bin` (or `~/.local/bin` if not writable). Pass `--help` to see all options.
