@@ -19,13 +19,16 @@
 *.out
 
 # --- Release artifacts ---
-/release/
+# release/ IS tracked — binaries live in the repo so install.sh can fetch
+# them from raw.githubusercontent.com without needing a GitHub Release page.
+# Only ignore the per-target directories release.sh extracts during build.
+/release/claws-*-linux-*/
+/release/claws-*-darwin-*/
+/release/checksums-sha256.txt
 /dist/
 /build/
-*.tar.gz
 *.tgz
 *.zip
-# Checksums are kept inside /release/ — both are ignored
 
 # --- Credentials / secrets (never commit) ---
 credentials.txt

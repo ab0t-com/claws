@@ -120,11 +120,15 @@ for target in "${TARGETS[@]}"; do
     echo -e "${GREEN}OK${NC}"
 done
 
-# Top-level checksums file (canonical name for tooling)
+# Top-level checksums file
 echo ""
 echo -n "  Generating SHA256SUMS... "
-( cd "$RELEASE_DIR" && sha256sum *.tar.gz > SHA256SUMS && cp SHA256SUMS checksums-sha256.txt )
+( cd "$RELEASE_DIR" && sha256sum *.tar.gz > SHA256SUMS )
 echo -e "${GREEN}OK${NC}"
+
+# VERSION file — install.sh reads this from main to resolve "latest"
+echo "$VERSION" > "$RELEASE_DIR/VERSION"
+echo "  Wrote $RELEASE_DIR/VERSION → $VERSION"
 
 echo ""
 echo -e "${BOLD}Release artifacts:${NC}"
@@ -132,10 +136,7 @@ ls -lh "$RELEASE_DIR"/*.tar.gz 2>/dev/null \
     | awk '{print "  " $NF " (" $5 ")"}'
 echo ""
 echo "  Checksums: $RELEASE_DIR/SHA256SUMS"
+echo "  Version:   $RELEASE_DIR/VERSION → $VERSION"
 echo ""
-echo -e "${BOLD}Next steps:${NC}"
-echo "  1. Inspect a manifest:   tar tzf release/claws-${VERSION}-linux-amd64.tar.gz | head"
-echo "  2. Tag the release:      git tag ${VERSION} && git push --tags"
-echo "  3. Upload to GitHub:     gh release create ${VERSION} \\"
-echo "                             release/*.tar.gz release/SHA256SUMS"
+echo -e "${BOLD}Next:${NC} git add release/ && git commit && git push && git tag $VERSION && git push origin $VERSION"
 echo ""

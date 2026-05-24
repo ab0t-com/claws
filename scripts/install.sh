@@ -227,32 +227,93 @@ fetch_url() {
     fi
 }
 
+# Source-build fallback. Used when no release tarball exists for the
+# requested version. Clones the repo at the ref and builds via `go build`.
+# Requires: git, go (1.22+). On failure, prints how to install them.
+install_from_source() {
+    local ref="$1"
+    echo ""
+    echo -e "${BOLD}Source-build fallback${NC}"
+    info "ref:  $ref"
+    info "repo: https://github.com/${REPO}.git"
+
+    for tool in git go; do
+        if ! command -v "$tool" &>/dev/null; then
+            err "$tool is required for source build but not installed"
+            case "$tool" in
+                git) echo "  Ubuntu/Debian:  sudo apt install -y git" >&2 ;;
+                go)  echo "  Install Go 1.22+ from https://go.dev/dl/ or via your package manager." >&2
+                     echo "  Ubuntu/Debian:  sudo apt install -y golang-go" >&2 ;;
+            esac
+            exit 1
+        fi
+    done
+
+    local SRC; SRC=$(mktemp -d)
+    trap "rm -rf $SRC" RETURN
+
+    echo -n "  Cloning... "
+    if ! git clone --quiet --depth=1 --branch "$ref" \
+            "https://github.com/${REPO}.git" "$SRC" 2>/dev/null; then
+        echo -e "${YELLOW}tag not found, trying main${NC}"
+        rm -rf "$SRC"
+        SRC=$(mktemp -d)
+        if ! git clone --quiet --depth=1 "https://github.com/${REPO}.git" "$SRC"; then
+            die "git clone failed"
+        fi
+    else
+        echo -e "${GREEN}OK${NC}"
+    fi
+
+    echo -n "  Building (this takes ~30s)... "
+    if ! ( cd "$SRC" && go build -trimpath -ldflags "-s -w -X main.Version=${ref}" \
+            -o "$SRC/$BINARY" "./cmd/${BINARY}/" 2>&1 ); then
+        echo -e "${RED}FAIL${NC}"
+        die "go build failed"
+    fi
+    echo -e "${GREEN}OK${NC}"
+
+    install_binary "$SRC/$BINARY"
+    install_data_assets "$SRC"
+
+    echo ""
+    ok "claws ${ref} installed (built from source)."
+    verify_on_path
+    echo ""
+    echo "  Get started:"
+    echo "    claws quickstart  — one-click first agent"
+    echo "    claws help        — see all commands"
+    echo ""
+}
+
 resolve_latest_version() {
-    # Use GitHub API for a stable, redirect-free lookup.
-    local api="https://api.github.com/repos/${REPO}/releases/latest"
+    # Binaries live in the repo under release/, so "latest" comes from
+    # release/VERSION on main. No GitHub Releases page, no auth.
     local tmp; tmp=$(mktemp)
-    if ! fetch_url "$api" "$tmp"; then
+    if ! fetch_url "https://raw.githubusercontent.com/${REPO}/main/release/VERSION" "$tmp"; then
         rm -f "$tmp"
         return 1
     fi
-    grep -m1 '"tag_name"' "$tmp" | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
+    head -1 "$tmp" | tr -d '[:space:]'
     rm -f "$tmp"
 }
 
 if [ -z "$VERSION" ]; then
-    info "Fetching latest version from github.com/${REPO}..."
+    info "Fetching latest version from github.com/${REPO}/release/VERSION..."
     VERSION="$(resolve_latest_version || true)"
     [ -n "$VERSION" ] || die "could not determine latest version. Specify --version=vX.Y.Z"
     info "Latest: $VERSION"
 fi
 
 TARBALL="claws-${VERSION}-${OS}-${ARCH}.tar.gz"
-BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+# Tarballs live in-repo at release/, fetched via raw.githubusercontent.com.
+# Tag-anchored URL so older versions remain reachable via git tags.
+BASE_URL="https://raw.githubusercontent.com/${REPO}/${VERSION}/release"
 TARBALL_URL="${BASE_URL}/${TARBALL}"
 CHECKSUMS_URL="${BASE_URL}/SHA256SUMS"
 
 info "Package:   $TARBALL"
-info "Checksums: SHA256SUMS"
+info "Source:    ${BASE_URL}"
 
 # --- Download ---
 TMP=$(mktemp -d)
@@ -260,8 +321,19 @@ trap 'rm -rf "$TMP"' EXIT
 
 echo -n "  Downloading tarball... "
 if ! fetch_url "$TARBALL_URL" "$TMP/$TARBALL"; then
-    echo -e "${RED}FAIL${NC}"
-    die "download failed: $TARBALL_URL"
+    echo -e "${YELLOW}NOT FOUND at tag${NC}"
+    # Fall back: try main (in case tag is newer than committed binaries)
+    BASE_URL="https://raw.githubusercontent.com/${REPO}/main/release"
+    TARBALL_URL="${BASE_URL}/${TARBALL}"
+    CHECKSUMS_URL="${BASE_URL}/SHA256SUMS"
+    echo -n "  Trying main... "
+    if ! fetch_url "$TARBALL_URL" "$TMP/$TARBALL"; then
+        echo -e "${YELLOW}NOT FOUND${NC}"
+        warn "no committed binary for $OS/$ARCH at $VERSION or main"
+        warn "falling back to source build"
+        install_from_source "$VERSION"
+        exit $?
+    fi
 fi
 echo -e "${GREEN}OK${NC}"
 

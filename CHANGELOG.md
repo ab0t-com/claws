@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.0.1] — 2026-05-24
+
+### Fixed
+
+- **`claws init` post-install lookup** — the binary now finds
+  `docker-compose.yml` at `${XDG_DATA_HOME:-$HOME/.local/share}/claws/`
+  (where the installer places it), in addition to the existing OPENCLAW_ROOT,
+  next-to-binary, and CWD lookups. Before this, fresh `curl … | sh` installs
+  failed at `claws init` with "docker-compose.yml not found".
+
+### Changed
+
+- **Release distribution model.** Binaries now live inside the repo at
+  `release/`, fetched by `install.sh` from `raw.githubusercontent.com`. No
+  GitHub Release page is required — `git tag v1.0.1 && git push` is the
+  entire release flow. Older versions remain reachable via tag-anchored URLs.
+- **`install.sh`** now reads `release/VERSION` from `main` to resolve "latest"
+  and falls back to source-build (git clone + go build) if no matching
+  prebuilt tarball exists.
+
+### Added
+
+- **`release/VERSION`** — single-line file written by `release.sh` so
+  `install.sh` can resolve the latest version without GitHub API or auth.
+- **Source-build fallback in `install.sh`** — used only when no committed
+  binary exists for the requested platform/version. Requires `git` and
+  Go 1.22+ on the host.
+
 ## [v1.0.0] — 2026-05-24
 
 First public release under the MIT license.
