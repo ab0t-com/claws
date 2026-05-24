@@ -358,15 +358,16 @@ func printFirstRun() {
 	fmt.Printf("%sclaws%s — AI agent team manager\n\n", bold, nc)
 	if count == 0 {
 		fmt.Println("  No agents running yet.")
-		fmt.Println()
-		fmt.Printf("    %sclaws setup%s    — guided team setup\n", bold, nc)
-		fmt.Printf("    %sclaws create%s   — create an agent\n", bold, nc)
 	} else {
 		fmt.Printf("  %d agent(s) registered.\n", count)
-		fmt.Println()
-		fmt.Printf("    %sclaws list%s       — see all agents\n", bold, nc)
-		fmt.Printf("    %sclaws dashboard%s  — live status view\n", bold, nc)
 	}
-	fmt.Printf("    %sclaws help%s      — see all commands\n", bold, nc)
+	// Replaced the hand-rolled static menu with state-driven `Next:` hints.
+	// The provider chooses what to suggest based on fleet state (zero
+	// agents → setup; some never-started → start-all; healthy ones →
+	// dashboard; etc.). One `claws help` line stays as the always-on
+	// "everything else" pointer.
+	hintsRender("", hintsCtxCheap(paths))
+	fmt.Println()
+	fmt.Printf("  %sclaws help%s — see every command\n", bold, nc)
 	fmt.Println()
 }

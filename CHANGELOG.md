@@ -7,7 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — next-step hints framework
+
+- **`cmd/claws/hints/` package** lifted from sharedwatch's
+  `internal/hints` (sharedwatch's own README explicitly endorses
+  "second adopter lifts the package; third adopter extracts to a
+  shared module"). Engine + types are identical; Context fields and
+  providers are claws-specific.
+- **`Next:` block on `claws` (no args).** Replaces the hand-rolled
+  static "see all agents / dashboard / help" menu with state-driven
+  suggestions: empty fleet → setup; some never-started → start-all;
+  healthy agents → dashboard; errors → triage; newer release → update.
+- **`claws list` gains a `NEXT` column.** Per-row, one terse
+  copy-pasteable command derived from that agent's status (healthy →
+  `claws agent ping <name>`; created → `claws start <name>`; stopped
+  → `claws start <name>`; missing → `claws remove <name> --purge`).
+  Plus a fleet-level `Next:` block beneath the table aggregating
+  cross-cutting moves (start-all, fleet logs, errors).
+- **`claws start <name>` emits a `Next:` block** after the health
+  check completes — suggests `claws agent ping <name>` and
+  `claws logs <name> -f`.
+- **`CLAWS_HINTS` env var** controls verbosity (`default` / `agent`
+  / `terse` / `off`). Operators who find the blocks noisy can
+  silence with `export CLAWS_HINTS=off`.
+
+### Why this matters
+
+`claws list` previously showed NAME / PORT / STATUS / RAM / UPTIME —
+five facts and zero guidance. A non-technical user had no idea what
+command to run next for any given agent. The framework makes
+next-step guidance a first-class, uniform concern across the CLI:
+adding hints to a new command is one provider function + one
+`Register()` call, not bespoke `fmt.Println` in each handler.
+
+### Coverage in this release
+
+Wired into: top-level `claws`, `claws list`, `claws start`.
+Provider definitions also shipped (registered, ready to wire) for:
+`claws create`, `claws stop`, `claws remove`, `claws auth`,
+`claws channel add`, `claws update`, `claws image bootstrap`,
+`claws agent ping`. Wiring those handlers is a v1.6.10+ follow-up.
+
+### Design notes
+
+- **Zero imports from other claws packages** — the hints package
+  consumes only a `Context` value passed in. Keeps it portable for
+  the eventual extraction.
+- **Providers are pure functions of `Context`** — no I/O, no global
+  reads, no clock. Trivially testable.
+- **Context populator (`hintsCtxCheap`) is registry-only by
+  default** — no docker calls. The `claws list` handler enriches
+  with per-agent status because it already pays that cost for the
+  table; other handlers can opt in later.
+- **Two surfaces for per-row guidance**: the `NEXT` column in
+  `claws list` (per-row terse) and the `Next:` block beneath
+  (fleet-level aggregate). The hints engine owns the latter;
+  `perRowNext()` in `commands.go` owns the former — same logic,
+  different rendering needs.
+
+### Tests
+
+- `cmd/claws/hints/hints_test.go` covers the engine (profile
+  resolution, truncation, terse-strips-reason, JSON shape) and the
+  built-in providers (toplevel empty + mixed, list empty +
+  populated, start with/without name, update with/without agents).
+- Convention enforced: tests never call `hints.Clear()` (per the
+  package README — clearing breaks subsequent tests in the binary).
 
 ## [v1.6.8] — 2026-05-24
 

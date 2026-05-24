@@ -485,19 +485,32 @@ func cmdStart(args []string) error {
 
 	fmt.Println()
 	info("Waiting for health...")
+	healthy := false
 	for i := 0; i < 15; i++ {
 		resp, err := http.Get(url)
 		if err == nil && resp.StatusCode == 200 {
 			resp.Body.Close()
 			info(fmt.Sprintf("Instance '%s' is healthy on :%s", name, port))
-			return nil
+			healthy = true
+			break
 		}
 		if resp != nil {
 			resp.Body.Close()
 		}
 		time.Sleep(2 * time.Second)
 	}
-	warn("Health check didn't pass in 30s — check: claws logs " + name)
+	if !healthy {
+		warn("Health check didn't pass in 30s — check: claws logs " + name)
+	}
+	// "Next:" hints — same suggestions whether health passed or not (in
+	// both cases the operator wants ping + logs; the hint provider keys
+	// off AgentName, not the outcome).
+	ctx := hintsCtxCheap(paths)
+	ctx.AgentName = name
+	if healthy {
+		ctx.AgentStatus = "healthy"
+	}
+	hintsRender("start", ctx)
 	return nil
 }
 
@@ -738,9 +751,13 @@ func cmdList(args []string) error {
 	var jsonEntries []listEntry
 
 	if !jsonMode {
-		fmt.Printf("%s%-15s %-8s %-12s %-10s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", nc)
-		fmt.Printf("%-15s %-8s %-12s %-10s %s\n", "───────────────", "────────", "────────────", "──────────", "──────────")
+		fmt.Printf("%s%-18s %-8s %-12s %-10s %-10s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", "NEXT", nc)
+		fmt.Printf("%-18s %-8s %-12s %-10s %-10s %s\n", "──────────────────", "────────", "────────────", "──────────", "──────────", "────")
 	}
+
+	// Collected statuses for the trailing hints provider (avoids re-running
+	// docker compose ps just to populate hints.Context).
+	statuses := map[string]string{}
 
 	for _, e := range entries {
 		dir := instanceDir(paths, e.Name)
@@ -776,21 +793,51 @@ func cmdList(args []string) error {
 				statusPlain = "created"
 			}
 		}
+		statuses[e.Name] = statusPlain
 
 		if jsonMode {
 			jsonEntries = append(jsonEntries, listEntry{
 				Name: e.Name, Port: port, Status: statusPlain, RAM: ram, Uptime: uptime,
 			})
 		} else {
-			fmt.Printf("%-15s :%-7s %-22s %-10s %s\n", e.Name, port, status, ram, uptime)
+			// NEXT column: one terse, copy-pasteable command per row.
+			// Computed inline (cheap; same logic as the hint provider
+			// but rendered per-row instead of aggregated).
+			next := perRowNext(e.Name, statusPlain)
+			fmt.Printf("%-18s :%-7s %-22s %-10s %-10s %s\n", e.Name, port, status, ram, uptime, next)
 		}
 	}
 
 	if jsonMode {
 		data, _ := json.MarshalIndent(jsonEntries, "", "  ")
 		fmt.Println(string(data))
+		return nil
 	}
+
+	// Aggregate fleet-level "Next:" block beneath the table.
+	ctx := hintsCtxCheap(paths)
+	hintsAttachStatus(&ctx, statuses)
+	hintsRender("list", ctx)
 	return nil
+}
+
+// perRowNext picks the single best follow-up command for an agent row
+// based on its observable status. Mirrors the provider logic but per-row
+// (the hints package emits at command-level, not row-level).
+func perRowNext(name, status string) string {
+	switch status {
+	case "healthy":
+		return "claws agent ping " + name
+	case "starting":
+		return "claws logs " + name + " -f"
+	case "stopped":
+		return "claws start " + name
+	case "created", "":
+		return "claws start " + name
+	case "missing":
+		return "claws remove " + name + " --purge"
+	}
+	return "claws info " + name
 }
 
 // ---------------------------------------------------------------------------
