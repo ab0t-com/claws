@@ -77,3 +77,62 @@ Templates should prefer `prompt` going forward.
 5. **P0.5** — Migration helpers
 6. **P0.6** — Tests
 7. **Commit P0 as one chunk**, then P1 phase, then P2 phase, then cut v1.6.0
+
+## 2026-05-24 — Shipped (commit fd6af48, tag v1.6.0)
+
+All P0 + P1 + P2 tasks landed. Final state:
+
+**P0 — silent feature failures: FIXED**
+- Cron jobs.json shape matches the live runtime's editable schema —
+  verified by reading sarah's jobs.json.bak. UUID-stable IDs, preserves
+  runtime-owned state.* on re-apply. Schedule conversions: @daily,
+  @hourly, @weekly, @monthly, @yearly, @reboot, "every <dur>", crontab.
+- Hooks land at <team>/shared/hooks/<event>.sh (matches mount). Per-agent
+  retained via Runtime.HooksScope=agent.
+- Skills land at <team>/shared/skills/. Same opt-in.
+- Runtime contract additions: HooksScope, SkillsScope, CronFormat,
+  3 new capability flags.
+- migrate cron: parses legacy crontab, converts, leaves legacy file in
+  place. Idempotent.
+- migrate uuids: populates CLAWS_INSTANCE_UUID + mirrors to openclaw.json
+  meta.id. Idempotent.
+
+**P1 — fleet operator visibility: ALL SHIPPED**
+- `team tree` — ASCII topology renderer; tested with multi-tier (depth-2
+  hierarchy + intra-tier peers). Cleanly handles missing/disconnected
+  managers.
+- `cron list` — reads jobs.json + state.*, renders schedule + next-run +
+  last-run + status with color-coded status.
+- `cron tail` — poll-based 2s tail of cron/runs/*.jsonl.
+- `fleet doctor` — runs doctor + audit + drift + orphans with sectioned
+  output + summary + non-zero exit on any failure.
+- (Deferred: agent show is in v1.7 — `info <name>` already covers most.)
+
+**P2 — UUIDs + contract: ALL SHIPPED**
+- UUID at create-time: every new agent gets CLAWS_INSTANCE_UUID
+  (v4, randomly generated).
+- `claws id <name>` → uuid (script-friendly).
+- `claws by-id <uuid>` → team/name reverse lookup.
+- `claws contract show [<rt>]` — beautiful renderer of capability flags,
+  hook contract, cron contract, skills scope, mount points. Warns on
+  declared-but-unverified Events capability.
+- `claws contract list` — registered runtimes.
+
+**Open questions for runtime author — STILL OPEN (best-guess in place)**
+1. Cron jobs.json editable shape: confirmed by reading sarah's .bak file.
+   Shipped with that shape. If wrong, easy v1.6.1 patch.
+2-5: Made educated guesses based on docker-compose.override.yml mount
+   layout and visible runtime artifacts.
+
+**Final state**
+- origin/main at fd6af48, v1.6.0 tag pushed.
+- release/VERSION → v1.6.0.
+- Status: **CLOSED**.
+
+**Deferred to v1.7+:**
+- extends: template composition
+- Remote --template=github:org/repo
+- Sidecar one-click installer
+- `claws agent show <name>` consolidated overview
+- `claws team task-graph` (existing `team show` covers most)
+- Test coverage uplift (subprocess coverage merging)
