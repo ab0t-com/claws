@@ -1,0 +1,39 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "specialist-mesh",
+    "version": "1.0.0",
+    "description": "Three peer specialists collaborating on a shared workspace — no hierarchy, all-to-all peer references. Researcher + writer + reviewer. Each sees the others as peers (read shared workspace, no task delegation).",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["teams", "topology", "mesh", "peer"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": { "loopbackOnly": true, "dmDefault": "pairing", "outboundDefault": "off" },
+  "team": { "name": "mesh", "shared": true },
+  "agents": [
+    {
+      "name": "researcher",
+      "peers": ["writer", "reviewer"],
+      "sandbox": true,
+      "tools": { "profile": "research", "allow": ["read", "memory", "web-search"] },
+      "skills": ["web-search", "memory", "citation-format"]
+    },
+    {
+      "name": "writer",
+      "peers": ["researcher", "reviewer"],
+      "sandbox": true,
+      "tools": { "profile": "research", "allow": ["read", "edit", "memory"] },
+      "skills": ["memory", "markdown-utils"]
+    },
+    {
+      "name": "reviewer",
+      "peers": ["researcher", "writer"],
+      "sandbox": true,
+      "tools": { "profile": "research", "allow": ["read", "memory"] },
+      "skills": ["memory", "fact-check"]
+    }
+  ],
+  "postSetup": ["audit"]
+}

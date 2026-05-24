@@ -9,6 +9,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.5.0] — 2026-05-24
+
+### Added — Cron section in templates
+
+- **`agents[].cron[]`** — declare periodic jobs inline:
+  ```json
+  "cron": [
+    {"name": "daily-summary", "schedule": "@daily",    "command": "echo summary"},
+    {"name": "heartbeat",     "schedule": "every 30m", "hook": "onIdle"}
+  ]
+  ```
+- Schedule formats: standard 5-field crontab, `@hourly|@daily|@weekly|@monthly|@yearly|@reboot`, and `every <Go-duration>`.
+- Job actions are mutually exclusive: `command` (shell), `hook` (reference an
+  event in `agents[].hooks`), or `exec` (array, no shell interpretation).
+- Optional `timezone` (CRON_TZ prefix), `enabled` (default true; false →
+  written as a commented-out DISABLED line).
+- Materialised to `<instance>/workspace/<runtime.CronDir>/claws.crontab`
+  in `<runtime.CronFormat>` (default: `crontab`). Idempotent — only
+  re-written when content changes.
+- Validation at apply-time: invalid schedules, missing actions, and
+  references to unknown hooks all fail loud at parse time.
+
+### Added — Event injection block
+
+- **`agents[].events: {enabled, digestMode, endpoint, allowFromIps}`** —
+  declare the agent accepts external events. Maps to `openclaw.json`
+  `events.*` via `cmdConfig set`. The runtime decides whether/how to
+  expose the HTTP endpoint based on its `Capabilities.Events` flag.
+- Designed to pair with the sibling `../intent-gateway` project — the
+  gateway reads the events config off agents and routes accordingly.
+- `digestMode: true` = events batched into periodic digests;
+  `digestMode: false` = each event processed individually.
+
+### Added — First-class sidecar helpers
+
+- **`agents[].sidecars: [{name, kind, config}]`** — declare a helper
+  CLI that integrates with the agent. **Configure-only**: claws writes
+  the integration JSON to `workspace/sidecars/<name>.json` but does
+  NOT install or run the sidecar binary itself.
+- Built-in registry: `sharedwatch`, `intent-gateway`, `custom`.
+- Examples:
+  - `sharedwatch` — SQLite-backed file-watcher for multi-agent
+    coordination (sibling project at `../sharedwatch`).
+  - `intent-gateway` — event ingest + intent routing (sibling project).
+- Unknown `kind` → apply warns inline and skips, doesn't fail the run.
+
+### Added — Topology
+
+- **`agents[].peers: [string]`** — explicit peer references for
+  non-hierarchical relationships (mesh teams).
+- **Multi-level manager chains** — `manager: <name>` already worked
+  for one level; now validated for arbitrary depth.
+- **`workspace/topology.json`** materialised per-agent listing
+  `manager`, `peers`, and auto-derived `workers` (agents that declare
+  this one as their manager).
+- **Cycle detection** at apply-time: agent → manager chain that
+  revisits any name fails loud, with the offending agent named.
+- Self-manager and self-peer references rejected.
+- Manager/peer references to non-existent agents rejected.
+
+### Added — Runtime adapter additions (Phase A-D)
+
+- **`Runtime.CronDir`** + **`Runtime.CronFormat`** — declare where
+  cron jobs land + the format.
+- **`Runtime.Capabilities.Cron`**, **`Runtime.Capabilities.Events`**,
+  **`Runtime.Capabilities.Sidecars`** — three new capability flags.
+- OpenClaw runtime declares all three as `true`, with
+  `CronDir="cron"`, `CronFormat="crontab"`.
+
+### Added — Bundled templates
+
+New:
+- **`templates/teams/multi-tier.json`** — 7 agents in a depth-2
+  hierarchy (lead-of-leads → 2 team-leads → 4 workers). Demonstrates
+  multi-tier manager chains + intra-tier peers.
+- **`templates/teams/specialist-mesh.json`** — 3 peer specialists
+  (researcher + writer + reviewer) with no hierarchy. Demonstrates
+  mesh topology + all-to-all peer references.
+
+Updated:
+- **`templates/teams/research-trio.json`** — lead now has cron section
+  (daily-summary at `@daily`, heartbeat at `every 30m` referencing
+  `onMessage` hook).
+- **`templates/specialty/knowledge-base.json`** — librarian gets a
+  `sharedwatch` sidecar watching the docs/ dir + hourly reindex cron.
+- **`templates/specialty/oncall-rotation.json`** — oncall agent gets
+  `events: {enabled: true, endpoint: "/events/oncall"}` for live
+  PagerDuty webhook ingest.
+
+### Tests
+
+- 13 new tests: cron schedule validation (good + bad), cron apply
+  end-to-end with hook references + disabled jobs, cron rejection of
+  ambiguous actions, events apply, sidecar apply + unknown-kind warning,
+  topology cycle detection (4 cases), apply-time topology.json artefacts.
+- All 11 bundled templates dry-run validated.
+
+### Test coverage baseline
+
+- `go test -cover ./cmd/claws/...` reports **9.5%** line coverage
+  (measured at v1.4.0 → v1.5.0 boundary). Note: most tests are
+  integration-style (spawn binary as subprocess), which Go's `-cover`
+  doesn't measure across process boundaries. Real coverage is
+  substantially higher; the v1.5 unit tests for new helpers do count.
+
+### Not in this release
+
+- `extends:` template composition — still v1.6+.
+- Remote `--template=github:org/repo` — still v1.6+.
+
 ## [v1.4.0] — 2026-05-24
 
 ### Added — Hook register on Runtime adapter

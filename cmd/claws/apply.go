@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const applyHelp = `Usage: claws apply --file=<profile.json> [--yes] [--dry-run]
@@ -82,14 +83,53 @@ type ProfileAgent struct {
 	Name     string                 `json:"name"`
 	Role     string                 `json:"role,omitempty"`
 	Manager  string                 `json:"manager,omitempty"`
+	Peers    []string               `json:"peers,omitempty"`           // v1.5 — explicit peer references
 	Image    string                 `json:"image,omitempty"`           // pin to specific runtime image
 	Sandbox  *bool                  `json:"sandbox,omitempty"`         // agents.defaults.sandbox (nil = inherit)
 	Tools    *ProfileTools          `json:"tools,omitempty"`
 	Skills   []SkillRef             `json:"skills,omitempty"`          // strings OR ResourceRefs (custom unmarshal)
 	Hooks    map[string]HookRef     `json:"hooks,omitempty"`           // event → string OR ResourceRef
+	Cron     []ProfileCronJob       `json:"cron,omitempty"`            // v1.5 — periodic jobs
+	Events   *ProfileEvents         `json:"events,omitempty"`          // v1.5 — event injection config
+	Sidecars []ProfileSidecar       `json:"sidecars,omitempty"`        // v1.5 — per-agent helper sidecars
 	Config   map[string]interface{} `json:"config,omitempty"`          // arbitrary openclaw.json patches
 	Auth     *ProfileAuth           `json:"auth,omitempty"`
 	Channels []ProfileChannel       `json:"channels,omitempty"`
+}
+
+// ProfileCronJob — one periodic action declared in agents[].cron[].
+// Schedule formats accepted:
+//   - 5-field crontab:        "0 9 * * 1"          (9am every Monday)
+//   - @-aliases:              "@hourly", "@daily", "@weekly", "@monthly", "@reboot"
+//   - duration:               "every 30m"          (Go duration syntax after the word "every")
+// Exactly one of Command / Hook / Exec must be set.
+type ProfileCronJob struct {
+	Name     string   `json:"name"`                  // unique within the agent
+	Schedule string   `json:"schedule"`              // see above
+	Command  string   `json:"command,omitempty"`     // inline shell command
+	Hook     string   `json:"hook,omitempty"`        // reference an event in agents[].hooks
+	Exec     []string `json:"exec,omitempty"`        // exec form (no shell interpretation)
+	Timezone string   `json:"timezone,omitempty"`    // e.g. "UTC", "Pacific/Auckland"
+	Enabled  *bool    `json:"enabled,omitempty"`     // default true
+}
+
+// ProfileEvents — declares the agent accepts external event injection.
+// Maps to openclaw.json events.* via cmdConfig set. Runtime decides
+// whether/how to expose the endpoint based on its Capabilities.Events.
+type ProfileEvents struct {
+	Enabled       bool     `json:"enabled,omitempty"`
+	DigestMode    bool     `json:"digestMode,omitempty"`    // batch events into periodic digests
+	Endpoint      string   `json:"endpoint,omitempty"`      // relative path, e.g. "/events/sarah"
+	AllowFromIPs  []string `json:"allowFromIps,omitempty"`  // CIDR allowlist, empty = any
+}
+
+// ProfileSidecar — declares a helper CLI that should be configured for
+// this agent. The operator installs the sidecar binary separately;
+// claws only writes the integration config.
+type ProfileSidecar struct {
+	Name   string                 `json:"name"`             // local identifier within the template
+	Kind   string                 `json:"kind"`             // "sharedwatch" | "intent-gateway" | "custom"
+	Config map[string]interface{} `json:"config,omitempty"` // kind-specific configuration
 }
 
 // SkillRef accepts either a bare string ("calendar") or a full object form
@@ -311,6 +351,37 @@ func cmdApply(args []string) error {
 		if err := validateName(ag.Name); err != nil {
 			return errorf("invalid agent name %q: %v", ag.Name, err)
 		}
+		// v1.5 — validate cron schedules at parse-time (fail loud, not silent)
+		for _, cj := range ag.Cron {
+			if cj.Name == "" {
+				return errorf("agent %q: cron job missing name", ag.Name)
+			}
+			if err := validateCronSchedule(cj.Schedule); err != nil {
+				return errorf("agent %q cron %q: %v", ag.Name, cj.Name, err)
+			}
+			n := 0
+			if cj.Command != "" {
+				n++
+			}
+			if cj.Hook != "" {
+				n++
+			}
+			if len(cj.Exec) > 0 {
+				n++
+			}
+			if n != 1 {
+				return errorf("agent %q cron %q: exactly one of command/hook/exec required", ag.Name, cj.Name)
+			}
+			if cj.Hook != "" {
+				if _, ok := ag.Hooks[cj.Hook]; !ok {
+					return errorf("agent %q cron %q: references unknown hook %q", ag.Name, cj.Name, cj.Hook)
+				}
+			}
+		}
+	}
+	// v1.5 — topology validation: cycle detection on manager chains, peers reference existing agents
+	if err := validateTopology(p.Agents); err != nil {
+		return err
 	}
 
 	const (
@@ -467,6 +538,44 @@ func cmdApply(args []string) error {
 			} else {
 				fmt.Printf("  %s✓ hooks written: %d event(s)%s\n", green, len(ag.Hooks), nc)
 			}
+		}
+
+		// v1.5 Phase A — cron jobs
+		if len(ag.Cron) > 0 {
+			if err := applyCron(paths, full, ag); err != nil {
+				fmt.Printf("  %s! cron: %v%s\n", gold, err, nc)
+			} else {
+				fmt.Printf("  %s✓ cron written: %d job(s)%s\n", green, len(ag.Cron), nc)
+			}
+		}
+
+		// v1.5 Phase B — event injection config
+		if ag.Events != nil && ag.Events.Enabled {
+			if err := applyEventsConfig(full, ag.Events); err != nil {
+				fmt.Printf("  %s! events: %v%s\n", gold, err, nc)
+			} else {
+				mode := "single"
+				if ag.Events.DigestMode {
+					mode = "digest"
+				}
+				fmt.Printf("  %s✓ events injection enabled (%s mode)%s\n", green, mode, nc)
+			}
+		}
+
+		// v1.5 Phase C — per-agent sidecars
+		if len(ag.Sidecars) > 0 {
+			for _, sc := range ag.Sidecars {
+				if err := applySidecar(paths, full, sc); err != nil {
+					fmt.Printf("  %s! sidecar %s: %v%s\n", gold, sc.Kind, err, nc)
+				} else {
+					fmt.Printf("  %s✓ sidecar configured: %s (%s)%s\n", green, sc.Name, sc.Kind, nc)
+				}
+			}
+		}
+
+		// v1.5 Phase D — topology (manager/peers/workers materialised per-agent)
+		if err := applyTopology(paths, p.Agents, full); err != nil {
+			fmt.Printf("  %s! topology: %v%s\n", gold, err, nc)
 		}
 
 		// channels — D1 idempotence: skip if already enabled
@@ -795,4 +904,266 @@ func apikeyConfigured(paths Paths, full, provider string) bool {
 		return true
 	}
 	return false
+}
+
+// ===========================================================================
+// v1.5 — cron, events, sidecars, topology
+// ===========================================================================
+
+// validateCronSchedule accepts:
+//   - 5-field crontab ("0 9 * * 1")
+//   - @-aliases (@hourly, @daily, @weekly, @monthly, @yearly, @reboot)
+//   - "every <duration>" (Go duration syntax, e.g. "every 30m")
+func validateCronSchedule(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return errorf("empty schedule")
+	}
+	if strings.HasPrefix(s, "@") {
+		switch s {
+		case "@hourly", "@daily", "@weekly", "@monthly", "@yearly", "@annually", "@reboot":
+			return nil
+		}
+		return errorf("unknown @-alias %q", s)
+	}
+	if strings.HasPrefix(s, "every ") {
+		dur := strings.TrimSpace(strings.TrimPrefix(s, "every "))
+		if _, err := time.ParseDuration(dur); err != nil {
+			return errorf("invalid duration after 'every': %v", err)
+		}
+		return nil
+	}
+	// Plain crontab: must have exactly 5 whitespace-separated fields.
+	fields := strings.Fields(s)
+	if len(fields) != 5 {
+		return errorf("crontab must have 5 fields (got %d): %q", len(fields), s)
+	}
+	return nil
+}
+
+// applyCron writes the agent's cron jobs to <instance>/workspace/<runtime.CronDir>/<name>.crontab
+// (or single combined crontab depending on runtime CronFormat).
+func applyCron(paths Paths, full string, ag ProfileAgent) error {
+	rt, err := resolveRuntime(paths, full)
+	if err != nil {
+		rt = openclawRuntime()
+	}
+	if !rt.Capabilities.Cron {
+		return errorf("runtime %q does not declare Cron capability", rt.Name)
+	}
+	dir := rt.CronDir
+	if dir == "" {
+		dir = "cron"
+	}
+	cronDir := filepath.Join(paths.Root, full, "workspace", dir)
+	if err := os.MkdirAll(cronDir, 0755); err != nil {
+		return err
+	}
+	// Format: combined crontab file. Each line: SCHEDULE COMMAND
+	// (crontab convention is space-separated; quote command if needed by your daemon).
+	var lines []string
+	lines = append(lines, "# claws-managed cron — agent: "+full)
+	lines = append(lines, "# Edit by editing the template profile and re-running `claws apply`.")
+	lines = append(lines, "")
+	for _, cj := range ag.Cron {
+		if cj.Enabled != nil && !*cj.Enabled {
+			lines = append(lines, "# DISABLED: "+cj.Name)
+			continue
+		}
+		var cmd string
+		switch {
+		case cj.Command != "":
+			cmd = cj.Command
+		case cj.Hook != "":
+			if rt.HooksDir != "" {
+				cmd = "sh /workspace/" + rt.HooksDir + "/" + cj.Hook + (rt.HookFileExt)
+			} else {
+				cmd = "# hook " + cj.Hook + " (runtime has no HooksDir)"
+			}
+		case len(cj.Exec) > 0:
+			cmd = strings.Join(cj.Exec, " ")
+		}
+		tz := ""
+		if cj.Timezone != "" {
+			tz = "CRON_TZ=" + cj.Timezone + " "
+		}
+		lines = append(lines, "# job: "+cj.Name)
+		lines = append(lines, tz+cj.Schedule+" "+cmd)
+	}
+	body := strings.Join(lines, "\n") + "\n"
+	out := filepath.Join(cronDir, "claws.crontab")
+	// Idempotence: skip write if content matches
+	if existing, err := os.ReadFile(out); err == nil && string(existing) == body {
+		return nil
+	}
+	return os.WriteFile(out, []byte(body), 0644)
+}
+
+// applyEventsConfig writes events.* config keys via cmdConfig set so the
+// runtime can pick them up. Runtime decides whether to expose an actual
+// HTTP endpoint based on its Capabilities.Events flag.
+func applyEventsConfig(full string, ev *ProfileEvents) error {
+	if ev == nil {
+		return nil
+	}
+	set := func(k string, v interface{}) error {
+		j, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		return cmdConfig([]string{"set", full, k, string(j)})
+	}
+	if err := set("events.enabled", ev.Enabled); err != nil {
+		return err
+	}
+	if err := set("events.digestMode", ev.DigestMode); err != nil {
+		return err
+	}
+	if ev.Endpoint != "" {
+		if err := set("events.endpoint", ev.Endpoint); err != nil {
+			return err
+		}
+	}
+	if len(ev.AllowFromIPs) > 0 {
+		if err := set("events.allowFromIps", ev.AllowFromIPs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applySidecar writes a sidecar declaration to the agent's workspace.
+// claws does NOT install or run the sidecar binary itself — that's the
+// operator's job. We just write the integration config the sidecar can
+// pick up at runtime, plus a hint file for the operator.
+func applySidecar(paths Paths, full string, sc ProfileSidecar) error {
+	if sc.Kind == "" {
+		return errorf("sidecar missing kind")
+	}
+	// Validate kind against built-in registry.
+	switch sc.Kind {
+	case "sharedwatch", "intent-gateway", "custom":
+		// ok
+	default:
+		return errorf("unknown sidecar kind %q (built-ins: sharedwatch, intent-gateway, custom)", sc.Kind)
+	}
+	sidecarDir := filepath.Join(paths.Root, full, "workspace", "sidecars")
+	if err := os.MkdirAll(sidecarDir, 0755); err != nil {
+		return err
+	}
+	name := sc.Name
+	if name == "" {
+		name = sc.Kind
+	}
+	out := filepath.Join(sidecarDir, name+".json")
+	body := map[string]interface{}{
+		"name":     name,
+		"kind":     sc.Kind,
+		"agent":    full,
+		"config":   sc.Config,
+		"_managed": "claws",
+	}
+	data, err := json.MarshalIndent(body, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if existing, err := os.ReadFile(out); err == nil && string(existing) == string(data) {
+		return nil
+	}
+	return os.WriteFile(out, data, 0644)
+}
+
+// validateTopology checks manager chains for cycles and peer references for existence.
+func validateTopology(agents []ProfileAgent) error {
+	names := map[string]bool{}
+	for _, a := range agents {
+		names[a.Name] = true
+	}
+	// Manager refs must point to existing agents.
+	for _, a := range agents {
+		if a.Manager != "" && !names[a.Manager] {
+			return errorf("agent %q: manager %q is not in the team", a.Name, a.Manager)
+		}
+		if a.Manager == a.Name {
+			return errorf("agent %q: cannot be its own manager", a.Name)
+		}
+		for _, p := range a.Peers {
+			if !names[p] {
+				return errorf("agent %q: peer %q is not in the team", a.Name, p)
+			}
+			if p == a.Name {
+				return errorf("agent %q: cannot be its own peer", a.Name)
+			}
+		}
+	}
+	// Cycle detection: walk manager chain from each agent, fail if we revisit.
+	for _, a := range agents {
+		seen := map[string]bool{a.Name: true}
+		cur := a.Manager
+		for cur != "" {
+			if seen[cur] {
+				return errorf("manager cycle detected involving agent %q", cur)
+			}
+			seen[cur] = true
+			var next string
+			for _, b := range agents {
+				if b.Name == cur {
+					next = b.Manager
+					break
+				}
+			}
+			cur = next
+		}
+	}
+	return nil
+}
+
+// applyTopology writes <instance>/workspace/topology.json describing this
+// agent's manager, peers, and workers (derived from who declares this
+// agent as their manager).
+func applyTopology(paths Paths, agents []ProfileAgent, full string) error {
+	parts := strings.SplitN(full, "/", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	team, name := parts[0], parts[1]
+
+	var self *ProfileAgent
+	for i := range agents {
+		if agents[i].Name == name {
+			self = &agents[i]
+			break
+		}
+	}
+	if self == nil {
+		return nil
+	}
+	var workers []string
+	for _, a := range agents {
+		if a.Manager == name {
+			workers = append(workers, a.Name)
+		}
+	}
+	topo := map[string]interface{}{
+		"team":    team,
+		"name":    name,
+		"role":    self.Role,
+		"manager": self.Manager,
+		"peers":   self.Peers,
+		"workers": workers,
+	}
+	data, err := json.MarshalIndent(topo, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	out := filepath.Join(paths.Root, full, "workspace", "topology.json")
+	if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
+		return err
+	}
+	if existing, err := os.ReadFile(out); err == nil && string(existing) == string(data) {
+		return nil
+	}
+	return os.WriteFile(out, data, 0644)
 }

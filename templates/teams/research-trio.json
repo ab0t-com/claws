@@ -3,28 +3,53 @@
   "kind": "Profile",
   "metadata": {
     "name": "research-trio",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Manager + 2 specialist workers (literature review + data analysis). Shared workspace, task queue. Slack channel on the manager only; workers receive tasks via the filesystem queue.",
     "author": "ab0t",
     "license": "MIT",
-    "tags": ["teams", "research", "manager-worker", "slack"]
+    "tags": [
+      "teams",
+      "research",
+      "manager-worker",
+      "slack"
+    ]
   },
-  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "runtime": {
+    "name": "openclaw",
+    "image": "openclaw:local"
+  },
   "policy": {
     "loopbackOnly": true,
     "dmDefault": "pairing",
     "outboundDefault": "off"
   },
-  "team": { "name": "research", "shared": true },
+  "team": {
+    "name": "research",
+    "shared": true
+  },
   "agents": [
     {
       "name": "lead",
       "role": "manager",
       "sandbox": true,
-      "tools": { "profile": "research", "allow": ["read", "edit", "memory", "web-search", "task-dispatch"] },
-      "skills": ["web-search", "memory", "task-queue", "research-synthesis"],
+      "tools": {
+        "profile": "research",
+        "allow": [
+          "read",
+          "edit",
+          "memory",
+          "web-search",
+          "task-dispatch"
+        ]
+      },
+      "skills": [
+        "web-search",
+        "memory",
+        "task-queue",
+        "research-synthesis"
+      ],
       "hooks": {
-        "onStart":   "echo \"lead manager online\" >> $WORKSPACE/memory/team.log",
+        "onStart": "echo \"lead manager online\" >> $WORKSPACE/memory/team.log",
         "onMessage": "echo \"[$(date -u +%FT%TZ)] lead got: $MSG_SUMMARY\" >> $WORKSPACE/memory/messages.log"
       },
       "config": {
@@ -35,29 +60,65 @@
       },
       "auth": {
         "preferred": "codex",
-        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
       },
-      "channels": [{
-        "type": "slack",
-        "botTokenFrom": { "env": "SLACK_BOT_TOKEN" },
-        "appTokenFrom": { "env": "SLACK_APP_TOKEN" },
-        "dmPolicy": "pairing"
-      }]
+      "channels": [
+        {
+          "type": "slack",
+          "botTokenFrom": {
+            "env": "SLACK_BOT_TOKEN"
+          },
+          "appTokenFrom": {
+            "env": "SLACK_APP_TOKEN"
+          },
+          "dmPolicy": "pairing"
+        }
+      ],
+      "cron": [
+        {
+          "name": "daily-summary",
+          "schedule": "@daily",
+          "command": "echo \"2026-05-24T04:03:10Z daily team summary\" >> $WORKSPACE/memory/daily.log"
+        },
+        {
+          "name": "heartbeat",
+          "schedule": "every 30m",
+          "hook": "onMessage"
+        }
+      ]
     },
     {
       "name": "lit-review",
       "role": "worker",
       "manager": "lead",
       "sandbox": true,
-      "tools": { "profile": "research", "allow": ["read", "memory", "web-search"] },
-      "skills": ["web-search", "memory", "pdf-parse", "citation-format"],
+      "tools": {
+        "profile": "research",
+        "allow": [
+          "read",
+          "memory",
+          "web-search"
+        ]
+      },
+      "skills": [
+        "web-search",
+        "memory",
+        "pdf-parse",
+        "citation-format"
+      ],
       "config": {
         "agents.defaults.maxTokens": 6144,
         "agents.defaults.persona": "literature-reviewer"
       },
       "auth": {
         "preferred": "apikey",
-        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
       }
     },
     {
@@ -65,17 +126,35 @@
       "role": "worker",
       "manager": "lead",
       "sandbox": true,
-      "tools": { "profile": "coding", "allow": ["read", "edit", "bash", "memory"] },
-      "skills": ["python-exec", "memory", "csv-utils", "plot"],
+      "tools": {
+        "profile": "coding",
+        "allow": [
+          "read",
+          "edit",
+          "bash",
+          "memory"
+        ]
+      },
+      "skills": [
+        "python-exec",
+        "memory",
+        "csv-utils",
+        "plot"
+      ],
       "config": {
         "agents.defaults.maxTokens": 8192,
         "agents.defaults.persona": "data-analyst"
       },
       "auth": {
         "preferred": "apikey",
-        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
       }
     }
   ],
-  "postSetup": ["audit"]
+  "postSetup": [
+    "audit"
+  ]
 }

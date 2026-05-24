@@ -89,6 +89,10 @@ type Runtime struct {
 	HookFileExt         string   `json:"hookFileExt,omitempty"`         // e.g. ".sh"
 	SupportedHookEvents []string `json:"supportedHookEvents,omitempty"` // e.g. ["onStart","onMessage","onIdle","onError","onShutdown"]
 
+	// Cron register (v1.5) — declares where periodic jobs land + format.
+	CronDir    string `json:"cronDir,omitempty"`    // workspace-relative, e.g. "cron"
+	CronFormat string `json:"cronFormat,omitempty"` // "crontab" | "systemd-timer" | "json"
+
 	// Capabilities — what features this runtime supports
 	Capabilities RuntimeCapabilities `json:"capabilities"`
 }
@@ -102,6 +106,9 @@ type RuntimeCapabilities struct {
 	Tasks    bool `json:"tasks"`    // manager/worker task queue
 	Shared   bool `json:"shared"`   // shared resources (skills, workspace, hooks)
 	Bridge   bool `json:"bridge"`   // bridge/companion port
+	Cron     bool `json:"cron"`     // periodic jobs via workspace/<CronDir>/ (v1.5)
+	Events   bool `json:"events"`   // external event injection endpoint (v1.5)
+	Sidecars bool `json:"sidecars"` // configures helper sidecars like sharedwatch (v1.5)
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +174,12 @@ func openclawRuntime() Runtime {
 			"onStart", "onMessage", "onIdle", "onError", "onShutdown",
 		},
 
+		// Cron contract (v1.5) — periodic jobs land here in standard
+		// crontab format. The runtime image may consume them via a
+		// builtin cron daemon or via an operator-installed cron.
+		CronDir:    "cron",
+		CronFormat: "crontab",
+
 		Capabilities: RuntimeCapabilities{
 			Channels: true,
 			Pairing:  true,
@@ -175,6 +188,9 @@ func openclawRuntime() Runtime {
 			Tasks:    true,
 			Shared:   true,
 			Bridge:   true,
+			Cron:     true,
+			Events:   true,
+			Sidecars: true,
 		},
 	}
 }

@@ -3,52 +3,98 @@
   "kind": "Profile",
   "metadata": {
     "name": "knowledge-base",
-    "version": "1.0.0",
-    "description": "RAG-style knowledge-base agent — watches a local docs dir, indexes content into memory, answers via SSH tunnel only (no public channel). Web-search + file-watch + memory skills, sandbox enabled, read-only tools.",
+    "version": "1.1.0",
+    "description": "RAG-style knowledge-base agent \u2014 watches a local docs dir, indexes content into memory, answers via SSH tunnel only (no public channel). Web-search + file-watch + memory skills, sandbox enabled, read-only tools.",
     "author": "ab0t",
     "license": "MIT",
-    "tags": ["specialty", "rag", "knowledge-base", "no-channel", "memory"]
+    "tags": [
+      "specialty",
+      "rag",
+      "knowledge-base",
+      "no-channel",
+      "memory"
+    ]
   },
-  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "runtime": {
+    "name": "openclaw",
+    "image": "openclaw:local"
+  },
   "policy": {
     "loopbackOnly": true,
     "dmDefault": "pairing",
     "outboundDefault": "off"
   },
-  "team": { "name": "kb", "shared": true },
-  "agents": [{
-    "name": "librarian",
-    "sandbox": true,
-    "tools": {
-      "profile": "research",
-      "allow": ["read", "memory", "web-search", "file-watch"],
-      "deny": ["edit", "bash", "exec"]
-    },
-    "skills": [
-      "memory",
-      "web-search",
-      "file-watch",
-      "embedding-index",
-      "citation-format"
-    ],
-    "hooks": {
-      "onStart":   "echo \"librarian online — indexing $DOCS_DIR\" >> $WORKSPACE/memory/lifecycle.log",
-      "onIdle":    "echo \"$(date -u +%FT%TZ) index-refresh\" >> $WORKSPACE/memory/index.log"
-    },
-    "config": {
-      "agents.defaults.maxTokens": 16384,
-      "agents.defaults.persona": "librarian",
-      "memory.enabled": true,
-      "memory.persistInterval": "30m",
-      "rag.enabled": true,
-      "rag.indexDir": "/home/node/.openclaw/workspace/index",
-      "rag.watchDir": "/home/node/.openclaw/workspace/docs"
-    },
-    "auth": {
-      "preferred": "apikey",
-      "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
-    },
-    "channels": []
-  }],
-  "postSetup": ["audit"]
+  "team": {
+    "name": "kb",
+    "shared": true
+  },
+  "agents": [
+    {
+      "name": "librarian",
+      "sandbox": true,
+      "tools": {
+        "profile": "research",
+        "allow": [
+          "read",
+          "memory",
+          "web-search",
+          "file-watch"
+        ],
+        "deny": [
+          "edit",
+          "bash",
+          "exec"
+        ]
+      },
+      "skills": [
+        "memory",
+        "web-search",
+        "file-watch",
+        "embedding-index",
+        "citation-format"
+      ],
+      "hooks": {
+        "onStart": "echo \"librarian online \u2014 indexing $DOCS_DIR\" >> $WORKSPACE/memory/lifecycle.log",
+        "onIdle": "echo \"$(date -u +%FT%TZ) index-refresh\" >> $WORKSPACE/memory/index.log"
+      },
+      "config": {
+        "agents.defaults.maxTokens": 16384,
+        "agents.defaults.persona": "librarian",
+        "memory.enabled": true,
+        "memory.persistInterval": "30m",
+        "rag.enabled": true,
+        "rag.indexDir": "/home/node/.openclaw/workspace/index",
+        "rag.watchDir": "/home/node/.openclaw/workspace/docs"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
+      },
+      "channels": [],
+      "sidecars": [
+        {
+          "name": "docs-watcher",
+          "kind": "sharedwatch",
+          "config": {
+            "watchDir": "/home/node/.openclaw/workspace/docs",
+            "actor": "librarian",
+            "cursorName": "librarian-cursor"
+          }
+        }
+      ],
+      "cron": [
+        {
+          "name": "reindex",
+          "schedule": "@hourly",
+          "command": "echo reindex"
+        }
+      ]
+    }
+  ],
+  "postSetup": [
+    "audit"
+  ]
 }

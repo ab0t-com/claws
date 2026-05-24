@@ -1,0 +1,69 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "multi-tier",
+    "version": "1.0.0",
+    "description": "Two-level hierarchy: lead-of-leads → 2 team-leads → 4 workers. Demonstrates depth-2 manager chains plus per-tier task queues. Each team-lead manages 2 workers; workers in the same team are peers.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["teams", "topology", "multi-tier", "hierarchy"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": { "loopbackOnly": true, "dmDefault": "pairing", "outboundDefault": "off" },
+  "team": { "name": "org", "shared": true },
+  "agents": [
+    {
+      "name": "lead",
+      "role": "manager",
+      "sandbox": true,
+      "tools": { "profile": "research" },
+      "config": { "agents.defaults.persona": "lead-of-leads", "tasks.enabled": true }
+    },
+    {
+      "name": "alpha-lead",
+      "role": "manager",
+      "manager": "lead",
+      "sandbox": true,
+      "tools": { "profile": "research" },
+      "config": { "agents.defaults.persona": "team-alpha-lead", "tasks.enabled": true }
+    },
+    {
+      "name": "alpha-worker-1",
+      "role": "worker",
+      "manager": "alpha-lead",
+      "peers": ["alpha-worker-2"],
+      "sandbox": true
+    },
+    {
+      "name": "alpha-worker-2",
+      "role": "worker",
+      "manager": "alpha-lead",
+      "peers": ["alpha-worker-1"],
+      "sandbox": true
+    },
+    {
+      "name": "beta-lead",
+      "role": "manager",
+      "manager": "lead",
+      "sandbox": true,
+      "tools": { "profile": "coding" },
+      "config": { "agents.defaults.persona": "team-beta-lead", "tasks.enabled": true }
+    },
+    {
+      "name": "beta-worker-1",
+      "role": "worker",
+      "manager": "beta-lead",
+      "peers": ["beta-worker-2"],
+      "sandbox": true
+    },
+    {
+      "name": "beta-worker-2",
+      "role": "worker",
+      "manager": "beta-lead",
+      "peers": ["beta-worker-1"],
+      "sandbox": true
+    }
+  ],
+  "postSetup": ["audit"]
+}

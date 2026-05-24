@@ -3,57 +3,95 @@
   "kind": "Profile",
   "metadata": {
     "name": "oncall-rotation",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Oncall page-and-ack agent on Slack. Receives PagerDuty/Opsgenie webhooks, posts structured handoff to the rotation channel, tracks acks in memory. Allowlist by Slack user ID; never outbound on its own.",
     "author": "ab0t",
     "license": "MIT",
-    "tags": ["specialty", "sre", "oncall", "slack", "paging"]
+    "tags": [
+      "specialty",
+      "sre",
+      "oncall",
+      "slack",
+      "paging"
+    ]
   },
-  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "runtime": {
+    "name": "openclaw",
+    "image": "openclaw:local"
+  },
   "policy": {
     "loopbackOnly": false,
     "dmDefault": "allowlist",
     "outboundDefault": "allowlist"
   },
-  "team": { "name": "ops", "shared": true },
-  "agents": [{
-    "name": "oncall",
-    "sandbox": true,
-    "tools": {
-      "profile": "support",
-      "allow": ["read", "memory", "web-fetch"],
-      "deny": ["bash", "exec", "edit"]
-    },
-    "skills": [
-      "pagerduty-webhook",
-      "incident-template",
-      "memory",
-      "escalation-policy"
-    ],
-    "hooks": {
-      "onStart":   "echo \"oncall agent up — rotation: $(cat $WORKSPACE/rotation.txt 2>/dev/null || echo unknown)\" >> $WORKSPACE/memory/lifecycle.log",
-      "onMessage": "echo \"[$(date -u +%FT%TZ)] page: $MSG_SUMMARY\" >> $WORKSPACE/memory/pages.log",
-      "onError":   "echo \"[$(date -u +%FT%TZ)] FAIL: $ERROR_SUMMARY\" >> $WORKSPACE/memory/errors.log"
-    },
-    "config": {
-      "agents.defaults.maxTokens": 4096,
-      "agents.defaults.persona": "oncall-coordinator",
-      "memory.enabled": true,
-      "channels.slack.responseMode": "structured-handoff"
-    },
-    "auth": {
-      "preferred": "apikey",
-      "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
-    },
-    "channels": [{
-      "type": "slack",
-      "botTokenFrom": { "env": "SLACK_BOT_TOKEN" },
-      "appTokenFrom": { "env": "SLACK_APP_TOKEN" },
-      "dmPolicy": "allowlist"
-    }]
-  }],
+  "team": {
+    "name": "ops",
+    "shared": true
+  },
+  "agents": [
+    {
+      "name": "oncall",
+      "sandbox": true,
+      "tools": {
+        "profile": "support",
+        "allow": [
+          "read",
+          "memory",
+          "web-fetch"
+        ],
+        "deny": [
+          "bash",
+          "exec",
+          "edit"
+        ]
+      },
+      "skills": [
+        "pagerduty-webhook",
+        "incident-template",
+        "memory",
+        "escalation-policy"
+      ],
+      "hooks": {
+        "onStart": "echo \"oncall agent up \u2014 rotation: $(cat $WORKSPACE/rotation.txt 2>/dev/null || echo unknown)\" >> $WORKSPACE/memory/lifecycle.log",
+        "onMessage": "echo \"[$(date -u +%FT%TZ)] page: $MSG_SUMMARY\" >> $WORKSPACE/memory/pages.log",
+        "onError": "echo \"[$(date -u +%FT%TZ)] FAIL: $ERROR_SUMMARY\" >> $WORKSPACE/memory/errors.log"
+      },
+      "config": {
+        "agents.defaults.maxTokens": 4096,
+        "agents.defaults.persona": "oncall-coordinator",
+        "memory.enabled": true,
+        "channels.slack.responseMode": "structured-handoff"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": {
+          "provider": "openai",
+          "fromEnv": "OPENAI_API_KEY"
+        }
+      },
+      "channels": [
+        {
+          "type": "slack",
+          "botTokenFrom": {
+            "env": "SLACK_BOT_TOKEN"
+          },
+          "appTokenFrom": {
+            "env": "SLACK_APP_TOKEN"
+          },
+          "dmPolicy": "allowlist"
+        }
+      ],
+      "events": {
+        "enabled": true,
+        "digestMode": false,
+        "endpoint": "/events/oncall"
+      }
+    }
+  ],
   "warnings": [
     "loopbackOnly is set to false so PagerDuty webhooks can reach the gateway. Bind via a reverse proxy with auth in production."
   ],
-  "postSetup": ["audit"]
+  "postSetup": [
+    "audit"
+  ]
 }
