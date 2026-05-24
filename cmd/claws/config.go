@@ -40,9 +40,10 @@ func resolvePaths() Paths {
 	}
 
 	// Compose template search order:
-	// 1. OPENCLAW_ROOT/docker-compose.yml (installed by claws init)
-	// 2. Next to the binary (development / co-located install)
-	// 3. Current working directory (fallback)
+	// 1. OPENCLAW_ROOT/docker-compose.yml (installed by `claws init`)
+	// 2. Next to the binary (dev / co-located install)
+	// 3. XDG data dir — $XDG_DATA_HOME/claws or ~/.local/share/claws (install.sh puts it here)
+	// 4. Current working directory (fallback)
 	compose := ""
 	candidates := []string{
 		filepath.Join(root, "docker-compose.yml"),
@@ -51,6 +52,16 @@ func resolvePaths() Paths {
 	exe, _ := os.Executable()
 	if exe != "" {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "docker-compose.yml"))
+	}
+
+	dataHome := os.Getenv("XDG_DATA_HOME")
+	if dataHome == "" {
+		if home, _ := os.UserHomeDir(); home != "" {
+			dataHome = filepath.Join(home, ".local", "share")
+		}
+	}
+	if dataHome != "" {
+		candidates = append(candidates, filepath.Join(dataHome, "claws", "docker-compose.yml"))
 	}
 
 	cwd, _ := os.Getwd()

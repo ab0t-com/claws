@@ -51,15 +51,23 @@ func cmdInit(args []string) error {
 	// 4. Copy compose template if not present in OPENCLAW_ROOT
 	composeDest := filepath.Join(paths.Root, "docker-compose.yml")
 	if _, err := os.Stat(composeDest); os.IsNotExist(err) {
-		// Find compose template: next to binary, then CWD
+		// Find compose template — same lookup order as resolvePaths:
+		// next to the binary → XDG data dir → CWD
 		var composeSource string
-		exe, _ := os.Executable()
 		candidates := []string{}
-		if exe != "" {
+		if exe, _ := os.Executable(); exe != "" {
 			candidates = append(candidates, filepath.Join(filepath.Dir(exe), "docker-compose.yml"))
 		}
-		cwd, _ := os.Getwd()
-		if cwd != "" {
+		dataHome := os.Getenv("XDG_DATA_HOME")
+		if dataHome == "" {
+			if home, _ := os.UserHomeDir(); home != "" {
+				dataHome = filepath.Join(home, ".local", "share")
+			}
+		}
+		if dataHome != "" {
+			candidates = append(candidates, filepath.Join(dataHome, "claws", "docker-compose.yml"))
+		}
+		if cwd, _ := os.Getwd(); cwd != "" {
 			candidates = append(candidates, filepath.Join(cwd, "docker-compose.yml"))
 		}
 		for _, c := range candidates {
@@ -76,7 +84,7 @@ func cmdInit(args []string) error {
 				info(fmt.Sprintf("Copied docker-compose.yml from %s", composeSource))
 			}
 		} else {
-			warn("docker-compose.yml not found next to claws binary or in CWD")
+			warn("docker-compose.yml not found next to claws binary, in XDG data dir, or in CWD")
 			fmt.Println("  Copy it manually to: " + composeDest)
 		}
 	} else {
