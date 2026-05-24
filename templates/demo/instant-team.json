@@ -1,0 +1,66 @@
+{
+  "apiVersion": "claws.ab0t.com/v1",
+  "kind": "Profile",
+  "metadata": {
+    "name": "instant-team",
+    "version": "1.0.0",
+    "description": "Minimum-input team demo: 1 user-facing coordinator on Telegram + 1 worker behind the scenes. DM the coordinator; it delegates to the worker via the shared task queue and relays the worker's response back. Demonstrates manager/worker coordination with just one bot token.",
+    "author": "ab0t",
+    "license": "MIT",
+    "tags": ["demo", "instant", "team", "telegram", "manager-worker"]
+  },
+  "runtime": { "name": "openclaw", "image": "openclaw:local" },
+  "policy": {
+    "loopbackOnly": true,
+    "dmDefault": "pairing",
+    "outboundDefault": "off"
+  },
+  "team": { "name": "instant-team", "shared": true },
+  "agents": [
+    {
+      "name": "coordinator",
+      "role": "manager",
+      "sandbox": true,
+      "tools": {
+        "profile": "assistant",
+        "allow": ["read", "edit", "memory", "task-dispatch"]
+      },
+      "config": {
+        "agents.defaults.maxTokens": 4096,
+        "agents.defaults.persona": "team-coordinator",
+        "tasks.enabled": true,
+        "tasks.dispatchPolicy": "round-robin"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+      },
+      "channels": [
+        {
+          "type": "telegram",
+          "tokenFrom": { "env": "TELEGRAM_BOT_TOKEN" },
+          "dmPolicy": "pairing"
+        }
+      ]
+    },
+    {
+      "name": "worker",
+      "role": "worker",
+      "manager": "coordinator",
+      "sandbox": true,
+      "tools": {
+        "profile": "research",
+        "allow": ["read", "memory", "web-search"]
+      },
+      "config": {
+        "agents.defaults.maxTokens": 4096,
+        "agents.defaults.persona": "research-worker"
+      },
+      "auth": {
+        "preferred": "apikey",
+        "fallbackApiKey": { "provider": "openai", "fromEnv": "OPENAI_API_KEY" }
+      }
+    }
+  ],
+  "postSetup": ["audit"]
+}

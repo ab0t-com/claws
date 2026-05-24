@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.3] — 2026-05-24
+
+Adds the team variant of the say-GO demo.
+
+### Added — `templates/demo/instant-team.json`
+
+Minimum-input team: 1 user-facing **coordinator** agent on Telegram +
+1 backend **worker** agent. DM the coordinator → it delegates via the
+shared task queue → worker writes a result → coordinator relays back.
+
+Demonstrates the manager/worker topology with the same two tokens as
+`instant-bot` (no extra setup required — `OPENAI_API_KEY` +
+`TELEGRAM_BOT_TOKEN`).
+
+```bash
+claws apply --template=demo/instant-team --secrets-dir=/tmp/claws-secrets
+claws start instant-team/coordinator
+claws start instant-team/worker
+# DM the coordinator. Ask it to research something.
+```
+
+### Why this exists
+
+The v1.6.2 `instant-bot` template gets a solo agent on Telegram in
+under 5 minutes. `instant-team` does the same for the multi-agent
+case — without forcing the operator to provision two Telegram bots
+(the v1.5 `teams/coding-pair` template needed two separate bot
+tokens; this one needs one).
+
 ## [v1.6.2] — 2026-05-24
 
 The "say GO, have a bot on your phone" patch. Closes the gap between
