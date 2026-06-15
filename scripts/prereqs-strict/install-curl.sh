@@ -49,6 +49,10 @@ echo -e "  ${DIM}Log: $LOG_FILE${NC}"
 
 if [ "${CLAWS_NO_INSTALL:-0}" = "1" ]; then warn "CLAWS_NO_INSTALL=1 — refusing to install."; exit 0; fi
 if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then SKIP_CONFIRM=1; fi
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo -e "  ${DIM}non-interactive stdin — auto-confirming${NC}"; SKIP_CONFIRM=1
+fi
+[ "$(id -u)" -eq 0 ] && echo -e "  ${DIM}running as root — sudo not needed${NC}"
 
 if command -v curl >/dev/null 2>&1; then
     ok "curl already installed: $(curl --version | head -1)"

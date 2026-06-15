@@ -140,6 +140,20 @@ if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${GITLAB_CI:-}" ] \
     echo -e "  ${DIM}CI environment detected; will skip confirmation prompts.${NC}"
 fi
 
+# Non-TTY stdin (curl|bash, cloud-init, ssh command). Communicate
+# clearly: this often means automation, fresh EC2 first-boot, or an
+# agent running us — auto-confirm so we don't hang waiting for input.
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo -e "  ${DIM}non-interactive stdin detected (curl|bash, cloud-init, agent automation) — auto-confirming${NC}"
+    SKIP_CONFIRM=1
+fi
+
+# Root context: e.g. fresh root-only EC2. Sudo isn't needed; note it.
+if [ "$(id -u)" -eq 0 ]; then
+    echo -e "  ${DIM}running as root — sudo not needed${NC}"
+    log "ROOT: running as uid 0, sudo skipped"
+fi
+
 if [ -n "${HTTP_PROXY:-}${HTTPS_PROXY:-}" ]; then
     log "PROXY: HTTP_PROXY=${HTTP_PROXY:-} HTTPS_PROXY=${HTTPS_PROXY:-} NO_PROXY=${NO_PROXY:-}"
     echo -e "  ${DIM}Proxy:  HTTPS_PROXY=${HTTPS_PROXY:-${HTTP_PROXY:-}} (will be honoured)${NC}"

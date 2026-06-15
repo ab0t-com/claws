@@ -55,6 +55,10 @@ if [ -f /.dockerenv ] || (grep -q docker /proc/1/cgroup 2>/dev/null); then
     warn "container environment detected. Continuing anyway (git in a container is fine)."
 fi
 if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then SKIP_CONFIRM=1; fi
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo -e "  ${DIM}non-interactive stdin — auto-confirming${NC}"; SKIP_CONFIRM=1
+fi
+[ "$(id -u)" -eq 0 ] && echo -e "  ${DIM}running as root — sudo not needed${NC}"
 
 if command -v git >/dev/null 2>&1; then
     ok "git already installed: $(git --version)"

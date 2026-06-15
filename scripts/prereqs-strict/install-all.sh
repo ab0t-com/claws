@@ -77,6 +77,14 @@ if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${GITLAB_CI:-}" ]; 
     echo -e "  ${DIM}CI environment detected; prompts will be auto-confirmed where safe.${NC}"
 fi
 
+# Non-TTY stdin (curl|bash, cloud-init, ssh command, agent automation).
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo -e "  ${DIM}non-interactive stdin detected — auto-confirming${NC}"
+    SKIP_CONFIRM=1
+    FORWARD_FLAGS+=("--yes")
+fi
+[ "$(id -u)" -eq 0 ] && echo -e "  ${DIM}running as root — sudo not needed${NC}"
+
 # OS detection
 OS_FAMILY=""; OS_ID=""; PKG_MGR=""
 if [ "$(uname)" = "Darwin" ]; then

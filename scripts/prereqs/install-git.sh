@@ -27,6 +27,12 @@ for arg in "$@"; do
     esac
 done
 
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo "  [info] non-interactive stdin — auto-confirming"
+    SKIP_CONFIRM=1
+fi
+[ "$(id -u)" -eq 0 ] && echo "  [info] running as root — sudo not needed"
+
 if [ -t 1 ]; then
     BOLD="\033[1m"; GREEN="\033[0;32m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; DIM="\033[0;90m"; NC="\033[0m"
 else

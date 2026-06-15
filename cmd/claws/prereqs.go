@@ -22,7 +22,10 @@ import (
 // scripts/prereqs/ — both as a curl one-liner (works on a fresh box) and
 // the manual provider docs (for users who'd rather not curl|bash).
 
-const prereqsRepoBase = "https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs"
+const (
+	prereqsRepoBase       = "https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs"
+	prereqsRepoBaseStrict = "https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs-strict"
+)
 
 // commandsNotNeedingDocker lists the commands that can safely run without
 // docker on PATH or the daemon reachable. Everything else gets the
@@ -112,37 +115,66 @@ func commandNeedsDocker(cmd string) bool {
 
 // missingPrereqError formats a friendly error for a missing CLI tool,
 // pointing at both the universal installer and the per-tool installer.
+//
+// Two install paths are surfaced explicitly:
+//   - human (interactive): plain `curl ... | bash`, prompts for confirm
+//   - agent / fresh EC2 / cloud-init: `curl ... | bash -s -- --yes`
+//     plus the strict-variant URL for corporate-managed boxes
+//
+// The strict path is mentioned because that's the variant a security
+// team or company policy is most likely to require — and it has --audit
+// mode for review before any change.
 func missingPrereqError(tool, role string) error {
 	dim := "\033[0;90m"
 	nc := "\033[0m"
 	bold := "\033[1m"
+	yellow := "\033[0;33m"
 
-	var perToolURL string
+	var perToolURL, strictURL string
 	switch tool {
 	case "docker":
 		perToolURL = prereqsRepoBase + "/install-docker.sh"
+		strictURL = prereqsRepoBaseStrict + "/install-docker.sh"
 	case "git":
 		perToolURL = prereqsRepoBase + "/install-git.sh"
+		strictURL = prereqsRepoBaseStrict + "/install-git.sh"
 	case "curl":
 		perToolURL = prereqsRepoBase + "/install-curl.sh"
+		strictURL = prereqsRepoBaseStrict + "/install-curl.sh"
 	default:
 		perToolURL = prereqsRepoBase + "/install-all.sh"
+		strictURL = prereqsRepoBaseStrict + "/install-all.sh"
 	}
 
 	return errorf(`%s is not installed (%s).
 
-  %sQuick install — auto-detects your OS%s:
+  %sHuman (interactive)%s:
+    %scurl -fsSL %s | bash%s
+
+  %sAgent / fresh EC2 / cloud-init%s (no prompts):
+    %scurl -fsSL %s | bash -s -- --yes%s
+
+  %sCorporate / audit-managed host%s (audit-friendly, --audit reviews before changing anything):
     %scurl -fsSL %s | bash%s
 
   %sOr install everything claws needs in one shot%s:
     %scurl -fsSL %s/install-all.sh | bash%s
 
   Verify after install:
-    %sclaws doctor%s`,
+    %sclaws doctor%s
+
+  Skip the install entirely if claws is on a box that already has
+  docker installed by other means: re-run your command and the daemon
+  check will tell you what's still missing. Set %sCLAWS_NO_INSTALL=1%s
+  in your environment to make the strict installers refuse to run
+  (policy switch).`,
 		tool, role,
 		bold, nc, dim, perToolURL, nc,
+		bold, nc, dim, perToolURL, nc,
+		bold, nc, dim, strictURL, nc,
 		bold, nc, dim, prereqsRepoBase, nc,
-		dim, nc)
+		dim, nc,
+		yellow, nc)
 }
 
 // validatePrereqsForCommand is the dispatch-level entry point. main.go

@@ -7,7 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — `publish-release.sh` now ships artifacts in the same commit as the tag
+
+Bug history: the tag was created BEFORE `release.sh` ran. Result: the
+tag pointed at a commit without the cross-platform binaries, and every
+release required a follow-up `release: ship vX.Y.Z artifacts` commit
+by hand to land the actual tarballs. Hit this on v1.6.5, v1.6.6,
+v1.6.7, v1.6.10, v1.6.11, v1.6.12, v1.6.13, v1.6.14, v1.6.15, v1.6.16.
+
+Fix: reordered the steps so artifacts are committed BEFORE the tag.
+New flow:
+
+  1. Sanity checks
+  2. Tests
+  3. CHANGELOG bump + commit
+  4. **Build artifacts (was step 6)**
+  5. **Commit `release/` (NEW)**
+  6. **Annotated tag (was step 5, now points at the artifact commit)**
+  7. Push branch + tag
+  8. GitHub release
+
+One `publish-release.sh vX.Y.Z` invocation now produces a single
+coherent release with both the changelog and the artifacts under
+the tag, no hand-follow-up.
+
+### Fixed — refuses to publish when `[Unreleased]` is empty
+
+Bit on v1.6.15 and v1.6.16: I ran `publish-release.sh` before
+populating `[Unreleased]` and the script silently shipped an empty
+changelog entry that had to be backfilled. The CHANGELOG body
+rewriter has been correct since v1.6.7; the issue was the operator
+(me) forgetting to write notes first.
+
+Fix: `publish-release.sh` now refuses to proceed if `[Unreleased]`
+is empty or only contains the standard `_(nothing yet)_` /
+`_(no changes documented)_` placeholder. Override with
+`ALLOW_EMPTY_CHANGELOG=1` for the rare case where empty notes are
+intentional.
+
+### Added — prereq scripts handle non-TTY contexts (cloud-init, agent, fresh EC2 root)
+
+Real client scenario: install scripts run on a fresh EC2 first-boot
+via cloud-init, often as root, never with a TTY. The previous
+implementation would call `read -r -p "Continue?"` and get EOF
+immediately, defaulting to "aborted by user" and never installing
+anything.
+
+Fix: every script in `scripts/prereqs/` and `scripts/prereqs-strict/`
+now detects non-TTY stdin and auto-confirms with a clear notice:
+
+```
+[info] non-interactive stdin (curl|bash / cloud-init / CI) — auto-confirming
+[info] running as root — sudo not needed
+```
+
+Plus an explicit root-context notice so the operator/log can see
+that we detected uid 0 and skipped sudo. The strict variant logs
+this to the audit file with `ROOT:` prefix.
+
+### Improved — CLI prereq error surfaces three install paths
+
+The friendly error when docker is missing now shows:
+
+```
+==> docker is not installed (manages the agent containers).
+
+  Human (interactive):
+    curl -fsSL .../install-docker.sh | bash
+
+  Agent / fresh EC2 / cloud-init (no prompts):
+    curl -fsSL .../install-docker.sh | bash -s -- --yes
+
+  Corporate / audit-managed host (audit-friendly):
+    curl -fsSL .../prereqs-strict/install-docker.sh | bash
+
+  Or install everything claws needs in one shot:
+    curl -fsSL .../install-all.sh | bash
+
+  Verify after install:
+    claws doctor
+
+  Set CLAWS_NO_INSTALL=1 to make the strict installers refuse to
+  run (policy switch).
+```
+
+Three audience-specific paths plus the corporate policy switch
+hint. An agent or cloud-init script that catches this error gets a
+copy-pasteable command that won't hang on a prompt.
+
+### Honest flag
+
+The header comment in `publish-release.sh` (lines 13-22) still
+documents the old step order. Updating that is purely cosmetic and
+can land in any future patch.
 
 ## [v1.6.16] — 2026-06-15
 

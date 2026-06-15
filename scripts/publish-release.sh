@@ -177,6 +177,46 @@ if [ ! -f "$CHANGELOG" ]; then
     warn "CHANGELOG.md not found — skipping bump"
 else
     TODAY=$(date -u +%Y-%m-%d)
+
+    # Refuse to publish a release with an empty [Unreleased] body.
+    # We've been bitten twice (v1.6.15, v1.6.16) by running publish-release.sh
+    # before populating [Unreleased] — the tag goes out with an empty
+    # changelog section and has to be backfilled in a follow-up commit.
+    # Catch it up front instead.
+    if [ "$DRY_RUN" -eq 0 ]; then
+        unreleased_body=$(python3 - "$CHANGELOG" <<'PYEOF'
+import re, sys
+with open(sys.argv[1]) as f:
+    body = f.read()
+m = re.search(r"^## \[Unreleased\][^\n]*\n(?P<body>.*?)(?=^## \[|\Z)", body, flags=re.MULTILINE | re.DOTALL)
+if not m:
+    print("__NO_UNRELEASED__")
+else:
+    text = m.group("body").strip()
+    # Strip the standard "(nothing yet)" placeholders.
+    if text in {"", "_(nothing yet)_", "_(no changes documented)_"}:
+        print("__EMPTY__")
+    else:
+        print("__POPULATED__")
+PYEOF
+)
+        case "$unreleased_body" in
+            __EMPTY__)
+                warn "CHANGELOG.md [Unreleased] section is empty."
+                warn ""
+                warn "Releasing now would tag $VERSION with an empty changelog."
+                warn "Populate the [Unreleased] section first with what's in this release."
+                warn ""
+                warn "Or set ALLOW_EMPTY_CHANGELOG=1 if you really intend to ship empty notes."
+                [ "${ALLOW_EMPTY_CHANGELOG:-0}" = "1" ] || die "refusing to publish (set ALLOW_EMPTY_CHANGELOG=1 to override)"
+                warn "ALLOW_EMPTY_CHANGELOG=1 — proceeding with empty notes"
+                ;;
+            __NO_UNRELEASED__)
+                warn "CHANGELOG.md has no [Unreleased] section — proceeding without bump"
+                ;;
+        esac
+    fi
+
     if grep -q "^## \[Unreleased\]" "$CHANGELOG"; then
         info "promoting [Unreleased] → [$VERSION] — $TODAY"
         if [ "$DRY_RUN" -eq 0 ]; then
@@ -253,7 +293,34 @@ if [ "$DRY_RUN" -eq 0 ] && [ -n "$(git status --porcelain CHANGELOG.md 2>/dev/nu
 fi
 
 # =====================================================================
-# 5. Annotated tag
+# 5. Build release artifacts FIRST so we can commit them BEFORE tagging
+#
+# Bug history: this used to be step 6, AFTER the tag. The tag would
+# point at the changelog-bump commit but NOT the release/ artifacts —
+# every release required a follow-up "release: ship vX.Y.Z artifacts"
+# commit by hand, and that commit was on main but the tag wasn't.
+# Now artifacts are produced, committed, THEN tagged in one flow.
+# =====================================================================
+step "Building release artifacts"
+run "\"$ROOT/scripts/release.sh\" \"$VERSION\""
+ok "artifacts in $ROOT/release/"
+
+# =====================================================================
+# 6. Commit release artifacts (BEFORE tag, so tag points at them)
+# =====================================================================
+if [ "$DRY_RUN" -eq 0 ] && [ -n "$(git status --porcelain release/ 2>/dev/null)" ]; then
+    step "Committing release/ artifacts"
+    run "git add release/"
+    run "git commit -m \"release: ship $VERSION artifacts (linux/darwin x amd64/arm64)\""
+    ok "artifact commit created"
+elif [ "$DRY_RUN" -eq 1 ]; then
+    step "Committing release/ artifacts (dry-run)"
+    echo "  [dry-run] git add release/"
+    echo "  [dry-run] git commit -m \"release: ship $VERSION artifacts (linux/darwin x amd64/arm64)\""
+fi
+
+# =====================================================================
+# 7. Annotated tag (now points at the commit that includes release/)
 # =====================================================================
 step "Creating annotated tag $VERSION"
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -264,14 +331,7 @@ fi
 ok "tag $VERSION created"
 
 # =====================================================================
-# 6. Build release artifacts
-# =====================================================================
-step "Building release artifacts"
-run "\"$ROOT/scripts/release.sh\" \"$VERSION\""
-ok "artifacts in $ROOT/release/"
-
-# =====================================================================
-# 7. Push branch + tag
+# 8. Push branch + tag
 # =====================================================================
 if [ "$NO_PUSH" -eq 1 ]; then
     warn "skipping push (--no-push)"
@@ -283,7 +343,7 @@ else
 fi
 
 # =====================================================================
-# 8. GitHub release
+# 9. GitHub release
 # =====================================================================
 if [ "$NO_GH" -eq 1 ] || [ "$NO_PUSH" -eq 1 ]; then
     warn "skipping GitHub release creation"

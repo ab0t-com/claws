@@ -44,6 +44,17 @@ HELP
     esac
 done
 
+# Non-TTY contexts (curl|bash, cloud-init, CI, ssh command) have no
+# human to answer prompts. Auto-confirm so the install proceeds on a
+# fresh EC2 / root box without hanging.
+if [ ! -t 0 ] && [ "$SKIP_CONFIRM" -eq 0 ]; then
+    echo "  [info] non-interactive stdin (curl|bash / cloud-init / CI) — auto-confirming"
+    SKIP_CONFIRM=1
+fi
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  [info] running as root — sudo not needed"
+fi
+
 # --- Output helpers -----------------------------------------------------
 if [ -t 1 ]; then
     BOLD="\033[1m"; GREEN="\033[0;32m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; DIM="\033[0;90m"; NC="\033[0m"
