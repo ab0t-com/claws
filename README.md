@@ -178,16 +178,18 @@ claws auth fleet codex --missing-only  # OR re-auth every agent that doesn't ver
 
 ## Skills (for Claude Code users)
 
-If you're using [Claude Code](https://claude.com/claude-code) to work with or operate claws, this repo ships four ready-to-use skills at [`.claude/skills/`](.claude/skills/) that encode the common workflows above. They trigger automatically when you describe a relevant task in plain English.
+If you're using [Claude Code](https://claude.com/claude-code) to work with or operate claws, this repo ships six ready-to-use skills at [`.claude/skills/`](.claude/skills/) that encode the common workflows. They trigger automatically when you describe a relevant task in plain English.
 
 | Skill | Triggers on phrases like | What it does |
 |---|---|---|
 | [`claws-bootstrap-fresh-box`](.claude/skills/claws-bootstrap-fresh-box/SKILL.md) | "set up claws on this box", "install claws from scratch", "fresh EC2, get claws running" | Walks from "nothing installed" to "first agent responding on Telegram" — OS + TTY + root detection, prereq install (friendly or audit-managed), claws install, `claws setup`, verify with `claws agent ping`. |
 | [`claws-add-agent`](.claude/skills/claws-add-agent/SKILL.md) | "add a new agent", "spin up another bot called X", "add a worker under \<manager\>" | Adds an agent to an already-bootstrapped fleet — `claws create` + per-agent auth (with the no-shared-OAuth rule) + channel wiring + start + end-to-end ping. |
+| [`claws-teams-architecture`](.claude/skills/claws-teams-architecture/SKILL.md) | "how do teams work", "explain the team hierarchy", "what's in the shared folder", "design a team that does X" | The conceptual reference. How a team is laid out on disk, what `~/.openclaw/<team>/shared/` contains (hooks / skills / workspace / tasks / output), the atomic-`rename()` task queue, and four team design patterns (solo / coordinator+workers / peer pool / pipeline). **Read this before designing a team** so role + channel-ownership decisions at create time are right. |
 | [`claws-debug-agent`](.claude/skills/claws-debug-agent/SKILL.md) | "my agent isn't responding", "team/sarah stopped working", "refresh_token_reused", "auth keeps failing" | Five-step diagnostic (`list` → `agent ping` → `auth diagnose` → `logs` → `errors`) mapping each symptom to the exact fix command. Covers the v1.6.11–v1.6.15 version-gated bugs that can make the diagnostic itself lie. |
+| [`claws-security-audit`](.claude/skills/claws-security-audit/SKILL.md) | "audit my claws security", "harden claws", "set up security policy", "rotate tokens", "who can run claws" | Walks the operator through `claws audit` / `claws doctor` / `claws policy validate/enforce` / `scripts/security-audit.sh`, plus access control and the audit log. Maps each finding to its remediation. Encodes the channel-security defaults, the loopback-only bind, and the "policy enforce REWRITES per-instance configs" warning. |
 | [`claws-release`](.claude/skills/claws-release/SKILL.md) | "ship a new release", "cut v1.6.X", "release claws", "bump and ship" | Cuts a clean patch release via `publish-release.sh` — enforces patch-only versioning, the `[Unreleased]` discipline, and the v1.6.17+ artifact-before-tag ordering. |
 
-Each skill has explicit "do NOT use this skill for ..." disclaimers pointing at its siblings, so they don't collide. Describe what you want; Claude picks the right one from the trigger phrases.
+Each skill has explicit "do NOT use this skill for ..." disclaimers pointing at its siblings, so they don't collide on natural-language triggers. Describe what you want; Claude picks the right one.
 
 ## Features
 
