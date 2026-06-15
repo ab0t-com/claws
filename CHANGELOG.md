@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.19] — 2026-06-15
+
 ### Added — `claws image bootstrap --add-swap[=SIZE]` for low-RAM hosts
 
 Real client issue: the `openclaw` docker build peaks at ~3–4 GB RAM
