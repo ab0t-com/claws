@@ -100,5 +100,12 @@ docker-compose.override.yml
 # /tickets/
 
 # --- Tooling local config ---
+# Personal Claude Code settings stay local (settings.json, history, etc).
 .claude/
 .claude-memory/
+
+# ...EXCEPT project-shipped skills, which are team-wide assets — every
+# operator + every Claude Code session in this repo picks them up
+# automatically.
+!.claude/skills/
+!.claude/skills/**
