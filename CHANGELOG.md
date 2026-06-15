@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.20] — 2026-06-15
+
 ### Changed — auto-swap on low-RAM hosts; `claws setup` surfaces it before the build
 
 User feedback after v1.6.19: *"it needs something like 4 GB of RAM
