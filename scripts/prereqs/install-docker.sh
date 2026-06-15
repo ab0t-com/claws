@@ -70,7 +70,8 @@ run()  { if [ "$DRY_RUN" -eq 1 ]; then echo "  [dry-run] $*"; else eval "$*"; fi
 
 # --- OS detection (inlined for self-containment) ------------------------
 OS_FAMILY=""    # linux | macos
-OS_ID=""        # ubuntu | debian | fedora | rhel | centos | arch | alpine | macos
+OS_ID=""        # ubuntu | debian | fedora | rhel | centos | arch | alpine | amzn | macos
+OS_VERSION=""   # 22.04 | 2 | 2023 | etc.
 OS_LIKE=""     # debian | rhel | etc. (for fallback dispatch)
 PKG_MGR=""      # apt | dnf | yum | pacman | apk | brew
 
@@ -78,6 +79,7 @@ detect_os() {
     if [ "$(uname)" = "Darwin" ]; then
         OS_FAMILY="macos"
         OS_ID="macos"
+        OS_VERSION="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
         if command -v brew >/dev/null 2>&1; then
             PKG_MGR="brew"
         fi
@@ -88,6 +90,7 @@ detect_os() {
         . /etc/os-release
         OS_FAMILY="linux"
         OS_ID="${ID:-unknown}"
+        OS_VERSION="${VERSION_ID:-unknown}"
         OS_LIKE="${ID_LIKE:-}"
     fi
     if   command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt"
@@ -117,8 +120,78 @@ daemon_ok() {
     docker info >/dev/null 2>&1
 }
 
-# --- Linux install path -------------------------------------------------
+# --- Amazon Linux install path ------------------------------------------
+# Docker's get.docker.com rejects 'amzn' with "Unsupported distribution".
+# Amazon Linux 2 + 2023 both ship docker in their native repos, just under
+# slightly different package names. Compose plugin is missing from amzn
+# repos, so we install it manually from Docker's GitHub releases.
+install_amazon_linux() {
+    step "Installing Docker for Amazon Linux"
+    echo -e "  ${DIM}get.docker.com doesn't support 'amzn' — using native packages instead.${NC}"
+    echo -e "  ${DIM}Detected: Amazon Linux ${OS_VERSION:-unknown}${NC}"
+
+    need_sudo
+
+    if [ "$SKIP_CONFIRM" -eq 0 ] && [ "$DRY_RUN" -eq 0 ]; then
+        read -r -p "  Continue? [Y/n] " yn
+        case "$yn" in [Nn]*) die "aborted by user" ;; esac
+    fi
+
+    # Install docker engine via the native package manager.
+    case "${OS_VERSION:-}" in
+        2)
+            # Amazon Linux 2: docker is in the amazon-linux-extras topic.
+            step "Enabling amazon-linux-extras docker topic"
+            run "$SUDO amazon-linux-extras install -y docker"
+            ;;
+        2023|2023.*)
+            # Amazon Linux 2023: docker is in the main repo via dnf.
+            step "Installing docker via dnf"
+            run "$SUDO dnf install -y docker"
+            ;;
+        *)
+            # Fallback: try whatever package manager is present.
+            warn "unknown Amazon Linux version '${OS_VERSION:-?}' — trying generic install"
+            if command -v dnf >/dev/null 2>&1; then
+                run "$SUDO dnf install -y docker"
+            elif command -v yum >/dev/null 2>&1; then
+                run "$SUDO yum install -y docker"
+            else
+                die "no dnf or yum found"
+            fi
+            ;;
+    esac
+
+    # Install compose v2 plugin manually — not in Amazon Linux repos.
+    step "Installing docker compose v2 plugin"
+    COMPOSE_DIR="/usr/local/lib/docker/cli-plugins"
+    COMPOSE_BIN="$COMPOSE_DIR/docker-compose"
+    if [ -x "$COMPOSE_BIN" ]; then
+        ok "compose plugin already installed at $COMPOSE_BIN"
+    else
+        ARCH_SUFFIX="$(uname -m)"
+        case "$ARCH_SUFFIX" in
+            x86_64|aarch64) ;;
+            *) die "unsupported architecture for compose plugin: $ARCH_SUFFIX" ;;
+        esac
+        run "$SUDO mkdir -p $COMPOSE_DIR"
+        run "$SUDO curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${ARCH_SUFFIX} -o $COMPOSE_BIN"
+        run "$SUDO chmod +x $COMPOSE_BIN"
+        ok "compose plugin installed"
+    fi
+
+    # Common post-install: enable daemon, add user to docker group.
+    docker_post_install
+}
+
+# --- Linux install path (Docker's official convenience script) ----------
 install_linux() {
+    # Amazon Linux: get.docker.com refuses; route to the native path.
+    if [ "$OS_ID" = "amzn" ]; then
+        install_amazon_linux
+        return
+    fi
+
     step "Installing Docker via Docker's official convenience script"
     echo -e "  ${DIM}This uses https://get.docker.com — maintained by Docker Inc.${NC}"
     echo -e "  ${DIM}The script auto-detects your distro and installs from Docker's repos.${NC}"
@@ -140,12 +213,24 @@ install_linux() {
         curl -fsSL https://get.docker.com -o "$TMP"
         ok "fetched ($(wc -c <"$TMP") bytes)"
         echo -e "  ${DIM}Running install (may take 1-3 minutes)...${NC}"
-        $SUDO sh "$TMP"
-        rm -f "$TMP"
+        if ! $SUDO sh "$TMP" 2>&1 | tee /tmp/get-docker-output.log; then
+            if grep -q 'Unsupported distribution' /tmp/get-docker-output.log; then
+                rm -f /tmp/get-docker-output.log
+                die "get.docker.com doesn't support this distro ($OS_ID). Re-run with --method=distro to use your OS's package manager instead, or open an issue at https://github.com/ab0t-com/claws/issues with /etc/os-release contents."
+            fi
+            rm -f /tmp/get-docker-output.log
+            die "get.docker.com install failed — see output above"
+        fi
+        rm -f /tmp/get-docker-output.log "$TMP"
         trap - EXIT
         ok "Docker installed"
     fi
 
+    docker_post_install
+}
+
+# --- Common post-install: daemon enable + group membership --------------
+docker_post_install() {
     # Start + enable daemon
     if command -v systemctl >/dev/null 2>&1; then
         step "Starting Docker daemon"

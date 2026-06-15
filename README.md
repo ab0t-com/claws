@@ -247,7 +247,7 @@ claws shells out to Docker. On a fresh box, you'll need:
 curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs/install-all.sh | bash
 ```
 
-Auto-detects Ubuntu / Debian / Fedora / RHEL / Arch / Alpine / macOS. Idempotent — re-running skips anything already installed.
+Auto-detects Ubuntu / Debian / Fedora / RHEL / **Amazon Linux 2 + 2023** / Arch / Alpine / macOS. Idempotent — re-running skips anything already installed.
 
 If you're on a **fresh EC2 root box, cloud-init, or an agent automation context** (no TTY for prompts):
 

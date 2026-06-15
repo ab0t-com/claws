@@ -74,9 +74,13 @@ curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs
 | Debian 11+ | `apt-get` + `get.docker.com` |
 | Fedora 38+ | `dnf` + `get.docker.com` |
 | RHEL / CentOS / Rocky / Alma 8+ | `yum`/`dnf` + `get.docker.com` |
+| **Amazon Linux 2** | `amazon-linux-extras install docker` + compose plugin from GitHub |
+| **Amazon Linux 2023** | `dnf install docker` + compose plugin from GitHub |
 | Arch Linux | `pacman` + `get.docker.com` |
 | Alpine | `apk` (docker only, no compose plugin auto) |
 | macOS (Intel + Apple Silicon) | `brew install --cask docker` |
+
+Amazon Linux gets a dedicated install path because Docker's `get.docker.com` script rejects it with `ERROR: Unsupported distribution 'amzn'`. The script auto-detects `amzn` in `/etc/os-release` and routes to the native package install — no `--method=` flag needed. The compose v2 plugin isn't in Amazon Linux's repos, so it's installed from Docker's GitHub releases.
 
 For Windows: use WSL2 (Ubuntu) and run the installer there.
 

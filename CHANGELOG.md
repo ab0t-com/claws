@@ -7,7 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — Amazon Linux 2 + 2023 support in the prereq installers
+
+A client hit `ERROR: Unsupported distribution 'amzn'` while running
+`scripts/prereqs/install-docker.sh` on a fresh Amazon Linux EC2 box.
+The error comes from Docker's `get.docker.com` script — Docker
+explicitly refuses to install on Amazon Linux via the convenience
+script. Operators on EC2 / Lightsail / AWS-managed boxes hit this
+constantly.
+
+### Fix
+
+Both prereq installers (`scripts/prereqs/install-docker.sh` and
+`scripts/prereqs-strict/install-docker.sh`) now detect
+`ID="amzn"` in `/etc/os-release` and route to a dedicated Amazon
+Linux install path that doesn't go anywhere near `get.docker.com`:
+
+- **Amazon Linux 2** (`VERSION_ID=2`) → `amazon-linux-extras install -y docker`
+- **Amazon Linux 2023** (`VERSION_ID=2023.x`) → `dnf install -y docker`
+- **Unknown amzn version** → fallback to `dnf` or `yum`, whichever
+  is on PATH; warns
+
+In both cases the docker compose v2 plugin gets installed from
+`github.com/docker/compose/releases/latest/download/docker-compose-linux-<arch>`
+because Amazon Linux's repos don't ship it (it goes in
+`/usr/local/lib/docker/cli-plugins/`, the standard docker plugin
+dir, so `docker compose version` picks it up immediately).
+
+Auto-detection means operators don't need to pass `--method=` flags.
+In the strict variant, an explicit `--method=distro` still wins
+(escape hatch for ops who want to stay on the OS's exact package
+versions).
+
+### Defensive: `get.docker.com` failure now surfaces the fix
+
+If `get.docker.com` ever exits with `Unsupported distribution` for a
+distro we didn't pre-detect (e.g. a future amzn variant, or some
+other un-supported OS), the simple installer now catches that
+specific error and surfaces:
+
+```
+ERROR: get.docker.com doesn't support this distro (X).
+       Re-run with --method=distro to use your OS's package
+       manager instead, or open an issue at
+       https://github.com/ab0t-com/claws/issues with
+       /etc/os-release contents.
+```
+
+instead of failing with the raw stderr from `get.docker.com`.
+
+### Docs
+
+- Both `scripts/prereqs/README.md` and `scripts/prereqs-strict/README.md`
+  OS support tables now list Amazon Linux 2 + 2023 explicitly.
+- Main README Prerequisites section mentions Amazon Linux in the
+  auto-detect list.
+- The strict-variant README is now actually committed (it was lost
+  in an earlier Edit/Bash tool-call mishap; this restores it).
+
+### Honest flag
+
+This is fixed in the bash installer scripts only. If `claws image
+bootstrap` ever shells out to install docker on the fly (it doesn't,
+currently — it just builds the openclaw image, which assumes docker
+is present), the same routing would need to apply there too.
 
 ## [v1.6.17] — 2026-06-15
 

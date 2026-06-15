@@ -78,6 +78,19 @@ case "$METHOD" in
     *) echo "ERROR: invalid --method=$METHOD (use: getdocker | distro | skip)" >&2; exit 1 ;;
 esac
 
+# Amazon Linux: get.docker.com refuses with "Unsupported distribution 'amzn'".
+# Route to the distro path automatically (with a clear notice), but respect
+# an explicit --method=skip. If the operator passed --method=distro, leave
+# it alone.
+if [ -f /etc/os-release ]; then
+    _peek_id="$(. /etc/os-release; echo "${ID:-}")"
+    if [ "$_peek_id" = "amzn" ] && [ "$METHOD" = "getdocker" ]; then
+        METHOD="amzn"
+        echo "  [info] Amazon Linux detected; auto-routing to native install (get.docker.com rejects 'amzn')"
+    fi
+    unset _peek_id
+fi
+
 # ----------------------------------------------------------------------
 # Output helpers
 # ----------------------------------------------------------------------
@@ -227,6 +240,15 @@ case "$METHOD" in
     getdocker)
         echo "  1. Download https://get.docker.com (Docker's official installer)"
         echo "     ${DIM}→ verify it's not empty, then run it${NC}"
+        ;;
+    amzn)
+        case "${OS_VERSION:-}" in
+            2)        echo "  1. $SUDO amazon-linux-extras install -y docker" ;;
+            2023|2023.*) echo "  1. $SUDO dnf install -y docker" ;;
+            *)        echo "  1. $SUDO ${PKG_MGR:-dnf} install -y docker  (fallback)" ;;
+        esac
+        echo "  2. install docker compose v2 plugin from github.com/docker/compose releases"
+        echo "     ${DIM}→ Amazon Linux repos don't ship the compose plugin${NC}"
         ;;
     distro)
         case "$PKG_MGR" in
