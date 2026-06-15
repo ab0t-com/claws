@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.22] — 2026-06-15
+
 ### Fixed — auto-swap now picks a real-disk path (not tmpfs) and sizes to fit
 
 Real client failure on a 1 GB box:
