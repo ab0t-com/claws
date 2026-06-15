@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(nothing yet)_
 
+## [v1.6.16] — 2026-06-15
+
+_(no changes documented)_
+
 ## [v1.6.15] — 2026-05-24
 
 ### Fixed — `claws agent ping`, `claws health`, and auth verify (`readyz` strategy) all probed the gateway from the wrong place
