@@ -205,15 +205,30 @@ Examples:
 	}
 
 	if addSwap {
-		sizeBytes := parseSwapSize(addSwapSize)
-		if sizeBytes == 0 {
-			return errorf("--add-swap=%q: invalid size (use e.g. 8g, 4G, 2048m)", addSwapSize)
+		var sizeBytes uint64
+		if addSwapSize != "" {
+			// Operator specified explicit size — honour it (subject to
+			// disk-space capping inside newSwapfileManager).
+			sizeBytes = parseSwapSize(addSwapSize)
+			if sizeBytes == 0 {
+				return errorf("--add-swap=%q: invalid size (use e.g. 8g, 4G, 2048m)", addSwapSize)
+			}
+		} else {
+			// Auto-pick: enough to bring RAM + swap to ~6 GB. Existing
+			// swap already accounted for in the gating decision above
+			// (we only get here if needMoreRAM); use 0 for existingSwap
+			// in the size calc to ensure we add enough to actually
+			// matter.
+			sizeBytes = chooseAutoSwapSize(availMem, 0)
 		}
 		mgr, err := newSwapfileManager(sizeBytes)
 		if err != nil {
-			// On macOS this is the polite "configure Docker Desktop"
-			// message; we propagate it so the operator sees it once.
-			return errorf("swap automation unavailable: %v", err)
+			// Failures here include:
+			//   - macOS ("configure Docker Desktop")
+			//   - no candidate path has enough disk
+			//   - sudo missing
+			// All have actionable text already; propagate verbatim.
+			return errorf("swap setup failed: %v", err)
 		}
 		defer mgr.disable()
 		mgr.installSignalHandler()

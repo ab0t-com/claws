@@ -7,7 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — auto-swap now picks a real-disk path (not tmpfs) and sizes to fit
+
+Real client failure on a 1 GB box:
+
+```
+MemAvailable: 1.3 GB — openclaw build peaks at ~4 GB
+[auto] adding temporary swap for the build (--no-swap to opt out)
+
+Adding 8.6 GB temporary swapfile at /tmp/claws-bootstrap.swap
+  $ fallocate -l 8589934592 /tmp/claws-bootstrap.swap
+fallocate: fallocate failed: No space left on device
+  fallocate failed; falling back to dd
+  $ dd if=/dev/zero of=/tmp/claws-bootstrap.swap bs=1M count=8192 status=progress
+dd: error writing '/tmp/claws-bootstrap.swap': No space left on device
+667+0 records in
+666+0 records out
+698896384 bytes (699 MB, 667 MiB) copied
+==> ERROR: image bootstrap failed: failed to enable swap: dd fallback failed
+```
+
+Two compounding bugs:
+
+1. **`/tmp` was tmpfs.** On most modern Linux distros `/tmp` mounts as
+   tmpfs, which lives in RAM + system-swap. Putting our swapfile
+   on tmpfs is **recursive** — we'd be backing swap with swap. The
+   tmpfs was sized at ~700 MB (typical fraction of the box's RAM),
+   which matches the "699 MB written then ENOSPC" exactly.
+2. **8 GB was hard-coded.** A 1 GB RAM box probably can't spare 8 GB
+   of disk anywhere; capping at 8 GB makes no sense when the build
+   only needs ~3 GB of extra headroom to reach a 6 GB total budget.
+
+### Three fixes in v1.6.22
+
+**1. Pick a real-disk path** — try candidates in order, reject any
+that's tmpfs (`/proc/mounts` lookup) or doesn't have enough free
+space:
+
+```
+1. /var/cache/claws/bootstrap.swap     (preferred — real disk, claws-owned dir)
+2. /var/tmp/claws-bootstrap.swap        (real disk on most distros)
+3. /var/claws-bootstrap.swap            (fallback in /var)
+4. $HOME/.cache/claws/bootstrap.swap    (non-root setups)
+5. /tmp/claws-bootstrap.swap            (last resort — only if NOT tmpfs)
+```
+
+If none has enough free space, the script fails fast with a clear
+list of what was tried and why:
+
+```
+no candidate path is usable for a swapfile:
+  /var/cache/claws — only 800 MB free (need ≥ 3.0 GB)
+  /var/tmp — only 800 MB free (need ≥ 3.0 GB)
+  /tmp — is tmpfs (swap-on-tmpfs is recursive)
+  $HOME/.cache/claws — only 800 MB free (need ≥ 3.0 GB)
+
+Free up at least 3.0 GB on /var or $HOME/.cache, or pass --no-swap to accept the OOM risk.
+```
+
+**2. Size the swap to actual need.** `chooseAutoSwapSize(availMem,
+existingSwap)` computes the smallest swap that brings RAM + swap to
+6 GB (4 GB build budget + 2 GB headroom for layer compression etc).
+Clamped to [2 GB, 8 GB]:
+
+| RAM | Existing swap | Swap added |
+|---|---|---|
+| 1 GB | 0 | 5 GB |
+| 1 GB | 2 GB | 3 GB |
+| 4 GB | 0 | 2 GB (minimum useful) |
+| 4 GB | 4 GB | 2 GB (minimum useful — never adds zero) |
+| (any) | (already covers budget) | (auto-swap doesn't fire — v1.6.21 guard) |
+
+**3. Cap the requested size to what fits on the chosen filesystem.**
+With a 1 GB reserve so the docker build itself has scratch room:
+
+```
+requested swap 8.0 GB is larger than disk free on /var — capping to 4.5 GB
+```
+
+### What the client sees now on the same 1 GB box
+
+```
+MemAvailable: 1.3 GB — openclaw build peaks at ~4 GB
+[auto] adding temporary swap for the build (--no-swap to opt out)
+
+Adding 4.7 GB temporary swapfile at /var/cache/claws/bootstrap.swap
+  $ sudo fallocate -l 5046244966 /var/cache/claws/bootstrap.swap
+  $ sudo chmod 600 /var/cache/claws/bootstrap.swap
+  $ sudo mkswap /var/cache/claws/bootstrap.swap
+  $ sudo swapon /var/cache/claws/bootstrap.swap
+  ✓ swap active (4.7 GB)
+
+  building openclaw:local (this can take several minutes)
+  [...build runs to completion...]
+
+  Cleaning up swap: swapoff + rm /var/cache/claws/bootstrap.swap
+  ✓ openclaw:local built from source
+```
+
+### Safety guarantees (unchanged from v1.6.21)
+
+- We still **never** `swapoff` swap we didn't create.
+- We still **never** write to `/etc/fstab` or any permanent config.
+- We still **never** overwrite an existing file at our path.
+- Signal-handler cleanup on Ctrl-C still fires.
+- We still **never** rebuild `openclaw:local` if it's already present.
+
+### Tests
+
+- `mountFstypeForPath` — pure-function variant of `isTmpfs`. Tests
+  cover root mount fallback, exact mountpoint match, prefix-not-match
+  boundary (`/tmp` vs `/tmpfoo`), nested mounts, empty mounts content.
+- `chooseAutoSwapSize` — sizing logic across the matrix (tiny VPS,
+  partial swap, plenty of RAM, absurd deficit clamped to ceiling).
 
 ## [v1.6.21] — 2026-06-15
 

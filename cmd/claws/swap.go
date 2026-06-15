@@ -5,11 +5,29 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 )
+
+// minUsefulSwapBytes is the smallest swapfile that's worth bothering
+// with. Below this the build will probably still OOM (the bundler
+// peaks at ~3 GB beyond RAM), so it's better to fail fast than spend
+// 30 seconds creating a 1 GB swap that won't save the build anyway.
+const minUsefulSwapBytes = 2 * 1024 * 1024 * 1024 // 2 GiB
+
+// recommendedSwapHeadroomBytes is the safety margin we add on top of
+// "RAM + swap >= 4 GB" when sizing an auto-swap. The peak is 4 GB but
+// the build does other things concurrently (e.g. compresses layers),
+// and a too-small swap stresses the kernel into thrashing.
+const recommendedSwapHeadroomBytes = 2 * 1024 * 1024 * 1024 // 2 GiB
+
+// diskReserveBytes is the space we leave free on the chosen filesystem
+// after allocating the swapfile, so the build itself + intermediate
+// docker layers can write to disk without running it dry.
+const diskReserveBytes = 1 * 1024 * 1024 * 1024 // 1 GiB
 
 // ---------------------------------------------------------------------------
 // swap.go — temporary swapfile lifecycle for `claws image bootstrap --add-swap`
@@ -195,11 +213,169 @@ func newSwapfileManager(sizeBytes uint64) (*swapfileManager, error) {
 	if err != nil {
 		return nil, err
 	}
+	path, free, err := pickSwapfilePath()
+	if err != nil {
+		return nil, err
+	}
+	// Clamp sizeBytes to what fits on the chosen filesystem, leaving
+	// diskReserveBytes free for the build's own scratch.
+	maxFit := uint64(0)
+	if free > diskReserveBytes {
+		maxFit = free - diskReserveBytes
+	}
+	if maxFit < minUsefulSwapBytes {
+		return nil, fmt.Errorf("not enough free disk on any candidate path for a useful swapfile (need ≥ %s + %s reserve; best path %s has %s free)",
+			formatBytes(minUsefulSwapBytes), formatBytes(diskReserveBytes), path, formatBytes(free))
+	}
+	if sizeBytes > maxFit {
+		fmt.Printf("  %srequested swap %s is larger than disk free on %s — capping to %s%s\n",
+			"\033[0;90m", formatBytes(sizeBytes), filepath.Dir(path), formatBytes(maxFit), "\033[0m")
+		sizeBytes = maxFit
+	}
 	return &swapfileManager{
-		path:      "/tmp/claws-bootstrap.swap",
+		path:      path,
 		sizeBytes: sizeBytes,
 		sudo:      sudo,
 	}, nil
+}
+
+// pickSwapfilePath picks the best on-disk path for a swapfile.
+//
+// Tries candidates in order; picks the first one that:
+//  1. ISN'T tmpfs (a swapfile on tmpfs is recursive — tmpfs IS backed
+//     by RAM + swap)
+//  2. Has at least minUsefulSwapBytes + diskReserveBytes free
+//
+// Returns the chosen path and the free-bytes count on its filesystem,
+// or an error listing what was tried.
+func pickSwapfilePath() (string, uint64, error) {
+	type candidate struct{ dir, name string }
+	candidates := []candidate{
+		{"/var/cache/claws", "bootstrap.swap"},
+		{"/var/tmp", "claws-bootstrap.swap"},
+		{"/var", "claws-bootstrap.swap"},
+	}
+	// $HOME/.cache/claws — works for non-root setups where /var isn't
+	// writable. Walk last so /var paths get tried first.
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append(candidates, candidate{filepath.Join(home, ".cache", "claws"), "bootstrap.swap"})
+	}
+	// /tmp last, AND only if it's not tmpfs (most modern distros mount
+	// /tmp as tmpfs — in which case a swapfile here is nonsense).
+	candidates = append(candidates, candidate{"/tmp", "claws-bootstrap.swap"})
+
+	type tried struct{ path, reason string }
+	var rejected []tried
+
+	const minNeeded = minUsefulSwapBytes + diskReserveBytes
+	for _, c := range candidates {
+		path := filepath.Join(c.dir, c.name)
+		// Ensure dir exists (or can be created). If creation fails,
+		// move on — most likely we don't have write access to /var/.
+		if _, err := os.Stat(c.dir); err != nil {
+			if mkErr := os.MkdirAll(c.dir, 0o755); mkErr != nil {
+				rejected = append(rejected, tried{c.dir, fmt.Sprintf("can't create: %v", mkErr)})
+				continue
+			}
+		}
+		if isTmpfs(c.dir) {
+			rejected = append(rejected, tried{c.dir, "is tmpfs (swap-on-tmpfs is recursive)"})
+			continue
+		}
+		free := freeDiskBytes(c.dir)
+		if free < minNeeded {
+			rejected = append(rejected, tried{c.dir, fmt.Sprintf("only %s free (need ≥ %s)", formatBytes(free), formatBytes(minNeeded))})
+			continue
+		}
+		return path, free, nil
+	}
+
+	// Nothing worked — surface what was tried, since the error message
+	// is the only signal a non-technical operator has.
+	var b strings.Builder
+	b.WriteString("no candidate path is usable for a swapfile:")
+	for _, r := range rejected {
+		b.WriteString(fmt.Sprintf("\n  %s — %s", r.path, r.reason))
+	}
+	b.WriteString(fmt.Sprintf("\n\nFree up at least %s on /var or $HOME/.cache, or pass --no-swap to accept the OOM risk.", formatBytes(minNeeded)))
+	return "", 0, fmt.Errorf("%s", b.String())
+}
+
+// freeDiskBytes returns the bytes available on the filesystem that
+// contains the given directory. Returns 0 on statfs error.
+func freeDiskBytes(dir string) uint64 {
+	var s syscall.Statfs_t
+	if err := syscall.Statfs(dir, &s); err != nil {
+		return 0
+	}
+	// Bavail is blocks available to a non-superuser; multiply by block
+	// size for byte count.
+	return s.Bavail * uint64(s.Bsize)
+}
+
+// isTmpfs returns true if the filesystem that contains dir is tmpfs.
+// Reads /proc/mounts and finds the longest-prefix mount point.
+func isTmpfs(dir string) bool {
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return false
+	}
+	return mountFstypeForPath(string(data), dir) == "tmpfs"
+}
+
+// mountFstypeForPath returns the fstype of the mount whose mountpoint
+// is the longest prefix of `dir`. Pure-function variant for tests.
+//
+// /proc/mounts format: "device mountpoint fstype options dump pass".
+// We care about fields 1 (mountpoint) and 2 (fstype).
+func mountFstypeForPath(mountsContent, dir string) string {
+	bestMount := ""
+	bestType := ""
+	for _, line := range strings.Split(mountsContent, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		mountpoint := fields[1]
+		fstype := fields[2]
+		// Match if dir is exactly mountpoint or under it. Slash boundary
+		// guard so "/tmp" doesn't match "/tmp-foo". Root "/" is special-
+		// cased because "/" + "/" = "//" which no path actually starts
+		// with — every dir falls back to root.
+		matches := dir == mountpoint ||
+			mountpoint == "/" ||
+			strings.HasPrefix(dir, mountpoint+"/")
+		if matches && len(mountpoint) > len(bestMount) {
+			bestMount = mountpoint
+			bestType = fstype
+		}
+	}
+	return bestType
+}
+
+// chooseAutoSwapSize picks the swap size to use when --add-swap is set
+// without an explicit value. Goal: bring RAM + swap to (recommended +
+// headroom). Bounded to [minUseful, 8 GB] so we don't allocate an
+// absurd amount even on a tiny box with tons of disk.
+//
+// availMem is the current RAM-available figure (from /proc/meminfo).
+// existingSwap is the currently-active swap from /proc/swaps.
+func chooseAutoSwapSize(availMem, existingSwap uint64) uint64 {
+	const target = 4*1024*1024*1024 + recommendedSwapHeadroomBytes // 6 GB
+	have := availMem + existingSwap
+	var need uint64
+	if have >= target {
+		need = minUsefulSwapBytes
+	} else {
+		need = target - have
+	}
+	if need < minUsefulSwapBytes {
+		need = minUsefulSwapBytes
+	}
+	if need > 8*1024*1024*1024 {
+		need = 8 * 1024 * 1024 * 1024
+	}
+	return need
 }
 
 // enable creates the swapfile and turns it on. After this returns nil,

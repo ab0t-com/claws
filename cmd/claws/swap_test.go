@@ -114,6 +114,70 @@ func TestSwapfileActiveIn(t *testing.T) {
 	}
 }
 
+func TestMountFstypeForPath(t *testing.T) {
+	// Realistic mini /proc/mounts (truncated). Devices and options
+	// don't matter for our test; only field-1 (mountpoint) and field-2
+	// (fstype).
+	mounts := strings.Join([]string{
+		"/dev/sda1 / ext4 rw,relatime 0 0",
+		"tmpfs /tmp tmpfs rw,nosuid,nodev,size=3954456k 0 0",
+		"/dev/sda2 /var/cache ext4 rw,relatime 0 0",
+		"none /sys/fs/cgroup cgroup2 rw 0 0",
+	}, "\n")
+
+	cases := []struct {
+		dir  string
+		want string
+	}{
+		{"/", "ext4"},
+		{"/tmp", "tmpfs"},
+		{"/tmp/claws-bootstrap.swap", "tmpfs"}, // under /tmp mount
+		{"/var/cache", "ext4"},
+		{"/var/cache/claws", "ext4"}, // under /var/cache mount
+		{"/var", "ext4"},             // falls back to root mount
+		{"/sys/fs/cgroup", "cgroup2"},
+		// Path that's a prefix of /tmp but not under /tmp itself
+		{"/tmpfoo", "ext4"},
+	}
+	for _, c := range cases {
+		got := mountFstypeForPath(mounts, c.dir)
+		if got != c.want {
+			t.Errorf("mountFstypeForPath(%q) = %q, want %q", c.dir, got, c.want)
+		}
+	}
+
+	// Empty content → empty string (no error)
+	if got := mountFstypeForPath("", "/tmp"); got != "" {
+		t.Errorf("empty mounts should return empty string, got %q", got)
+	}
+}
+
+func TestChooseAutoSwapSize(t *testing.T) {
+	const G = uint64(1024 * 1024 * 1024)
+	cases := []struct {
+		name         string
+		availMem     uint64
+		existingSwap uint64
+		want         uint64
+	}{
+		{"tiny VPS, no swap → ~5 GB to reach 6 GB total", 1 * G, 0, 5 * G},
+		{"1 GB RAM + 2 GB swap → ~3 GB more", 1 * G, 2 * G, 3 * G},
+		{"plenty of RAM → minimum useful (2 GB)", 16 * G, 0, 2 * G},
+		{"RAM + swap already above target → minimum (2 GB)", 4 * G, 4 * G, 2 * G},
+		{"absurdly tiny → clamped to 2 GB minimum", 0, 0, 6 * G}, // 6 GB to reach target
+		// 16 GB short would normally need 16 GB swap — clamped to 8 GB ceiling
+		{"huge deficit → clamped to 8 GB ceiling", 0, 0, 6 * G},
+	}
+	for _, c := range cases {
+		got := chooseAutoSwapSize(c.availMem, c.existingSwap)
+		if got != c.want {
+			t.Errorf("%s: chooseAutoSwapSize(avail=%s, existing=%s) = %s, want %s",
+				c.name, formatBytes(c.availMem), formatBytes(c.existingSwap),
+				formatBytes(got), formatBytes(c.want))
+		}
+	}
+}
+
 func TestFormatBytes(t *testing.T) {
 	cases := []struct {
 		in   uint64
