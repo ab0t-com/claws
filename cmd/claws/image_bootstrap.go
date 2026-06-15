@@ -24,12 +24,12 @@ import (
 //
 // All steps print what they're about to do before running.
 func cmdImageBootstrap(args []string) error {
-	var source, sourceRepo string
-	var yes, noBuild bool
+	var source, sourceRepo, addSwapSize string
+	var yes, noBuild, addSwap bool
 	for _, a := range args {
 		switch {
 		case a == "-h" || a == "--help":
-			fmt.Println(`Usage: claws image bootstrap [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build]
+			fmt.Println(`Usage: claws image bootstrap [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build] [--add-swap[=SIZE]]
 
 Ensure openclaw:local is present on this host. Order of operations:
   1. If openclaw:local already exists → no-op.
@@ -41,10 +41,16 @@ Flags:
   --source-repo=<git-url>      Git source to clone + build (default: github.com/openclaw/openclaw)
   --yes                        Skip the "about to run docker build" confirmation
   --no-build                   Skip the build fallback (pull only)
+  --add-swap[=SIZE]            Add a temporary swapfile for the build (Linux only).
+                               Default size 8g if no value given.
+                               Removed after build (success, failure, or Ctrl-C).
+                               Use on small boxes — openclaw build peaks at ~3-4 GB RAM.
 
 Examples:
   claws image bootstrap                                          # try repo build (default)
   claws image bootstrap --source=openclaw/runtime:v2026.5        # pull from a registry
+  claws image bootstrap --add-swap --yes                         # build on a low-RAM box
+  claws image bootstrap --add-swap=4g --yes                      # smaller swapfile
   OPENCLAW_IMAGE_SOURCE=openclaw/runtime:latest claws image bootstrap`)
 			return nil
 		case strings.HasPrefix(a, "--source="):
@@ -55,6 +61,11 @@ Examples:
 			yes = true
 		case a == "--no-build":
 			noBuild = true
+		case a == "--add-swap":
+			addSwap = true
+		case strings.HasPrefix(a, "--add-swap="):
+			addSwap = true
+			addSwapSize = strings.TrimPrefix(a, "--add-swap=")
 		}
 	}
 
@@ -132,6 +143,42 @@ Examples:
 		fmt.Printf("\n  %scloning %s → %s%s\n", dim, sourceRepo, buildDir, nc)
 		if err := runVerbose("git", "clone", "--depth=1", sourceRepo, buildDir); err != nil {
 			return errorf("git clone failed: %v", err)
+		}
+	}
+
+	// Memory check + optional swap, before the heavy build. Either path
+	// is best-effort: if we can't read /proc/meminfo (non-Linux, or an
+	// unusual setup), we just proceed with the build and let docker
+	// surface any OOM error itself.
+	const recommendedRAM = 4 * 1024 * 1024 * 1024 // 4 GB
+	availMem := availableMemoryBytes()
+	if availMem > 0 {
+		fmt.Printf("\n  %sMemAvailable: %s — openclaw build peaks at ~4 GB%s\n", dim, formatBytes(availMem), nc)
+		if availMem < recommendedRAM && !addSwap {
+			fmt.Printf("\n  %s! Low memory — docker build may OOM-kill.%s\n", gold, nc)
+			fmt.Printf("    Options:\n")
+			fmt.Printf("      (1) Re-run with %s--add-swap%s to add a temp swapfile (slow but works)\n", bold, nc)
+			fmt.Printf("      (2) Build on a bigger box, then transfer: %sdocker save openclaw:local | gzip > openclaw.tar.gz%s\n", dim, nc)
+			fmt.Printf("      (3) Pull from a registry: %s--source=ghcr.io/ab0t-com/openclaw:latest%s (when available)\n", dim, nc)
+			fmt.Printf("      (4) Wait — the build will probably fail; come back with --add-swap.\n")
+			fmt.Printf("    See: tickets/openclaw-image-build-ram-2026-06-15/\n")
+			fmt.Printf("\n  %sProceeding with build anyway (you said --yes).%s\n", dim, nc)
+		}
+	}
+
+	if addSwap {
+		sizeBytes := parseSwapSize(addSwapSize)
+		if sizeBytes == 0 {
+			return errorf("--add-swap=%q: invalid size (use e.g. 8g, 4G, 2048m)", addSwapSize)
+		}
+		mgr, err := newSwapfileManager(sizeBytes)
+		if err != nil {
+			return errorf("--add-swap not available: %v", err)
+		}
+		defer mgr.disable()
+		mgr.installSignalHandler()
+		if err := mgr.enable(); err != nil {
+			return errorf("failed to enable swap: %v", err)
 		}
 	}
 

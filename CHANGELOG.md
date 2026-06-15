@@ -7,7 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws image bootstrap --add-swap[=SIZE]` for low-RAM hosts
+
+Real client issue: the `openclaw` docker build peaks at ~3–4 GB RAM
+during the Node bundler stage; on small VPS boxes (1–2 GB) the build
+OOM-kills and the operator has no signal to correlate. v1.6.19 ships
+option 1 of the five-option design in
+[`tickets/openclaw-image-build-ram-2026-06-15/`](tickets/openclaw-image-build-ram-2026-06-15/ticket.md).
+
+```
+claws image bootstrap --add-swap         # 8 GB default
+claws image bootstrap --add-swap=4g      # tighter
+claws image bootstrap --add-swap=2048m   # m/M suffix supported
+```
+
+### Lifecycle (Linux only)
+
+1. Reads `MemAvailable` from `/proc/meminfo`. If < 4 GB and
+   `--add-swap` not passed → prints a warning with the four other
+   options from the ticket but proceeds (operator already
+   confirmed `--yes`; we don't gate twice).
+2. If `--add-swap` is passed → `newSwapfileManager()` validates root
+   or sudo, picks `/tmp/claws-bootstrap.swap`.
+3. `enable()` does `fallocate` (with `dd` fallback for filesystems
+   that don't support fallocate) → `chmod 600` → `mkswap` →
+   `swapon`. Each command is echoed before running.
+4. Signal handler wired for SIGINT / SIGTERM — Ctrl-C during the
+   build cleanly removes the swapfile before exiting (130).
+5. `defer disable()` covers success + non-signal failure paths:
+   `swapoff` + remove file.
+
+The swapfile is **never** persisted. No write to `/etc/fstab`, no
+permanent swap added, no system config touched beyond `swapon` /
+`swapoff` of our own temporary file.
+
+### Safety guarantees (the things that DON'T happen)
+
+- **`openclaw:local` is not rebuilt if it's already present.** Same
+  guard as before; this patch adds no new build trigger. Running
+  `claws image bootstrap --add-swap --yes` on a host that already
+  has the image prints `✓ openclaw:local already present` and
+  exits without invoking docker build.
+- **No host system swap config is changed.** The swapfile is at
+  `/tmp/` and removed on every exit path.
+- **macOS gets a clear "not applicable" message.** Swap automation
+  is Linux-only; on macOS, RAM is allocated via Docker Desktop →
+  Settings → Resources, not via swapfile.
+
+### Honest flag
+
+This is **option 1 of 5** from the ticket. The other four
+(pre-built image in the release tarball, GHCR pipeline, remote
+builder, comprehensive docs) are staged for follow-up patches. The
+GHCR pipeline (option 3) is the architecturally right answer;
+option 1 is what ships today because it requires no openclaw-repo
+coordination and works on a fresh $5 VPS immediately.
+
+### Tests
+
+- `cmd/claws/swap_test.go` — pure-function tests for `parseSwapSize`
+  (default, `g`/`G`/`m`/`M` suffixes, plain bytes, invalid input)
+  and `formatBytes` (B / MB / GB rendering in decimal units to match
+  `free -h` and cloud dashboards).
 
 ## [v1.6.18] — 2026-06-15
 
