@@ -22,12 +22,19 @@ const minUsefulSwapBytes = 2 * 1024 * 1024 * 1024 // 2 GiB
 // "RAM + swap >= 4 GB" when sizing an auto-swap. The peak is 4 GB but
 // the build does other things concurrently (e.g. compresses layers),
 // and a too-small swap stresses the kernel into thrashing.
-const recommendedSwapHeadroomBytes = 2 * 1024 * 1024 * 1024 // 2 GiB
+const recommendedSwapHeadroomBytes = 1 * 1024 * 1024 * 1024 // 1 GiB
+
+// autoSwapCeilingBytes caps the auto-computed swap size. Even on a
+// box with tons of disk, allocating more than this just wastes I/O.
+// The build's working set doesn't grow beyond ~6 GB total budget.
+const autoSwapCeilingBytes = 4 * 1024 * 1024 * 1024 // 4 GiB
 
 // diskReserveBytes is the space we leave free on the chosen filesystem
-// after allocating the swapfile, so the build itself + intermediate
-// docker layers can write to disk without running it dry.
-const diskReserveBytes = 1 * 1024 * 1024 * 1024 // 1 GiB
+// after allocating the swapfile, so the docker build itself + intermediate
+// layers can write to disk without running it dry. Bumped from 1 GB to
+// 3 GB after a client report — the openclaw image build's intermediate
+// layers + final image need ~2.6 GB of disk, plus working scratch.
+const diskReserveBytes = 3 * 1024 * 1024 * 1024 // 3 GiB
 
 // ---------------------------------------------------------------------------
 // swap.go — temporary swapfile lifecycle for `claws image bootstrap --add-swap`
@@ -114,12 +121,30 @@ func swapfileActiveIn(content, path string) bool {
 	return false
 }
 
+// totalMemoryBytes reads MemTotal from /proc/meminfo on Linux.
+// MemTotal is what the box was provisioned with; it doesn't fluctuate
+// with current cache pressure. Used for the auto-swap gating decision
+// because an 8 GB box that's currently caching aggressively can show
+// low MemAvailable but doesn't actually need swap — the kernel will
+// reclaim cache when the build asks for RAM.
+//
+// Returns 0 on non-Linux or on read error.
+func totalMemoryBytes() uint64 {
+	return readMeminfoField("MemTotal:")
+}
+
 // availableMemoryBytes reads MemAvailable from /proc/meminfo on Linux.
 // On other platforms returns 0 (= "unknown — caller should skip the
 // check"). Reading MemAvailable directly is more accurate than
 // `free -h`'s "available" column for our purposes (it factors in
 // reclaimable cache).
 func availableMemoryBytes() uint64 {
+	return readMeminfoField("MemAvailable:")
+}
+
+// readMeminfoField returns the byte value of the named /proc/meminfo
+// field (e.g. "MemTotal:" or "MemAvailable:"). Returns 0 on any failure.
+func readMeminfoField(prefix string) uint64 {
 	if runtime.GOOS != "linux" {
 		return 0
 	}
@@ -128,7 +153,7 @@ func availableMemoryBytes() uint64 {
 		return 0
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		if !strings.HasPrefix(line, "MemAvailable:") {
+		if !strings.HasPrefix(line, prefix) {
 			continue
 		}
 		fields := strings.Fields(line)
@@ -354,14 +379,15 @@ func mountFstypeForPath(mountsContent, dir string) string {
 }
 
 // chooseAutoSwapSize picks the swap size to use when --add-swap is set
-// without an explicit value. Goal: bring RAM + swap to (recommended +
-// headroom). Bounded to [minUseful, 8 GB] so we don't allocate an
-// absurd amount even on a tiny box with tons of disk.
+// without an explicit value. Goal: bring RAM + swap to (4 GB + 1 GB
+// headroom). Bounded to [minUseful, autoSwapCeiling] so we don't
+// allocate an absurd amount even on a tiny box with tons of disk —
+// docker also needs disk for the build's own scratch.
 //
 // availMem is the current RAM-available figure (from /proc/meminfo).
 // existingSwap is the currently-active swap from /proc/swaps.
 func chooseAutoSwapSize(availMem, existingSwap uint64) uint64 {
-	const target = 4*1024*1024*1024 + recommendedSwapHeadroomBytes // 6 GB
+	const target = 4*1024*1024*1024 + recommendedSwapHeadroomBytes // 5 GB
 	have := availMem + existingSwap
 	var need uint64
 	if have >= target {
@@ -372,8 +398,8 @@ func chooseAutoSwapSize(availMem, existingSwap uint64) uint64 {
 	if need < minUsefulSwapBytes {
 		need = minUsefulSwapBytes
 	}
-	if need > 8*1024*1024*1024 {
-		need = 8 * 1024 * 1024 * 1024
+	if need > autoSwapCeilingBytes {
+		need = autoSwapCeilingBytes
 	}
 	return need
 }

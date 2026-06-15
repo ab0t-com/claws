@@ -171,33 +171,47 @@ Examples:
 	// OSes). On macOS, RAM is configured via Docker Desktop's Resources
 	// panel, not via swapfile.
 	const recommendedRAM = 4 * 1024 * 1024 * 1024 // 4 GB
+	// Use MemTotal for the gating decision (not MemAvailable). An 8 GB
+	// box that's currently caching aggressively shows low MemAvailable
+	// but doesn't actually need swap — the kernel reclaims cache when
+	// the build asks for RAM. Auto-adding on those boxes wastes disk
+	// and worried clients.
+	//
+	// MemAvailable is still used for sizing IF we decide to add (a more
+	// accurate read of "how much headroom the build has right now").
+	ramTotal := totalMemoryBytes()
 	availMem := availableMemoryBytes()
-	if availMem > 0 {
-		fmt.Printf("\n  %sMemAvailable: %s — openclaw build peaks at ~4 GB%s\n", dim, formatBytes(availMem), nc)
+	if ramTotal == 0 {
+		// Couldn't read /proc/meminfo at all (non-Linux or unusual setup).
+		// Fall back to the availMem path: if we can't tell either way,
+		// trust whatever number we did manage to get.
+		ramTotal = availMem
+	}
+	if ramTotal > 0 {
+		fmt.Printf("\n  %sRAM total: %s   available now: %s   — openclaw build peaks at ~4 GB%s\n", dim, formatBytes(ramTotal), formatBytes(availMem), nc)
 		existingSwap := currentSwapBytes()
 		if existingSwap > 0 {
-			fmt.Printf("  %sExisting swap: %s (RAM + swap = %s)%s\n", dim, formatBytes(existingSwap), formatBytes(availMem+existingSwap), nc)
+			fmt.Printf("  %sExisting swap: %s (total budget = %s)%s\n", dim, formatBytes(existingSwap), formatBytes(ramTotal+existingSwap), nc)
 		}
-		// Effective memory = RAM + existing swap. The auto-add path only
-		// fires if THIS total is below the recommended budget. Respecting
-		// the operator's pre-existing swap config means we never touch
-		// it: we don't add when we don't need to, and we never `swapoff`
-		// anything except our own /tmp/claws-bootstrap.swap.
-		effectiveRAM := availMem + existingSwap
+		// Decision uses TOTAL RAM + existing swap. Never `swapoff`
+		// anything that isn't ours — only /tmp/claws-bootstrap.swap (or
+		// the /var/cache/claws fallback) ever gets touched.
+		effectiveRAM := ramTotal + existingSwap
 		needMoreRAM := effectiveRAM < recommendedRAM
 		switch {
 		case needMoreRAM && noSwap:
 			fmt.Printf("  %s! Memory budget short + --no-swap — docker build may OOM-kill. Proceeding.%s\n", gold, nc)
 		case needMoreRAM && !addSwap:
-			// Auto-enable: user said --yes, total RAM+swap is low, they
-			// didn't opt out. This is the "it just works" path the wizard
-			// relies on.
+			// Auto-enable: total RAM+swap is genuinely below 4 GB.
 			fmt.Printf("  %s[auto] adding temporary swap for the build (--no-swap to opt out)%s\n", gold, nc)
 			addSwap = true
 		case !needMoreRAM && !addSwap:
-			// Existing swap covers it; don't touch anything.
+			// Box has enough total RAM (possibly with existing swap).
+			// Don't touch anything.
 			if existingSwap > 0 {
-				fmt.Printf("  %s✓ existing swap covers the build budget — not adding any%s\n", dim, nc)
+				fmt.Printf("  %s✓ RAM + existing swap covers the build budget — not adding any%s\n", dim, nc)
+			} else {
+				fmt.Printf("  %s✓ RAM covers the build budget — not adding swap%s\n", dim, nc)
 			}
 		case needMoreRAM && addSwap:
 			// Explicit operator override; respect it.

@@ -153,6 +153,10 @@ func TestMountFstypeForPath(t *testing.T) {
 }
 
 func TestChooseAutoSwapSize(t *testing.T) {
+	// Constants in swap.go as of v1.6.23:
+	//   target = 4 GB build budget + 1 GB headroom = 5 GB
+	//   min useful = 2 GB
+	//   auto ceiling = 4 GB (so we don't fill the disk with swap)
 	const G = uint64(1024 * 1024 * 1024)
 	cases := []struct {
 		name         string
@@ -160,13 +164,18 @@ func TestChooseAutoSwapSize(t *testing.T) {
 		existingSwap uint64
 		want         uint64
 	}{
-		{"tiny VPS, no swap → ~5 GB to reach 6 GB total", 1 * G, 0, 5 * G},
-		{"1 GB RAM + 2 GB swap → ~3 GB more", 1 * G, 2 * G, 3 * G},
+		// 1 GB RAM → need 4 GB to reach 5 GB target → 4 GB (also the ceiling)
+		{"tiny VPS, no swap → swap up to ceiling", 1 * G, 0, 4 * G},
+		// 1 GB RAM + 2 GB swap = 3 GB → need 2 GB more
+		{"1 GB RAM + 2 GB swap → top up to budget", 1 * G, 2 * G, 2 * G},
+		// 16 GB RAM → already past target → minimum useful (2 GB)
 		{"plenty of RAM → minimum useful (2 GB)", 16 * G, 0, 2 * G},
-		{"RAM + swap already above target → minimum (2 GB)", 4 * G, 4 * G, 2 * G},
-		{"absurdly tiny → clamped to 2 GB minimum", 0, 0, 6 * G}, // 6 GB to reach target
-		// 16 GB short would normally need 16 GB swap — clamped to 8 GB ceiling
-		{"huge deficit → clamped to 8 GB ceiling", 0, 0, 6 * G},
+		// 4 GB RAM + 4 GB swap = 8 GB → past target → minimum
+		{"RAM + swap above target → minimum (2 GB)", 4 * G, 4 * G, 2 * G},
+		// 0 RAM → need 5 GB → capped to 4 GB ceiling
+		{"zero RAM → ceiling 4 GB", 0, 0, 4 * G},
+		// 3 GiB RAM → need 2 GiB to reach 5 GiB target → at minimum
+		{"mid-range RAM → between min and ceiling", 3 * G, 0, 2 * G},
 	}
 	for _, c := range cases {
 		got := chooseAutoSwapSize(c.availMem, c.existingSwap)
@@ -175,6 +184,17 @@ func TestChooseAutoSwapSize(t *testing.T) {
 				c.name, formatBytes(c.availMem), formatBytes(c.existingSwap),
 				formatBytes(got), formatBytes(c.want))
 		}
+	}
+}
+
+func TestReadMeminfoField(t *testing.T) {
+	// readMeminfoField returns 0 on non-Linux. We can't easily test
+	// against a custom file (no parameter for that), so just confirm
+	// the behaviour returns 0 for an unknown field name on this host.
+	// The Linux/Live path is exercised by the other call sites.
+	got := readMeminfoField("DefinitelyNotAField:")
+	if got != 0 {
+		t.Errorf("unknown field should return 0, got %d", got)
 	}
 }
 

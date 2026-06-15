@@ -7,7 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — auto-swap is now much more conservative about disk + uses MemTotal
+
+User report: a box with 8 GB RAM and ~3.5 GB disk got a 3.5 GB swap
+added — "too much for the machine." Two root causes:
+
+### 1. Auto-swap fired on a box with plenty of RAM
+
+v1.6.22 used `MemAvailable` (current free RAM) for the gating decision.
+On a busy 8 GB box, MemAvailable can drop below 4 GB just from cache —
+but the kernel reclaims cache when the build asks for RAM. We don't
+need swap on those boxes.
+
+v1.6.23 switches the gating decision to **MemTotal** (what the box was
+provisioned with). A box with ≥ 4 GB total RAM does not get auto-swap,
+regardless of current cache pressure. MemAvailable is still used for
+*sizing* if we decide to add (more accurate read of current headroom).
+
+```
+RAM total: 8.0 GB   available now: 1.3 GB   — openclaw build peaks at ~4 GB
+✓ RAM covers the build budget — not adding swap
+```
+
+### 2. Defaults were too aggressive for small-disk boxes
+
+Three constant changes:
+
+| Constant | Before | After | Why |
+|---|---|---|---|
+| `autoSwapCeilingBytes` (cap) | 8 GiB | **4 GiB** | Build's working set doesn't grow beyond ~5 GB total budget; more swap is wasted I/O |
+| `recommendedSwapHeadroomBytes` | 2 GiB | **1 GiB** | Target = 5 GB total (4 GB peak + 1 GB headroom). Less aggressive |
+| `diskReserveBytes` (kept for docker) | 1 GiB | **3 GiB** | Docker build needs ~2.6 GB for the openclaw image + intermediate layers + scratch. 1 GB reserve was too small |
+
+Combined effect on a 3.5 GB-disk + 1 GB-RAM box (genuine low-RAM
+case): chosen size = min(`5 GB - 1 GB`, 4 GB ceiling) = 4 GB, then
+capped to `disk - 3 GB reserve` = ~0.5 GB. Below the 2 GB minimum-
+useful threshold, so the script now fails fast with a clear "free up
+disk or use a bigger box" message instead of silently allocating
+something pointless.
+
+On a 1 GB-RAM box with 6 GB free disk: 4 GB swap (capped from 5 GB
+need by ceiling), leaving 3 GB reserved for docker. Build actually
+fits.
+
+### Three live scenarios
+
+| Scenario | v1.6.22 behaviour | v1.6.23 behaviour |
+|---|---|---|
+| 8 GB RAM total, 1.3 GB MemAvailable, plenty of disk | Added ~3 GB swap (wasted) | `✓ RAM covers the build budget — not adding swap` |
+| 1 GB RAM, 6 GB disk | 5 GB swap (left 1 GB for docker → build OOM-killed on disk) | 4 GB swap (capped to ceiling), 3 GB reserved for docker |
+| 1 GB RAM, 3.5 GB disk | 2.5 GB swap (left 1 GB for docker → not enough either way) | Fails fast: `not enough free disk on any candidate path for a useful swapfile` — clear "free disk or use bigger box" message |
+
+### What the operator sees now
+
+```
+  RAM total: 1.0 GB   available now: 850 MB   — openclaw build peaks at ~4 GB
+  [auto] adding temporary swap for the build (--no-swap to opt out)
+
+  Adding 4.0 GB temporary swapfile at /var/cache/claws/bootstrap.swap
+  ...
+```
+
+vs. (RAM-rich case):
+
+```
+  RAM total: 8.0 GB   available now: 1.3 GB   — openclaw build peaks at ~4 GB
+  ✓ RAM covers the build budget — not adding swap
+```
+
+### Tests
+
+- `chooseAutoSwapSize` test matrix updated for new constants (target
+  = 5 GB, ceiling = 4 GB).
+- New `TestReadMeminfoField` helper for the shared meminfo reader
+  (used by both `totalMemoryBytes` and `availableMemoryBytes`).
 
 ## [v1.6.22] — 2026-06-15
 
