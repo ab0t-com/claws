@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.23] — 2026-06-15
+
 ### Fixed — auto-swap is now much more conservative about disk + uses MemTotal
 
 User report: a box with 8 GB RAM and ~3.5 GB disk got a 3.5 GB swap
