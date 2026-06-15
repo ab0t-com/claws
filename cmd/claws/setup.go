@@ -110,6 +110,16 @@ func cmdSetup(args []string) error {
 			fmt.Println()
 			fmt.Println("    This image is the AI runtime — every agent runs inside it.")
 			fmt.Println("    Building takes 5-10 minutes the first time; future runs are instant.")
+
+			// Surface low-RAM context in the prompt so the operator sees
+			// the auto-swap plan BEFORE confirming. They don't have to
+			// know what swap is — we just tell them "your box is small
+			// so we'll handle that for you".
+			if availMem := availableMemoryBytes(); availMem > 0 && availMem < 4*1024*1024*1024 {
+				fmt.Printf("    %sYour box has %s RAM; the build needs ~4 GB. We'll add a temporary\n", "\033[0;33m", formatBytes(availMem))
+				fmt.Printf("    swapfile during the build (removed when it finishes).%s\n", nc)
+			}
+
 			ans := strings.ToLower(prompt("    Build openclaw:local now? (Y/n)", "y"))
 			if ans == "y" || ans == "yes" {
 				fmt.Println()

@@ -7,7 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Changed — auto-swap on low-RAM hosts; `claws setup` surfaces it before the build
+
+User feedback after v1.6.19: *"it needs something like 4 GB of RAM
+but our smalls only have 1 GB. Make sure it's integrated into the
+setup — we don't want our users to think and it just work."*
+
+v1.6.19 added `--add-swap` as an opt-in flag. v1.6.20 makes it the
+default behaviour when the host needs it — operators on 1 GB VPS
+boxes don't need to know the word "swap" exists.
+
+### Auto-swap is now the default with `--yes`
+
+```
+claws image bootstrap --yes
+```
+
+On a host with < 4 GB free RAM, this automatically:
+
+1. Detects the low-RAM situation via `/proc/meminfo`'s `MemAvailable`
+2. Adds a temporary 8 GB swapfile at `/tmp/claws-bootstrap.swap`
+3. Runs `docker build`
+4. Removes the swapfile when the build finishes (success, failure,
+   or Ctrl-C — same signal-handler lifecycle as v1.6.19)
+
+The operator sees one friendly line:
+
+```
+  MemAvailable: 1.2 GB — openclaw build peaks at ~4 GB
+  [auto] adding temporary swap for the build (--no-swap to opt out)
+```
+
+That's it. They didn't have to learn about `--add-swap`. They didn't
+have to read the ticket. They said `--yes` to "build the image" and
+the build worked.
+
+### `claws setup` step 1 surfaces the RAM situation BEFORE the prompt
+
+The wizard's "Build openclaw:local now? (Y/n)" prompt now precedes
+itself with a friendly notice when the box is small:
+
+```
+[1/6] Checking prerequisites...
+    ! Image 'openclaw:local' not found
+
+    This image is the AI runtime — every agent runs inside it.
+    Building takes 5-10 minutes the first time; future runs are instant.
+    Your box has 1.2 GB RAM; the build needs ~4 GB. We'll add a temporary
+    swapfile during the build (removed when it finishes).
+    Build openclaw:local now? (Y/n) [y]:
+```
+
+The wizard has invoked `cmdImageBootstrap([]string{"--yes"})` inline
+since v1.6.4; the auto-swap now kicks in automatically along that
+path. Non-technical users never see the word `--add-swap`; they just
+see *"your box is small so we'll handle that for you."*
+
+### New flag: `--no-swap` (opt out)
+
+For operators who explicitly don't want swap (security policy, SSD
+endurance concerns, want to fail fast on undersized hosts):
+
+```
+claws image bootstrap --no-swap --yes
+```
+
+prints `! Low memory + --no-swap — docker build may OOM-kill.
+Proceeding.` and accepts the OOM risk.
+
+### Decision summary
+
+| Host has | Default | Override |
+|---|---|---|
+| ≥ 4 GB RAM | Build normally, no swap | — |
+| < 4 GB RAM + `--yes` | **Auto-add swap, build, remove swap** | `--no-swap` |
+| < 4 GB RAM + interactive prompt | Wizard mentions RAM in the prompt; user confirms; auto-swap kicks in | — |
+| Explicit `--add-swap[=SIZE]` | Force swap (legacy v1.6.19 path) | — |
+| macOS | Returns a clear "configure Docker Desktop Settings → Resources" message | — |
+
+### Safety guarantees (unchanged from v1.6.19)
+
+- **`openclaw:local` is NOT rebuilt if it's already present.** Even
+  with `--yes`, the bootstrap exits with `✓ openclaw:local already
+  present` BEFORE any swap or build work happens.
+- **The swapfile is never persisted.** No `/etc/fstab` write, no
+  permanent swap config touched.
+- **Signal-handler cleanup on Ctrl-C** — same lifecycle as v1.6.19.
 
 ## [v1.6.19] — 2026-06-15
 

@@ -25,11 +25,11 @@ import (
 // All steps print what they're about to do before running.
 func cmdImageBootstrap(args []string) error {
 	var source, sourceRepo, addSwapSize string
-	var yes, noBuild, addSwap bool
+	var yes, noBuild, addSwap, noSwap bool
 	for _, a := range args {
 		switch {
 		case a == "-h" || a == "--help":
-			fmt.Println(`Usage: claws image bootstrap [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build] [--add-swap[=SIZE]]
+			fmt.Println(`Usage: claws image bootstrap [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build] [--add-swap[=SIZE] | --no-swap]
 
 Ensure openclaw:local is present on this host. Order of operations:
   1. If openclaw:local already exists → no-op.
@@ -41,16 +41,23 @@ Flags:
   --source-repo=<git-url>      Git source to clone + build (default: github.com/openclaw/openclaw)
   --yes                        Skip the "about to run docker build" confirmation
   --no-build                   Skip the build fallback (pull only)
-  --add-swap[=SIZE]            Add a temporary swapfile for the build (Linux only).
-                               Default size 8g if no value given.
-                               Removed after build (success, failure, or Ctrl-C).
-                               Use on small boxes — openclaw build peaks at ~3-4 GB RAM.
+  --add-swap[=SIZE]            Force a temporary swapfile around the build (default 8g).
+  --no-swap                    Opt OUT of the automatic low-RAM swapfile.
+
+Auto-swap (default with --yes): if the host has < 4 GB free RAM AND --yes is set,
+                                claws adds an 8 GB temporary swapfile for the build
+                                and removes it afterwards. The openclaw build peaks at
+                                ~3-4 GB RAM; without swap it OOM-kills on small VPS boxes.
+                                Pass --no-swap to opt out (accepts the OOM risk).
+                                The swapfile is /tmp/claws-bootstrap.swap, removed in
+                                every exit path including Ctrl-C.
 
 Examples:
-  claws image bootstrap                                          # try repo build (default)
+  claws image bootstrap                                          # try repo build (interactive)
+  claws image bootstrap --yes                                    # builds; auto-swaps on small boxes
   claws image bootstrap --source=openclaw/runtime:v2026.5        # pull from a registry
-  claws image bootstrap --add-swap --yes                         # build on a low-RAM box
-  claws image bootstrap --add-swap=4g --yes                      # smaller swapfile
+  claws image bootstrap --add-swap=4g --yes                      # explicit smaller swapfile
+  claws image bootstrap --no-swap --yes                          # accept OOM risk; no swap
   OPENCLAW_IMAGE_SOURCE=openclaw/runtime:latest claws image bootstrap`)
 			return nil
 		case strings.HasPrefix(a, "--source="):
@@ -66,6 +73,8 @@ Examples:
 		case strings.HasPrefix(a, "--add-swap="):
 			addSwap = true
 			addSwapSize = strings.TrimPrefix(a, "--add-swap=")
+		case a == "--no-swap":
+			noSwap = true
 		}
 	}
 
@@ -146,23 +155,36 @@ Examples:
 		}
 	}
 
-	// Memory check + optional swap, before the heavy build. Either path
-	// is best-effort: if we can't read /proc/meminfo (non-Linux, or an
-	// unusual setup), we just proceed with the build and let docker
-	// surface any OOM error itself.
+	// Memory check + auto-swap, before the heavy build.
+	//
+	// Goal: a user on a 1 GB VPS who runs `claws setup` and confirms
+	// the bootstrap shouldn't have to know the word "swap" exists. The
+	// build is going to fail without one, and they've already said yes
+	// to "build now". So: detect low RAM, auto-enable swap, print what
+	// we're doing, get on with it.
+	//
+	// Opt-outs:
+	//   --no-swap     : never auto-add; accept OOM risk
+	//   --add-swap[=] : explicit (legacy from v1.6.19; same effect as auto)
+	//
+	// Linux-only by construction (newSwapfileManager refuses on other
+	// OSes). On macOS, RAM is configured via Docker Desktop's Resources
+	// panel, not via swapfile.
 	const recommendedRAM = 4 * 1024 * 1024 * 1024 // 4 GB
 	availMem := availableMemoryBytes()
 	if availMem > 0 {
 		fmt.Printf("\n  %sMemAvailable: %s — openclaw build peaks at ~4 GB%s\n", dim, formatBytes(availMem), nc)
-		if availMem < recommendedRAM && !addSwap {
-			fmt.Printf("\n  %s! Low memory — docker build may OOM-kill.%s\n", gold, nc)
-			fmt.Printf("    Options:\n")
-			fmt.Printf("      (1) Re-run with %s--add-swap%s to add a temp swapfile (slow but works)\n", bold, nc)
-			fmt.Printf("      (2) Build on a bigger box, then transfer: %sdocker save openclaw:local | gzip > openclaw.tar.gz%s\n", dim, nc)
-			fmt.Printf("      (3) Pull from a registry: %s--source=ghcr.io/ab0t-com/openclaw:latest%s (when available)\n", dim, nc)
-			fmt.Printf("      (4) Wait — the build will probably fail; come back with --add-swap.\n")
-			fmt.Printf("    See: tickets/openclaw-image-build-ram-2026-06-15/\n")
-			fmt.Printf("\n  %sProceeding with build anyway (you said --yes).%s\n", dim, nc)
+		lowRAM := availMem < recommendedRAM
+		switch {
+		case lowRAM && noSwap:
+			fmt.Printf("  %s! Low memory + --no-swap — docker build may OOM-kill. Proceeding.%s\n", gold, nc)
+		case lowRAM && !addSwap:
+			// Auto-enable: user said --yes, RAM is low, they didn't opt out.
+			// This is the "it just works" path the wizard relies on.
+			fmt.Printf("  %s[auto] adding temporary swap for the build (--no-swap to opt out)%s\n", gold, nc)
+			addSwap = true
+		case lowRAM && addSwap:
+			// Already explicit; nothing to do.
 		}
 	}
 
@@ -173,7 +195,9 @@ Examples:
 		}
 		mgr, err := newSwapfileManager(sizeBytes)
 		if err != nil {
-			return errorf("--add-swap not available: %v", err)
+			// On macOS this is the polite "configure Docker Desktop"
+			// message; we propagate it so the operator sees it once.
+			return errorf("swap automation unavailable: %v", err)
 		}
 		defer mgr.disable()
 		mgr.installSignalHandler()
