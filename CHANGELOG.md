@@ -7,7 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — auto-swap respects the operator's existing swap config
+
+User feedback after v1.6.20: *"should it detect if swap already exists
+so we don't break a user's existing swap things"* — yes, absolutely.
+
+v1.6.20 added auto-swap on low-RAM boxes but didn't check whether the
+operator already had swap configured (via fstab, cloud-init, or
+manual setup). On a box with 1 GB RAM + 8 GB existing swap we'd
+**unnecessarily add ANOTHER 8 GB swap** even though the existing one
+covered the build budget. Worse, if a stale `/tmp/claws-bootstrap.swap`
+existed from a previous SIGKILLed run, we'd blindly overwrite it.
+
+Three guards added in v1.6.21:
+
+### Guard 1 — Respect existing swap
+
+`claws image bootstrap` now reads `/proc/swaps` and sums the
+currently-active swap. The "effective memory budget" is `RAM + swap`.
+We only auto-add if that total is below 4 GB.
+
+```
+  MemAvailable: 1.2 GB — openclaw build peaks at ~4 GB
+  Existing swap: 5.0 GB (RAM + swap = 6.2 GB)
+  ✓ existing swap covers the build budget — not adding any
+```
+
+A box with the operator's own swap config now goes straight to the
+build, no auto-add. We **never** call `swapoff` on swap we didn't
+create — only `/tmp/claws-bootstrap.swap` is ours; everything else
+stays exactly as the operator left it.
+
+### Guard 2 — Reuse our swapfile if it's already active
+
+If `/tmp/claws-bootstrap.swap` is already in `/proc/swaps` (e.g. a
+previous run got SIGKILLed before cleanup), `enable()` detects it
+and reuses rather than refusing or double-swapping on. The
+end-of-run `disable()` still cleans it up:
+
+```
+  ✓ swap already active at /tmp/claws-bootstrap.swap (reusing from previous run)
+```
+
+### Guard 3 — Refuse to overwrite a stale file at our path
+
+If a file exists at `/tmp/claws-bootstrap.swap` but is NOT currently
+active swap (e.g. corrupted state from a failed previous run), the
+script refuses with a clear remediation:
+
+```
+/tmp/claws-bootstrap.swap exists but isn't active swap — refusing to overwrite.
+Inspect or remove manually:
+  sudo rm /tmp/claws-bootstrap.swap
+Then re-run the build
+```
+
+This is intentionally conservative — we'd rather make the operator
+do one manual step than blindly `mkswap` over an unknown file.
+
+### Decision summary (updated from v1.6.20)
+
+| Host has | Default | Note |
+|---|---|---|
+| ≥ 4 GB RAM | Build normally, no swap | — |
+| ≥ 4 GB **RAM + existing swap** combined | Build normally; **don't add swap** | New in v1.6.21 |
+| < 4 GB total + `--yes` | Auto-add our 8 GB swap, build, remove | Same as v1.6.20 |
+| Our swap from a previous run still active | Reuse it; clean up in `disable()` | New in v1.6.21 |
+| Stale file at our swap path | Refuse with clear remediation | New in v1.6.21 |
+| Explicit `--add-swap[=SIZE]` | Force swap regardless of existing | Same as v1.6.19 |
+| `--no-swap` | Never add, accept OOM risk | Same as v1.6.20 |
+
+### Safety guarantees (now explicit)
+
+- **We only ever `swapoff` `/tmp/claws-bootstrap.swap`** — never any
+  other swap on the system.
+- **We never write to `/etc/fstab`** or any permanent system swap
+  config.
+- **We never overwrite an existing file at our path** without
+  explicit operator action.
+
+### Tests
+
+- `cmd/claws/swap_test.go` — new tests for `parseProcSwapsTotal`
+  (empty, single fstab swap, multiple summed, trailing newline,
+  garbage skipped) and `swapfileActiveIn` (exact match, miss,
+  empty, prefix-not-equal, whitespace tolerance).
 
 ## [v1.6.20] — 2026-06-15
 

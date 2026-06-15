@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseSwapSize(t *testing.T) {
 	cases := []struct {
@@ -23,6 +26,91 @@ func TestParseSwapSize(t *testing.T) {
 		if got := parseSwapSize(c.in); got != c.want {
 			t.Errorf("parseSwapSize(%q) = %d, want %d", c.in, got, c.want)
 		}
+	}
+}
+
+func TestParseProcSwapsTotal(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		want    uint64
+	}{
+		{
+			"empty (no swap configured)",
+			"Filename                Type        Size            Used    Priority\n",
+			0,
+		},
+		{
+			"single fstab swapfile",
+			"Filename                Type        Size            Used    Priority\n" +
+				"/swapfile               file        5242876         581768  -2\n",
+			5242876 * 1024,
+		},
+		{
+			"multiple swaps summed",
+			"Filename                Type        Size            Used    Priority\n" +
+				"/dev/sda5               partition   2097148         0       -2\n" +
+				"/swap.img               file        4194300         0       -3\n",
+			(2097148 + 4194300) * 1024,
+		},
+		{
+			"trailing newline tolerated",
+			"Filename Type Size Used Priority\n/swapfile file 1024 0 -1\n\n",
+			1024 * 1024,
+		},
+		{
+			"garbage tolerated (skip un-parseable)",
+			"Filename Type Size Used Priority\nweird line\n/swap file 2048 0 -1\n",
+			2048 * 1024,
+		},
+	}
+	for _, c := range cases {
+		got := parseProcSwapsTotal(c.content)
+		if got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSwapfileActiveIn(t *testing.T) {
+	content := "Filename Type Size Used Priority\n" +
+		"/tmp/claws-bootstrap.swap file 8589934 0 -2\n" +
+		"/swapfile file 5242876 0 -3\n"
+
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/tmp/claws-bootstrap.swap", true},
+		{"/swapfile", true},
+		{"/no-such-swap", false},
+		{"", false},
+		// Path is a prefix of an active swap but not exact — should be false
+		{"/tmp", false},
+	}
+	for _, c := range cases {
+		got := swapfileActiveIn(content, c.path)
+		if got != c.want {
+			t.Errorf("swapfileActiveIn(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+
+	// Header-only (no swap) → false for anything
+	if swapfileActiveIn("Filename Type Size Used Priority\n", "/anything") {
+		t.Error("header-only content should not report anything as active")
+	}
+
+	// Empty content → false
+	if swapfileActiveIn("", "/tmp/x") {
+		t.Error("empty content should return false")
+	}
+
+	// Sanity: nothing weird with whitespace
+	if !swapfileActiveIn(strings.Join([]string{
+		"Filename Type Size Used Priority",
+		"/tmp/x  file  1024  0  -1",
+	}, "\n"), "/tmp/x") {
+		t.Error("expected /tmp/x to match a tab-separated entry")
 	}
 }
 

@@ -28,6 +28,74 @@ import (
 // Desktop Settings → Resources" guidance instead of trying to add swap.
 // ---------------------------------------------------------------------------
 
+// currentSwapBytes returns the total currently-active swap on the
+// system, in bytes. Reads /proc/swaps; returns 0 on read error or on
+// non-Linux platforms. Used by the auto-swap decision so we don't add
+// more swap if the operator already has enough configured via fstab,
+// cloud-init, or any other means.
+func currentSwapBytes() uint64 {
+	if runtime.GOOS != "linux" {
+		return 0
+	}
+	data, err := os.ReadFile("/proc/swaps")
+	if err != nil {
+		return 0
+	}
+	return parseProcSwapsTotal(string(data))
+}
+
+// parseProcSwapsTotal sums the "Size" column of /proc/swaps content
+// (excluding the header line) and returns the total in bytes. The
+// /proc/swaps Size column is in KB. Exposed as a pure function so it
+// can be unit-tested with fixture content.
+func parseProcSwapsTotal(content string) uint64 {
+	var total uint64
+	for i, line := range strings.Split(content, "\n") {
+		if i == 0 || line == "" { // skip header + blank lines
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		kb, err := strconv.ParseUint(fields[2], 10, 64)
+		if err != nil {
+			continue
+		}
+		total += kb * 1024
+	}
+	return total
+}
+
+// swapfileActive returns true if /proc/swaps lists the given path as
+// currently-active swap. Used to detect "our swap from a previous run
+// is still on" so we can reuse it rather than fail or double-swapon.
+func swapfileActive(path string) bool {
+	if runtime.GOOS != "linux" {
+		return false
+	}
+	data, err := os.ReadFile("/proc/swaps")
+	if err != nil {
+		return false
+	}
+	return swapfileActiveIn(string(data), path)
+}
+
+// swapfileActiveIn is the pure-function variant of swapfileActive, for
+// unit tests.
+func swapfileActiveIn(content, path string) bool {
+	for i, line := range strings.Split(content, "\n") {
+		if i == 0 || line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) >= 1 && fields[0] == path {
+			return true
+		}
+	}
+	return false
+}
+
 // availableMemoryBytes reads MemAvailable from /proc/meminfo on Linux.
 // On other platforms returns 0 (= "unknown — caller should skip the
 // check"). Reading MemAvailable directly is more accurate than
@@ -136,9 +204,36 @@ func newSwapfileManager(sizeBytes uint64) (*swapfileManager, error) {
 
 // enable creates the swapfile and turns it on. After this returns nil,
 // the caller MUST eventually call disable() (best done via defer).
+//
+// Three safety guards run first:
+//
+//  1. If our path is ALREADY active in /proc/swaps, we reuse it —
+//     don't double-swapon, don't overwrite. This handles the case
+//     where a previous run got SIGKILLed and the cleanup didn't fire.
+//     disable() will still swapoff + remove on exit, so we're not
+//     leaving state behind on the user's behalf.
+//  2. If a file exists at our path but ISN'T active swap, we refuse —
+//     could be a stale file from a corrupted previous run, could be
+//     something the user put there. Either way, blindly overwriting is
+//     wrong. Operator removes it manually then re-runs.
+//  3. The build path (cmdImageBootstrap) only reaches enable() after
+//     deciding existing swap isn't enough; so by the time we're here,
+//     we know we need to add more.
 func (s *swapfileManager) enable() error {
 	const dim = "\033[0;90m"
 	const nc = "\033[0m"
+
+	// Guard 1: our path already active in /proc/swaps → reuse.
+	if swapfileActive(s.path) {
+		fmt.Printf("\n  ✓ swap already active at %s (reusing from previous run)\n", s.path)
+		s.active = true
+		return nil
+	}
+	// Guard 2: stale file at our path → refuse.
+	if _, err := os.Stat(s.path); err == nil {
+		return fmt.Errorf("%s exists but isn't active swap — refusing to overwrite. Inspect or remove manually:\n  sudo rm %s\nThen re-run the build", s.path, s.path)
+	}
+
 	fmt.Printf("\n  Adding %s temporary swapfile at %s\n", formatBytes(s.sizeBytes), s.path)
 	fmt.Printf("  %s(temporary — removed when the build finishes or you Ctrl-C)%s\n", dim, nc)
 

@@ -174,17 +174,33 @@ Examples:
 	availMem := availableMemoryBytes()
 	if availMem > 0 {
 		fmt.Printf("\n  %sMemAvailable: %s — openclaw build peaks at ~4 GB%s\n", dim, formatBytes(availMem), nc)
-		lowRAM := availMem < recommendedRAM
+		existingSwap := currentSwapBytes()
+		if existingSwap > 0 {
+			fmt.Printf("  %sExisting swap: %s (RAM + swap = %s)%s\n", dim, formatBytes(existingSwap), formatBytes(availMem+existingSwap), nc)
+		}
+		// Effective memory = RAM + existing swap. The auto-add path only
+		// fires if THIS total is below the recommended budget. Respecting
+		// the operator's pre-existing swap config means we never touch
+		// it: we don't add when we don't need to, and we never `swapoff`
+		// anything except our own /tmp/claws-bootstrap.swap.
+		effectiveRAM := availMem + existingSwap
+		needMoreRAM := effectiveRAM < recommendedRAM
 		switch {
-		case lowRAM && noSwap:
-			fmt.Printf("  %s! Low memory + --no-swap — docker build may OOM-kill. Proceeding.%s\n", gold, nc)
-		case lowRAM && !addSwap:
-			// Auto-enable: user said --yes, RAM is low, they didn't opt out.
-			// This is the "it just works" path the wizard relies on.
+		case needMoreRAM && noSwap:
+			fmt.Printf("  %s! Memory budget short + --no-swap — docker build may OOM-kill. Proceeding.%s\n", gold, nc)
+		case needMoreRAM && !addSwap:
+			// Auto-enable: user said --yes, total RAM+swap is low, they
+			// didn't opt out. This is the "it just works" path the wizard
+			// relies on.
 			fmt.Printf("  %s[auto] adding temporary swap for the build (--no-swap to opt out)%s\n", gold, nc)
 			addSwap = true
-		case lowRAM && addSwap:
-			// Already explicit; nothing to do.
+		case !needMoreRAM && !addSwap:
+			// Existing swap covers it; don't touch anything.
+			if existingSwap > 0 {
+				fmt.Printf("  %s✓ existing swap covers the build budget — not adding any%s\n", dim, nc)
+			}
+		case needMoreRAM && addSwap:
+			// Explicit operator override; respect it.
 		}
 	}
 
