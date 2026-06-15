@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.17] — 2026-06-15
+
 ### Fixed — `publish-release.sh` now ships artifacts in the same commit as the tag
 
 Bug history: the tag was created BEFORE `release.sh` ran. Result: the
