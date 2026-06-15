@@ -11,7 +11,107 @@ _(nothing yet)_
 
 ## [v1.6.16] — 2026-06-15
 
-_(no changes documented)_
+### Added — prereq installers + friendly CLI error when docker is missing
+
+A client hit `exec: "docker": executable file not found in $PATH`
+mid-command and had no path to recovery. This release makes
+fresh-box bootstrap a one-liner and replaces the opaque Go error
+with an actionable one pointing at the install command.
+
+### Two folders of installer scripts
+
+Both self-contained (no source dependencies), both work via
+`curl … | bash`. Cover Ubuntu / Debian / Fedora / RHEL / Arch /
+Alpine / macOS.
+
+**`scripts/prereqs/`** — simple, friendly path for personal dev boxes:
+- `check.sh`, `install-all.sh`, `install-docker.sh`,
+  `install-git.sh`, `install-curl.sh`.
+- Linux docker install via Docker's official `get.docker.com`;
+  macOS via `brew install --cask docker`.
+
+**`scripts/prereqs-strict/`** — same scope, audit-friendly for
+corporate / regulated environments:
+- `--audit` mode prints every command, executes nothing. Ideal
+  for security review.
+- Every sudo command echoed with `$ <cmd>` before running.
+- All output mirrored to `/tmp/claws-prereqs-<ts>.log`.
+- `CLAWS_NO_INSTALL=1` env var refuses to install (policy opt-out).
+- Refuses to run inside containers (no docker-in-docker).
+- Refuses to overwrite `/etc/docker/daemon.json`.
+- `--no-group` skips adding `$USER` to the docker group.
+- `--method=getdocker|distro|skip` lets ops choose how docker
+  installs.
+- CI environments auto-detected (skip prompts but never
+  auto-install).
+- openSUSE / zypper added.
+- `check.sh --json` for pipeline / CI integration.
+
+Both folders: **never** uninstall anything, **never** overwrite
+existing config, **never** disable existing services. Idempotent.
+
+### CLI prereq guard
+
+`cmd/claws/prereqs.go` + dispatch wiring in `main.go`.
+Commands that need docker run `requireDocker()` first; on failure
+print a verbose actionable error pointing at the install one-liner.
+
+Deny-list of commands that skip the check: `version`, `help`,
+`update`, `doctor`, `init`, `paste-secret`, no-args invocation.
+`doctor` in particular **must** run when docker is broken — it's
+the diagnostic.
+
+Daemon-down case gets specific guidance (three common causes:
+daemon stopped, user not in docker group, config issue, each with
+the fix command).
+
+### README Prerequisites section
+
+New section between title and Install with the prereq table,
+one-liner installer, check command, and per-tool installers.
+
+### Brand imagery — three prompt systems + hero image
+
+New `docs/brand/` directory with three brand-imagery prompt
+systems covering the same 15 use cases (hero, OG, icon, wordmark,
+release card, product story, palette, etc.):
+
+- `image-prompts.md` (v1) — tactile photographic, Italian craft
+  studio
+- `image-prompts-v2.md` (v2) — kawaii Sanrio × American startup
+  polish (what the current hero is based on)
+- `image-prompts-v3.md` (v3) — confident startup, Linear / Notion
+  / Vercel / Stripe sensibility
+
+Each has 15 prompts with full layered composition briefs plus a
+reshape-checker contract (aspect ratios + pixel targets).
+
+`assets/hero.png` — the kawaii product-launch hero image.
+`assets/hero-team.png` preserves the earlier team-photo
+illustration. README hero now follows the centered pattern from
+`ab0t-com/browser-agent`.
+
+### Files
+
+Added: `scripts/prereqs/` (5 scripts + README),
+`scripts/prereqs-strict/` (5 scripts + README), `cmd/claws/prereqs.go`,
+`docs/brand/image-prompts{,-v2,-v3}.md`, `assets/hero{,-team}.png`,
+`tickets/prereq-installer-2026-05-24/ticket.md`.
+
+Modified: `cmd/claws/main.go`, `README.md`.
+
+### Honest flags
+
+- No bash-script tests. Scripts are short, smoke-tested live, and
+  the strict variant's `--audit` mode is effectively a manual test
+  harness. Worth a future patch.
+- `claws doctor` is unchanged. It does its own checks and runs even
+  when docker is broken (intentional — it's the diagnostic).
+- The `publish-release.sh` body-wipe pattern bit again — I forgot
+  to populate `[Unreleased]` before running it. The release
+  artefacts are correct; only the in-repo CHANGELOG body was
+  missing at tag-time and is being backfilled in a follow-up
+  commit.
 
 ## [v1.6.15] — 2026-05-24
 
