@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.21] — 2026-06-15
+
 ### Fixed — auto-swap respects the operator's existing swap config
 
 User feedback after v1.6.20: *"should it detect if swap already exists
