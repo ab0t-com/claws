@@ -26,6 +26,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Prereq guard: commands that need docker get a friendly error if
+	// docker is missing or the daemon isn't reachable, instead of the
+	// opaque exec.LookPath failure that a non-technical user can't act on.
+	// Commands in commandsNotNeedingDocker (version, help, update, doctor,
+	// init, paste-secret, no-args) skip this check.
+	if err := validatePrereqsForCommand(cmd); err != nil {
+		fmt.Fprintf(os.Stderr, "\033[0;31m==> %s\033[0m\n", err)
+		os.Exit(1)
+	}
+
 	var err error
 	switch cmd {
 	case "create":

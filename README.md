@@ -1,8 +1,57 @@
-# claws
+<p align="center">
+  <img src="assets/hero.png" alt="claws — your AI team, on your server. Three small cream mascot agents stand together in front of a small dark-green home server with a padlock, set against a warm sunrise; the headline reads 'Your AI team. On your server.' with the kicker 'Sovereign. Private. Yours.' and a coral 'Get started' button" width="880">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<h1 align="center">claws</h1>
+
+<p align="center"><em>a small team of agents, on your own server</em></p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
+---
 
 Multi-instance manager for [OpenClaw](https://github.com/openclaw/openclaw). Run multiple isolated AI agent instances on a single server, each with its own identity, credentials, channels, and workspace.
+
+## Prerequisites
+
+claws shells out to Docker for everything. On a fresh box, you'll need:
+
+| Tool | Required | Why |
+|---|---|---|
+| **docker** (engine + daemon) | yes | Every agent runs in a container |
+| **docker compose** (v2 plugin) | yes | Per-agent compose orchestration |
+| **bash + curl** | yes | The installer scripts |
+| **git** | recommended | Source builds, CONTRIBUTING |
+
+### One-command install (auto-detects your OS)
+
+```bash
+# Installs everything claws needs (docker engine, compose plugin, git, curl)
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs/install-all.sh | bash
+```
+
+Supports Ubuntu, Debian, Fedora, RHEL / CentOS / Rocky, Arch, Alpine, and macOS. Idempotent — re-running skips anything already installed.
+
+### Just check what's missing
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs/check.sh | bash
+```
+
+Read-only. Exits 0 if all required prereqs are present, 1 otherwise.
+
+### Install one specific tool
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs/install-docker.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/prereqs/install-git.sh | bash
+```
+
+See [`scripts/prereqs/README.md`](scripts/prereqs/README.md) for the full reference (supported OSes, flags, failure modes, reuse in other tools).
+
+claws itself surfaces the friendly install command if you forget — running any container-using command on a box without docker prints the exact `curl … | bash` line to run.
 
 ## Install
 
