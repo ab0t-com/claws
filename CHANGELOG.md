@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.26] — 2026-06-16
+
 ### Added — `claws auth-monitor` unattended auth recovery
 
 Codex OAuth refresh tokens are single-use. Agents that share an upstream account
