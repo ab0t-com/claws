@@ -7,7 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws security tier` per-agent privilege tiering
+
+claws now exposes a four-tier privilege model on each agent's container —
+`untrusted` (read-only rootfs + all hardening) / `standard` (today's default;
+`cap_drop: ALL + no-new-privileges`) / `privileged` (sudo + apt + `/etc` write
+inside the container) / `host-reach` (docker.sock + `pid=host`; reserved for
+v1.6.26). The tier is per-agent, persistent across upgrades, and visible at a
+glance in `claws list`.
+
+```bash
+# get current tier
+claws security tier team/sarah
+
+# promote (requires --accept-risk for anything above standard)
+claws security tier team/sarah --set privileged --accept-risk
+
+# fleet view — only when something is above standard, otherwise hidden
+claws security tier --all
+claws list                       # TIER column appears when any agent != standard
+
+# demote (always allowed; security improvements aren't gated)
+claws security tier team/sarah --set standard
+```
+
+What the privileged tier actually does:
+
+- **Storage:** tier persisted in `instance.env` (`CLAWS_SECURITY_TIER=privileged`),
+  NOT openclaw.json — the runtime's strict schema rejects unknown keys and
+  this is purely a claws-side concept.
+- **Compose overlay:** claws writes a per-agent `docker-compose.security.yml`
+  emitted from the tier. Uses `!reset` tags (requires docker compose 2.20+)
+  to truly override the base file's `cap_drop` and `security_opt` rather than
+  appending to them.
+- **Container recreate:** `claws security tier --set` recreates the container
+  so docker picks up the new caps. Channels reconnect briefly.
+- **Sudo install:** after the recreate, claws execs into the container as
+  root, runs `apt-get install -y sudo`, writes `/etc/sudoers.d/node` with
+  `NOPASSWD: ALL`, and verifies `sudo -n true` returns 0. Idempotent.
+- **Audit log:** every tier change writes a `security.tier.change` JSONL
+  entry to `~/.openclaw/.audit.log` with `{ts, from, to, operator, accept_risk}`.
+
+What it does NOT do (host-vs-container boundary):
+
+- Privileged tier gives the agent sudo INSIDE its own container. The host
+  filesystem, other containers, and host processes remain invisible.
+- For host reach, the `host-reach` tier exists in the schema but its compose
+  emit + docker.sock mounting are gated behind a v1.6.26 release with a
+  separate `--i-understand-this-can-pwn-the-host` flag.
+
+### Why this matters (and what it replaces)
+
+Before: every agent on every host ran with `cap_drop: ALL + no-new-privileges`
+baked into the base `docker-compose.yml`. There was no per-agent dial. To
+give an agent privilege, an operator had to hand-edit the auto-generated
+`docker-compose.override.yml` — which gets clobbered on every `claws create`
+and `claws upgrade --hard`. The `tools.alsoAllow` knob in openclaw.json
+controls the runtime's tool-calling layer (whether the model can invoke
+`bash`); it does NOT change what the underlying Linux container can do.
+Adding `"sudo"` to `tools.alsoAllow` is a no-op when the binary doesn't
+exist and the kernel namespace prevents privilege escalation.
+
+`claws security tier` is the right layer for the actual decision: how much
+container-level capability the operator is willing to grant this specific
+agent.
 
 ## [v1.6.23] — 2026-06-15
 

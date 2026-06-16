@@ -15,12 +15,18 @@ func dc(paths Paths, name string, args ...string) *exec.Cmd {
 	dir := ref.Dir(paths)
 	envFile := filepath.Join(dir, "instance.env")
 	override := rt.OverridePath(dir)
+	security := securityComposePath(rt, dir)
 
 	composeTemplate := rt.ComposeTemplatePath(paths)
 
 	composeArgs := []string{"-f", composeTemplate}
 	if _, err := os.Stat(override); err == nil {
 		composeArgs = append(composeArgs, "-f", override)
+	}
+	// Security overlay applies LAST so cap_drop / security_opt overrides
+	// from the tier setting take precedence over both base and override.
+	if _, err := os.Stat(security); err == nil {
+		composeArgs = append(composeArgs, "-f", security)
 	}
 	composeArgs = append(composeArgs, "--env-file", envFile, "-p", rt.MakeProjectName(ref))
 	composeArgs = append(composeArgs, args...)
@@ -39,12 +45,16 @@ func dcOutput(paths Paths, name string, args ...string) (string, error) {
 	dir := ref.Dir(paths)
 	envFile := filepath.Join(dir, "instance.env")
 	override := rt.OverridePath(dir)
+	security := securityComposePath(rt, dir)
 
 	composeTemplate := rt.ComposeTemplatePath(paths)
 
 	composeArgs := []string{"-f", composeTemplate}
 	if _, err := os.Stat(override); err == nil {
 		composeArgs = append(composeArgs, "-f", override)
+	}
+	if _, err := os.Stat(security); err == nil {
+		composeArgs = append(composeArgs, "-f", security)
 	}
 	composeArgs = append(composeArgs, "--env-file", envFile, "-p", rt.MakeProjectName(ref))
 	composeArgs = append(composeArgs, args...)

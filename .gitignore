@@ -99,6 +99,14 @@ docker-compose.override.yml
 # /reports/
 # /tickets/
 
+# --- Security-sensitive design docs kept outside the public repo ---
+# These cover capability-tier design / sudo grants / per-agent privilege
+# elevation. Mirrored to ~/claw/workspace/private-claws-fleet/ for the
+# canonical copy.
+/tickets/agent-privilege-tiers-*/
+/tasklist_*.md
+/tasklist.md
+
 # --- Tooling local config ---
 # Personal Claude Code settings stay local (settings.json, history, etc).
 # Pattern: ignore everything INSIDE .claude/ (not the dir itself) so git

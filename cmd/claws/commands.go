@@ -901,9 +901,18 @@ func cmdList(args []string) error {
 	}
 	var jsonEntries []listEntry
 
+	// Show TIER column only when any agent is above standard. Keeps the
+	// common case (all-standard fleet) uncluttered while making non-standard
+	// tiers immediately visible.
+	showTier := fleetHasElevatedTier(paths)
 	if !jsonMode {
-		fmt.Printf("%s%-18s %-8s %-12s %-10s %-10s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", "NEXT", nc)
-		fmt.Printf("%-18s %-8s %-12s %-10s %-10s %s\n", "──────────────────", "────────", "────────────", "──────────", "──────────", "────")
+		if showTier {
+			fmt.Printf("%s%-18s %-8s %-12s %-10s %-10s %-12s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", "TIER", "NEXT", nc)
+			fmt.Printf("%-18s %-8s %-12s %-10s %-10s %-12s %s\n", "──────────────────", "────────", "────────────", "──────────", "──────────", "────────────", "────")
+		} else {
+			fmt.Printf("%s%-18s %-8s %-12s %-10s %-10s %s%s\n", bold, "NAME", "PORT", "STATUS", "RAM", "UPTIME", "NEXT", nc)
+			fmt.Printf("%-18s %-8s %-12s %-10s %-10s %s\n", "──────────────────", "────────", "────────────", "──────────", "──────────", "────")
+		}
 	}
 
 	// Collected statuses for the trailing hints provider (avoids re-running
@@ -955,7 +964,13 @@ func cmdList(args []string) error {
 			// Computed inline (cheap; same logic as the hint provider
 			// but rendered per-row instead of aggregated).
 			next := perRowNext(e.Name, statusPlain)
-			fmt.Printf("%-18s :%-7s %-22s %-10s %-10s %s\n", e.Name, port, status, ram, uptime, next)
+			if showTier {
+				tier := readSecurityTier(paths, e.Name)
+				tierStr := tierColor(tier) + string(tier) + nc
+				fmt.Printf("%-18s :%-7s %-22s %-10s %-10s %-22s %s\n", e.Name, port, status, ram, uptime, tierStr, next)
+			} else {
+				fmt.Printf("%-18s :%-7s %-22s %-10s %-10s %s\n", e.Name, port, status, ram, uptime, next)
+			}
 		}
 	}
 

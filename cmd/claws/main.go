@@ -146,6 +146,8 @@ func main() {
 		err = cmdPolicy(args)
 	case "audit":
 		err = cmdAudit(args)
+	case "security":
+		err = cmdSecurity(args)
 	case "config":
 		err = cmdConfig(args)
 	case "setup":

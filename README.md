@@ -288,6 +288,43 @@ Instances are configured via layered JSON merge:
 | `CLAWS_PREREQS_LOG` | `/tmp/claws-prereqs-<ts>.log` | Override strict installer log location |
 | `CLAWS_SKIP_VALIDATE` | unset | Skip compose config validation (tests only) |
 
+## Security tiers — per-agent privilege
+
+Every agent ships hardened by default: `cap_drop: ALL + no-new-privileges`,
+non-root container user, no `sudo`, no package install. For the agents that
+need more — an ops/admin tier that can `apt install`, write to `/etc`,
+download tooling — claws exposes a four-tier dial:
+
+| Tier | What changes | When to use |
+|---|---|---|
+| `untrusted` | Read-only rootfs + tmpfs only | Read-only assistants, untrusted partners |
+| `standard` | Default — `cap_drop: ALL + no-new-privileges` | All worker agents |
+| `privileged` | `sudo + apt + /etc write` inside the container | Ops agent that fetches + installs tooling |
+| `host-reach` | `docker.sock + pid=host` (v1.6.26) | The nuclear option; manage other containers |
+
+```bash
+# See current tiers across the fleet (TIER column auto-hides when all-standard)
+claws security tier --all
+
+# Promote one agent (refuses without --accept-risk for privileged+)
+claws security tier team/ops --set privileged --accept-risk
+
+# Demote (always allowed)
+claws security tier team/ops --set standard
+```
+
+The tier persists in `instance.env` (claws-side, runtime never sees it),
+gets emitted as a per-agent `docker-compose.security.yml` overlay (uses
+`!reset` so the base hardening is truly replaced, not appended to), and
+survives `claws upgrade --hard`. Every tier change writes a
+`security.tier.change` entry to `~/.openclaw/.audit.log`.
+
+> **Host vs container.** Privileged tier gives the agent sudo INSIDE its
+> own container. The host filesystem, other containers, and host processes
+> are still invisible. If the use case needs to reach the host, that's
+> `host-reach` — significantly bigger attack surface, gated behind a
+> separate explicit flag.
+
 ## Architecture
 
 - **Single static Go binary** — runs anywhere a Go 1.22+ binary runs
