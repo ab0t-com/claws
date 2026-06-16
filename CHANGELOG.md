@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — `claws security tier --set privileged` now also seeds the exec allowlist
+
+The openclaw 2026.3.9 runtime has a SECOND gating layer beyond `tools.profile`/
+`alsoAllow`: a per-agent **exec allowlist** at `~/.openclaw/exec-approvals.json`
+that gates every shell-out by glob pattern. With an empty allowlist, the
+runtime returns "not permitted" on every bash tool call even when the binary
+exists and capabilities allow it.
+
+v1.6.24 set up Linux caps + installed sudo but didn't touch the allowlist —
+the agent could still report "I don't have sudo" even though everything below
+the LLM layer was correct. v1.6.25 fixes that: entering the privileged tier
+now also runs `openclaw approvals allowlist add` for the standard privileged
+patterns (`/usr/bin/sudo`, `/usr/bin/apt`, `/usr/bin/apt-get`, `/usr/bin/dpkg`,
+`/usr/bin/curl`, `/usr/bin/wget`, `/usr/bin/pip*`, `/usr/bin/python3`,
+`/usr/bin/bash`, `/usr/bin/sh`, `/bin/bash`, `/bin/sh`).
+
+The allowlist file persists in the host-mounted `~/.openclaw/<team>/<name>/`
+directory, so unlike the apt-installed sudo binary (which lives in the
+writable container layer and gets wiped on every recreate), this part of
+the configuration survives `claws upgrade --hard` and is idempotent across
+re-runs.
 
 ## [v1.6.24] — 2026-06-16
 

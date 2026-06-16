@@ -277,19 +277,29 @@ func currentOperator() string {
 
 // installPrivilegedOverlay runs apt install sudo + writes /etc/sudoers.d/node
 // inside the agent's container, AFTER the container has been recreated with
-// the privileged tier's docker security config. Idempotent.
+// the privileged tier's docker security config. Then also seeds the openclaw
+// runtime's exec-approvals allowlist so the LLM can actually invoke sudo+apt
+// through its bash tool (the runtime gates exec calls by glob-pattern; with
+// an empty allowlist, even a present binary is unreachable).
 //
-// Returns nil if the overlay is already in place (sudo present + sudoers set).
+// Idempotent: probes for the sudo binary + working `sudo -n true` and seeds
+// the allowlist on every call, returning success if it ends in the right
+// state regardless of whether anything was changed.
 func installPrivilegedOverlay(paths Paths, name string) error {
 	container := resolveContainerName(paths, name)
 	if container == "" {
 		return fmt.Errorf("container for %s not found — start the agent first", name)
 	}
-	// Quick path: if sudo is already present and node can use it, we're done.
+	// Seed allowlist unconditionally — it's safe to re-add (idempotent) and
+	// covers the case where the allowlist was lost / agent was recreated.
+	if err := seedPrivilegedAllowlist(container); err != nil {
+		// Non-fatal — the runtime may not yet be ready; we'll print a hint.
+		fmt.Fprintf(os.Stderr, "  warning: exec allowlist seed failed: %v\n", err)
+	}
+	// Sudo binary path: short-circuit if already working.
 	if probeNodeSudo(container) {
 		return nil
 	}
-	// Install + configure.
 	install := exec.Command("docker", "exec", "-u", "root", container, "sh", "-c",
 		`apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sudo`)
 	install.Stdout = os.Stdout
@@ -306,6 +316,48 @@ func installPrivilegedOverlay(paths Paths, name string) error {
 	}
 	if !probeNodeSudo(container) {
 		return fmt.Errorf("sudo installed but `sudo -n true` still fails — check caps in docker-compose.security.yml")
+	}
+	return nil
+}
+
+// privilegedAllowlistPatterns is the set of openclaw exec-approvals patterns
+// granted on entry to the privileged tier. These are what the LLM-side tool
+// surface needs to actually invoke privileged commands; without them, the
+// binary exists but the runtime returns "not permitted" on every bash call.
+//
+// Kept tight: shells, sudo, package managers, and curl/wget. Anything more
+// exotic the operator can add via `openclaw approvals allowlist add` directly.
+var privilegedAllowlistPatterns = []string{
+	"/usr/bin/sudo",
+	"/usr/bin/apt",
+	"/usr/bin/apt-get",
+	"/usr/bin/dpkg",
+	"/usr/bin/curl",
+	"/usr/bin/wget",
+	"/usr/bin/pip",
+	"/usr/bin/pip3",
+	"/usr/bin/python3",
+	"/usr/bin/bash",
+	"/usr/bin/sh",
+	"/bin/bash",
+	"/bin/sh",
+}
+
+// seedPrivilegedAllowlist runs `openclaw approvals allowlist add` for every
+// pattern in privilegedAllowlistPatterns. Idempotent — duplicate adds collapse.
+// Patterns target the runtime's "main" agent (the default openclaw agent name
+// for a single-tenant instance; this is what every claws agent uses today).
+func seedPrivilegedAllowlist(container string) error {
+	for _, pattern := range privilegedAllowlistPatterns {
+		cmd := exec.Command("docker", "exec", container, "openclaw", "approvals",
+			"allowlist", "add", "--agent", "main", pattern)
+		// Discard stdout — the openclaw CLI dumps a colorful table per add;
+		// we don't want to spam the operator. Errors still go through.
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("seed %q: %w", pattern, err)
+		}
 	}
 	return nil
 }
