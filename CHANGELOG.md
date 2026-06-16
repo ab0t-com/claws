@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.25] — 2026-06-16
+
 ### Fixed — `claws security tier --set privileged` now also seeds the exec allowlist
 
 The openclaw 2026.3.9 runtime has a SECOND gating layer beyond `tools.profile`/
