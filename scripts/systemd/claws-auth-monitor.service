@@ -1,0 +1,35 @@
+[Unit]
+Description=claws — auto-recover broken agent auth via fallback API key
+Documentation=https://github.com/ab0t-com/claws#auth-monitor
+# Don't fire until docker is up; claws needs it to exec into agent containers.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Run as the user who owns ~/.openclaw (typically ubuntu on EC2).
+User=ubuntu
+Group=ubuntu
+
+# claws auth-monitor --once: single sweep, exits 0 even if some agents
+# couldn't be recovered (the timer fires again in 5 min). The audit log
+# records every attempt.
+ExecStart=/usr/local/bin/claws auth-monitor --once
+
+# Reasonable timeout: a verify probe + apikey swap per agent is fast
+# (< 10s each), 5 agents max → 60s comfortably.
+TimeoutStartSec=120
+
+# Don't restart on failure — the timer will retry on its next tick.
+Restart=no
+
+# Lock the unit down; it only needs to read state + write the audit log
+# + invoke docker. No network beyond what docker exec wants.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.openclaw
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

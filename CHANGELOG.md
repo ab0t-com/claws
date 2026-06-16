@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws auth-monitor` unattended auth recovery
+
+Codex OAuth refresh tokens are single-use. Agents that share an upstream account
+(common when one operator runs N agents off their personal ChatGPT plan) collide
+at refresh time — whichever agent refreshes first invalidates the others'
+refresh tokens, and the rest go 401 on every model call. Today the operator has
+to notice (often via Telegram silence at 3 AM), SSH in, and re-auth.
+
+`claws auth-monitor` runs unattended via systemd timer:
+
+```bash
+sudo bash scripts/systemd/install.sh        # installs + enables the timer
+claws paste-secret .recovery-api-key \      # one-time, from phone
+    --secrets-dir=$HOME/.openclaw            # (Mike pastes sk-...)
+```
+
+Every 5 min: probe every agent (combination of `/readyz` + a log scan for
+`refresh_token_reused` / `OAuth token refresh failed`). For each broken agent,
+swap from OAuth to API-key auth via the existing `claws auth <name> apikey
+openai <key>` machinery using the staged fallback key. Re-verify. Audit-log.
+No human in the loop after the initial key paste.
+
+When no fallback key is staged: the sweep prints a clear directive
+(`claws paste-secret .recovery-api-key --secrets-dir=$HOME/.openclaw`) and
+exits cleanly. Next sweep picks up the key the moment it lands.
+
+Files shipped:
+- `cmd/claws/auth_monitor.go` — the command.
+- `scripts/systemd/claws-auth-monitor.service` — oneshot service unit.
+- `scripts/systemd/claws-auth-monitor.timer` — 5-min cadence + on-boot catchup.
+- `scripts/systemd/install.sh` — installer (handles user/path substitution).
+
+Audit-log entries:
+- `auth.monitor.recover` — sweep ran + tried recovery. Reports `recovered=N still_broken=M`.
+- `auth.monitor.stalled` — sweep found broken agents but no usable fallback key. Reports the reason (`no-fallback-key`, `empty-fallback-key`, `invalid-fallback-key`).
+
+Why API-key fallback instead of OAuth retry: OAuth re-auth requires a TTY for
+the browser flow. API keys have no refresh and no collision class — they're the
+only auth mode that can be applied non-interactively, and they survive
+arbitrary container recreates. The trade-off is per-token cost vs the ChatGPT
+subscription benefit; the watcher kicks in only when OAuth has failed anyway.
 
 ## [v1.6.25] — 2026-06-16
 

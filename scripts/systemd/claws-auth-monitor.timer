@@ -1,0 +1,18 @@
+[Unit]
+Description=claws — fire auth-monitor every 5 minutes (auto-recover broken auth)
+Documentation=https://github.com/ab0t-com/claws#auth-monitor
+
+[Timer]
+# Run on first boot after 1 minute (give docker time to be up).
+OnBootSec=1min
+# Then every 5 min. Tight enough to catch a 401 within one Telegram round-trip;
+# loose enough to not hammer docker + the OpenAI API on a healthy fleet.
+OnUnitActiveSec=5min
+# RandomizedDelaySec smooths out the load if multiple boxes run claws.
+RandomizedDelaySec=15s
+# Catch up if the box was off (missed runs fire once on boot).
+Persistent=true
+Unit=claws-auth-monitor.service
+
+[Install]
+WantedBy=timers.target
