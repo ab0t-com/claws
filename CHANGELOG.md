@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.24] — 2026-06-16
+
 ### Added — `claws security tier` per-agent privilege tiering
 
 claws now exposes a four-tier privilege model on each agent's container —
