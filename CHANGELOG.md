@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — `auth-monitor` rejected fallback keys with whitespace/slashes
+
+`looksLikeAPIKey` in `cmd/claws/auth_monitor.go` short-circuited on any
+string starting with `sk-` without validating the remaining characters.
+A pasted token containing whitespace (e.g. a Telegram bot token), slashes,
+newlines, or any non-alphanum-plus-dash-underscore-dot character would
+slip through the shape check. Auth-monitor would then try to install it
+via `claws auth <agent> apikey openai <garbage>` and produce a confusing
+401 on the next request instead of refusing the fallback key cleanly.
+
+Fixed: the `sk-` shortcut is removed; char validation now runs for all
+inputs unconditionally. 13 sub-cases added to a new `TestLooksLikeAPIKey`
+table-driven test.
+
+### Added — tests for auth_monitor (was missing entirely)
+
+New `cmd/claws/auth_monitor_test.go` covers:
+- `looksLikeAPIKey` (13 sub-cases — accepts/rejects)
+- JSONL audit log format invariant + required keys
+- Append-only behavior across multiple sweeps
+- Resilience to a readonly audit directory (no panic)
+- `defaultMonitorInterval` sanity bounds
+- `defaultFallbackKeyName` is dot-prefixed (so it doesn't appear in `claws list` glob scans)
+
+### Added — 3 more tests for the security tier model
+
+In `cmd/claws/security_test.go`:
+- `TestWriteSecurityTierAudit` — tier transition entries serialize as JSONL with the keys downstream tooling reads
+- `TestPrivilegedAllowlistPatterns` — guards `/usr/bin/sudo`, `/usr/bin/apt`, `/usr/bin/bash` against accidental deletion
+- `TestCurrentOperatorNonEmpty` — audit log operator field never blank
 
 ## [v1.6.27] — 2026-06-25
 

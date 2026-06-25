@@ -217,7 +217,7 @@ The [60-second start](#60-second-start) above uses the convenience installer. Ot
 
 ```bash
 # Pin to a specific version
-curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash -s -- --version=v1.6.17
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash -s -- --version=v1.6.28
 
 # Self-update an existing install
 claws update                  # install the latest release
@@ -242,6 +242,26 @@ claws setup                                        # interactive — picks up th
 ```
 
 `claws setup` also auto-detects boxes with < 4 GB RAM and offers the tarball path by default — you don't need to remember the flag.
+
+### Auto-recovery from OAuth refresh-token collisions (optional)
+
+Codex OAuth refresh tokens are single-use. When two agents share an upstream ChatGPT account, refreshes collide and the loser goes 401 silently. `claws auth-monitor` runs as a 5-minute systemd timer and auto-swaps broken agents to a pre-staged fallback API key.
+
+```bash
+# 1. Install the timer (creates /etc/systemd/system/claws-auth-monitor.{service,timer}):
+sudo bash scripts/systemd/install.sh
+
+# 2. Stage your fallback OpenAI key (from your phone, no SSH after this):
+claws paste-secret .recovery-api-key --secrets-dir=$HOME/.openclaw
+
+# 3. Confirm the timer is firing:
+systemctl list-timers claws-auth-monitor
+tail -f $HOME/.openclaw/.audit.log | grep auth.monitor
+```
+
+When an agent goes 401 at 2 AM, the next 5-minute sweep auto-swaps it to API-key auth using the staged key. Recovery events land in the audit log as `auth.monitor.recover` JSONL entries.
+
+Without a staged key, sweeps log `auth.monitor.stalled` and print the `paste-secret` directive to the journal. Use `journalctl -u claws-auth-monitor` to inspect.
 
 ## Prerequisites
 
