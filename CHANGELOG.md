@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.27] — 2026-06-25
+
 ### Added — `claws image bootstrap --from-tarball` for low-RAM hosts
 
 The openclaw runtime build needs ~4 GB RAM. Small VPS / EC2 boxes
