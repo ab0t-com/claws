@@ -135,6 +135,7 @@ Examples:
 	// Step 1 — already present?
 	if imageExists("openclaw:local") {
 		fmt.Printf("  %s✓ openclaw:local already present%s — nothing to do.\n", green, nc)
+		printPostBootstrapNextSteps()
 		return nil
 	}
 	fmt.Printf("  %sopenclaw:local not present.%s\n\n", dim, nc)
@@ -151,6 +152,7 @@ Examples:
 		}
 		if imageExists("openclaw:local") {
 			fmt.Printf("\n  %s✓ openclaw:local loaded from tarball%s\n", green, nc)
+			printPostBootstrapNextSteps()
 			return nil
 		}
 		return errorf("tarball load completed but openclaw:local not present — investigate manually")
@@ -170,6 +172,7 @@ Examples:
 			}
 			if imageExists("openclaw:local") {
 				fmt.Printf("\n  %s✓ openclaw:local installed via pull%s\n", green, nc)
+				printPostBootstrapNextSteps()
 				return nil
 			}
 		} else {
@@ -320,7 +323,44 @@ Examples:
 	}
 	fmt.Printf("\n  %s✓ openclaw:local built from source%s\n", green, nc)
 	fmt.Printf("  %s(checkout kept at %s — safe to remove)%s\n\n", dim, buildDir, nc)
+	printPostBootstrapNextSteps()
 	return nil
+}
+
+// printPostBootstrapNextSteps prints a uniform "what to do next" hint after
+// any successful image bootstrap path (already-present, tarball, pull, build).
+// The output is context-aware: if no instances exist on this host, suggest
+// `claws setup` (the interactive onboarding flow). If instances already
+// exist, point at `claws start <name>` / `claws agent ping <name>`.
+//
+// The image is necessary but not sufficient — agents still need to be
+// created, authed, and channel-wired. Non-technical users need this
+// explicit next-step output so the success message isn't a dead-end.
+func printPostBootstrapNextSteps() {
+	const (
+		bold  = "\033[1m"
+		dim   = "\033[0;90m"
+		green = "\033[0;32m"
+		nc    = "\033[0m"
+	)
+	paths := resolvePaths()
+	names, _ := listInstanceNames(paths)
+
+	fmt.Println()
+	fmt.Printf("  %sNext:%s\n", bold, nc)
+	if len(names) == 0 {
+		// Fresh box — guide the user into the wizard.
+		fmt.Printf("    %s$%s claws setup                  %s# interactive onboarding (team, agent, auth, channel)%s\n", dim, nc, dim, nc)
+		fmt.Printf("    %sor:%s claws create <team>/<agent> + auth + channel manually (see: claws --help)\n", dim, nc)
+	} else {
+		// Existing fleet — assume the operator was refreshing the image.
+		fmt.Printf("    %s$%s claws list                    %s# show all instances%s\n", dim, nc, dim, nc)
+		fmt.Printf("    %s$%s claws start-all               %s# start everything%s\n", dim, nc, dim, nc)
+		fmt.Printf("    %s$%s claws agent ping <name>       %s# verify an agent end-to-end%s\n", dim, nc, dim, nc)
+	}
+	fmt.Println()
+	fmt.Printf("  %sVerify:%s docker images openclaw:local\n", green, nc)
+	fmt.Println()
 }
 
 // imageExists returns true if `docker image inspect <name>` succeeds.

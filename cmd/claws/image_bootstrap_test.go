@@ -160,3 +160,15 @@ func TestDefaultTarballURL_LooksRight(t *testing.T) {
 		t.Errorf("defaultTarballURL must end .tar.gz, got %q", defaultTarballURL)
 	}
 }
+
+// TestPrintPostBootstrapNextSteps_NoPanic — the next-steps printer must not
+// panic when paths can't enumerate instances. Used after every success path
+// in cmdImageBootstrap; if it crashes we drop the entire success message.
+func TestPrintPostBootstrapNextSteps_NoPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("printPostBootstrapNextSteps panicked: %v", r)
+		}
+	}()
+	printPostBootstrapNextSteps()
+}
