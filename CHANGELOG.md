@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.29] — 2026-06-25
+
 ### Added — `claws image bootstrap` prints next-step hints
 
 Previously every success path of `claws image bootstrap` ended at
