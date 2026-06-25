@@ -150,6 +150,8 @@ func main() {
 		err = cmdSecurity(args)
 	case "auth-monitor":
 		err = cmdAuthMonitor(args)
+	case "repair-ownership":
+		err = cmdRepairOwnership(args)
 	case "config":
 		err = cmdConfig(args)
 	case "setup":

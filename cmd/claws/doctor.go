@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"syscall"
 )
@@ -121,6 +122,34 @@ func cmdDoctor(args []string) error {
 	if image == "" {
 		image = "openclaw:local"
 	}
+	// v1.6.30 — surface the root/uid-1000 mismatch as a doctor check.
+	// Triggered any time claws is run as root AND there's at least one
+	// instance on disk owned by a uid other than the runtime container's uid.
+	if runningAsRoot() {
+		entries, _ := readRegistry(paths)
+		var misOwned []string
+		for _, e := range entries {
+			rt := mustResolveRuntime(paths, e.Name)
+			containerUID := runtimeContainerUID(rt)
+			ref, _ := ParseRef(e.Name)
+			configPath := filepath.Join(ref.Dir(paths), rt.ConfigFileName)
+			if st, err := os.Stat(configPath); err == nil {
+				if u := stUid(st); u != containerUID {
+					misOwned = append(misOwned, e.Name)
+				}
+			}
+		}
+		if len(misOwned) == 0 {
+			checks = append(checks, checkResult{"File ownership", true, "all instance files match runtime container uid"})
+		} else {
+			checks = append(checks, checkResult{
+				"File ownership",
+				false,
+				fmt.Sprintf("%d instance(s) own files as wrong uid — run: claws repair-ownership", len(misOwned)),
+			})
+		}
+	}
+
 	if out, err := exec.Command("docker", "image", "inspect", image, "--format", "{{.Id}}").Output(); err == nil {
 		short := trimSpace(string(out))
 		if len(short) > 19 {

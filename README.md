@@ -230,6 +230,19 @@ git clone https://github.com/ab0t-com/claws.git && cd claws
 
 The installer verifies the published SHA256 before installing, falls back to `~/.local/bin` if `/usr/local/bin` isn't writable, and keeps the previous binary for one-step rollback.
 
+### Running as root (Amazon Linux 2023, fresh EC2, no other user)
+
+claws auto-detects and handles the uid mismatch: the openclaw runtime container runs as `uid=1000`, so files claws creates as root get auto-chowned to uid 1000 at creation time. The wizard surfaces this with a banner before doing it. No operator action needed.
+
+If you have agents that pre-date v1.6.30 (created as root before the auto-fix landed), a single command repairs the fleet:
+
+```bash
+sudo claws repair-ownership            # walks every instance + chowns to uid 1000
+sudo claws repair-ownership --dry-run  # preview first
+```
+
+`claws doctor` flags the issue too when it sees root-owned instance dirs that should be uid 1000.
+
 ### Small box? Skip the openclaw build
 
 The openclaw runtime image build needs ~4 GB RAM. On a t3.micro / $5 VPS / 4 GB EC2 box, building OOMs even with swap. Use the pre-built image instead:

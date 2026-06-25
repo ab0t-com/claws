@@ -429,6 +429,24 @@ CLAUDE_WEB_COOKIE=
 			fmt.Printf("    ssh -N -L %d:127.0.0.1:%d ubuntu@<server>\n", gatewayPort, gatewayPort)
 		}
 	}
+
+	// v1.6.30 — root/uid-1000 mismatch fix. If we're running as root and
+	// the runtime expects a non-root container user (uid 1000 for openclaw),
+	// chown the instance dir + everything under it so the container can
+	// read its own files. Without this, every `claws auth/exec/start` on
+	// this agent would explode with EACCES on openclaw.json.
+	// See: private-claws-fleet/tickets/root-user-uid1000-mismatch-2026-06-25/
+	if uidMismatchActive(rt) {
+		containerUID := runtimeContainerUID(rt)
+		if !quietCreate {
+			info(fmt.Sprintf("Setting file ownership to uid %d (runtime container user)...", containerUID))
+		}
+		if err := chownInstanceDir(dir, containerUID); err != nil {
+			// Non-fatal: instance is created, but operator needs to chown manually.
+			warn(fmt.Sprintf("instance created but chown failed: %v\n  fix manually: sudo chown -R %d:%d %s",
+				err, containerUID, containerUID, dir))
+		}
+	}
 	return nil
 }
 
@@ -561,6 +579,10 @@ func cmdStart(args []string) error {
 	}
 
 	info(fmt.Sprintf("Starting instance '%s'...", name))
+	// v1.6.30 — pre-flight uid fix for pre-existing root-owned agents.
+	if err := ensureRuntimeReadable(paths, name); err != nil {
+		return err
+	}
 	if err := dcRun(paths, name, "up", "-d", gatewayService(paths, name)); err != nil {
 		return err
 	}
@@ -1401,6 +1423,10 @@ func cmdExec(args []string) error {
 	if err := requireInstance(paths, name); err != nil {
 		return err
 	}
+	// v1.6.30 — pre-flight uid fix for pre-existing root-owned agents.
+	if err := ensureRuntimeReadable(paths, name); err != nil {
+		return err
+	}
 	composeArgs := append([]string{"run", "--rm", cliService(paths, name)}, args[1:]...)
 	return dc(paths, name, composeArgs...).Run()
 }
@@ -1437,6 +1463,14 @@ func cmdAuth(args []string) error {
 	method := args[1]
 	force := hasFlag(args, "--force")
 	if err := requireInstance(paths, name); err != nil {
+		return err
+	}
+
+	// v1.6.30 — pre-flight uid fix. Catches the case where an instance was
+	// created BEFORE v1.6.30 (so root-owned files persist) and the operator
+	// is now running auth as root. Without this, the runtime container
+	// EACCES'es on openclaw.json and the OAuth flow explodes mid-step.
+	if err := ensureRuntimeReadable(paths, name); err != nil {
 		return err
 	}
 

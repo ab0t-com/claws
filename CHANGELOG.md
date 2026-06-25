@@ -7,7 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Fixed — `claws setup` as root no longer EACCES'es on the auth step
+
+The openclaw runtime container runs as `uid=1000(node)` (per the
+openclaw Dockerfile: `USER node`). When claws ran as root (typical on
+fresh AWS / Amazon Linux 2023 / RHEL boxes), every file claws wrote
+during `claws create` was owned by `root:root`, mode 0600. The container
+mounting those files via bind mount immediately `EACCES`'d on its own
+`openclaw.json`, breaking `claws auth … codex`, `claws exec …`,
+`claws start …` — basically every operation that needed the runtime
+to read its own config.
+
+Discovered from a real EC2 client smoke test of v1.6.27 — the wizard
+reached step 5/6 and exploded on OAuth. Reproduces deterministically
+on any RHEL-family / Amazon Linux fresh box where root is the default
+operator.
+
+**Fix:** `cmd/claws/uid_chown.go` (new file) adds:
+
+- `runningAsRoot()` / `uidMismatchActive(rt)` — gates
+- `chownInstanceDir(dir, uid)` — recursive `filepath.Walk` chown; idempotent
+- `ensureRuntimeReadable(paths, name)` — pre-flight check via
+  `syscall.Stat_t.Uid`; auto-fixes if root, else surfaces a clear
+  `sudo chown -R …` directive
+- `printRootRunningBanner()` — one-line yellow info during `claws setup`
+
+Wired into:
+- `cmd/claws/commands.go:cmdCreate` — auto-chown new instance dir
+  after writing all files
+- `cmd/claws/commands.go:cmdAuth` — pre-flight check + auto-fix
+- `cmd/claws/commands.go:cmdStart` — pre-flight check + auto-fix
+- `cmd/claws/commands.go:cmdExec` — pre-flight check + auto-fix
+- `cmd/claws/setup.go` — root-running banner during the wizard
+- `cmd/claws/doctor.go` — new "File ownership" check (only surfaces
+  when running as root)
+
+Plus a new top-level command:
+
+```bash
+sudo claws repair-ownership            # walk + chown every existing instance
+sudo claws repair-ownership --dry-run  # preview only
+```
+
+For fleets created before v1.6.30's auto-chown landed (root-owned and
+broken), `claws repair-ownership` is a single command to fix everything.
+Idempotent — skips instances already at uid 1000.
+
+9 new tests in `cmd/claws/uid_chown_test.go` covering the runtime-uid
+constant, the root-gate, the walk recursion (skipped when not root),
+the non-root no-op path, and the missing-config edge case.
 
 ## [v1.6.29] — 2026-06-25
 

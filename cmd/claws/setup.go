@@ -72,6 +72,11 @@ func cmdSetup(args []string) error {
 	fmt.Println("  message them.")
 	fmt.Println()
 
+	// v1.6.30 — if running as root (common on fresh EC2 / AWS Linux 2023),
+	// surface the uid-1000 mismatch up front so the auto-chown step later
+	// isn't a surprise. Non-blocking; claws proceeds either way.
+	printRootRunningBanner()
+
 	// -----------------------------------------------------------------------
 	// Step 1: Check prerequisites
 	// -----------------------------------------------------------------------
