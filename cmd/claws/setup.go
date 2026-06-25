@@ -106,31 +106,55 @@ func cmdSetup(args []string) error {
 		// v1.6.4: offer to bootstrap the image inline. Non-technical users
 		// shouldn't have to know what `claws image bootstrap` is.
 		fmt.Printf("    %s!%s Image '%s' not found\n", "\033[0;33m", nc, image)
+
+		// v1.6.27: prefer the pre-built tarball on low-RAM hosts. The
+		// openclaw build peaks at ~4 GB during the V8 mark-compact phase;
+		// even with auto-swap, some 4 GB EC2 boxes OOM. The tarball path
+		// downloads + docker-loads in < 100 MB RAM — strictly better when
+		// the box is small.
+		ramTotal := totalMemoryBytes()
+		preferTarball := ramTotal > 0 && ramTotal < 4*1024*1024*1024
+
 		if !nonInteractive {
 			fmt.Println()
 			fmt.Println("    This image is the AI runtime — every agent runs inside it.")
-			fmt.Println("    Building takes 5-10 minutes the first time; future runs are instant.")
-
-			// Surface low-RAM context in the prompt so the operator sees
-			// the auto-swap plan BEFORE confirming. They don't have to
-			// know what swap is — we just tell them "your box is small
-			// so we'll handle that for you".
-			if availMem := availableMemoryBytes(); availMem > 0 && availMem < 4*1024*1024*1024 {
-				fmt.Printf("    %sYour box has %s RAM; the build needs ~4 GB. We'll add a temporary\n", "\033[0;33m", formatBytes(availMem))
-				fmt.Printf("    swapfile during the build (removed when it finishes).%s\n", nc)
+			if preferTarball {
+				fmt.Printf("    %sYour box has %s RAM (build needs ~4 GB) — we'll download a pre-built\n", "\033[0;33m", formatBytes(ramTotal))
+				fmt.Printf("    image instead of building. Takes ~1 minute, no RAM gymnastics.%s\n", nc)
+			} else {
+				fmt.Println("    Building takes 5-10 minutes the first time; future runs are instant.")
 			}
 
-			ans := strings.ToLower(prompt("    Build openclaw:local now? (Y/n)", "y"))
+			ans := strings.ToLower(prompt("    Bootstrap openclaw:local now? (Y/n)", "y"))
 			if ans == "y" || ans == "yes" {
 				fmt.Println()
-				if err := cmdImageBootstrap([]string{"--yes"}); err != nil {
+				bootArgs := []string{"--yes"}
+				if preferTarball {
+					bootArgs = append(bootArgs, "--from-tarball")
+				}
+				if err := cmdImageBootstrap(bootArgs); err != nil {
 					return errorf("image bootstrap failed: %v", err)
 				}
 			} else {
-				warn("agents won't start without the image — run `claws image bootstrap --yes` later")
+				if preferTarball {
+					warn("agents won't start without the image — run `claws image bootstrap --from-tarball --yes` later")
+				} else {
+					warn("agents won't start without the image — run `claws image bootstrap --yes` later")
+				}
 			}
 		} else {
-			warn("Image not present and --non-interactive set — run `claws image bootstrap --yes` first")
+			// Non-interactive path. On low-RAM hosts, auto-prefer tarball so
+			// cloud-init / agent-orchestrated installs succeed without
+			// human follow-up. On beefier hosts, the operator should supply
+			// --image or have run image bootstrap separately.
+			if preferTarball {
+				fmt.Printf("    %sLow-RAM (%s); auto-fetching pre-built image (non-interactive)%s\n", "\033[0;33m", formatBytes(ramTotal), nc)
+				if err := cmdImageBootstrap([]string{"--yes", "--from-tarball"}); err != nil {
+					return errorf("image bootstrap (tarball) failed: %v", err)
+				}
+			} else {
+				warn("Image not present and --non-interactive set — run `claws image bootstrap --yes` first")
+			}
 		}
 	}
 

@@ -128,7 +128,14 @@ func cmdDoctor(args []string) error {
 		}
 		checks = append(checks, checkResult{"OpenClaw image", true, fmt.Sprintf("%s (%s)", image, short)})
 	} else {
-		checks = append(checks, checkResult{"OpenClaw image", false, fmt.Sprintf("%s not found — build or pull the image", image)})
+		// v1.6.27: on low-RAM hosts surface the --from-tarball path
+		// because the source build will OOM. Operators on small VPSes
+		// otherwise spend 20 minutes wondering why the build dies.
+		hint := "build or pull the image — run: claws image bootstrap --yes"
+		if ramTotalBytes := totalMemoryBytes(); ramTotalBytes > 0 && ramTotalBytes < 4*1024*1024*1024 {
+			hint = "build needs ~4 GB RAM (you have " + formatBytes(ramTotalBytes) + ") — run: claws image bootstrap --from-tarball --yes"
+		}
+		checks = append(checks, checkResult{"OpenClaw image", false, fmt.Sprintf("%s not found — %s", image, hint)})
 	}
 
 	// 6. Disk space

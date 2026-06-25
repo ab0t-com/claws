@@ -230,6 +230,19 @@ git clone https://github.com/ab0t-com/claws.git && cd claws
 
 The installer verifies the published SHA256 before installing, falls back to `~/.local/bin` if `/usr/local/bin` isn't writable, and keeps the previous binary for one-step rollback.
 
+### Small box? Skip the openclaw build
+
+The openclaw runtime image build needs ~4 GB RAM. On a t3.micro / $5 VPS / 4 GB EC2 box, building OOMs even with swap. Use the pre-built image instead:
+
+```bash
+# Install claws (~5 MB), then fetch a pre-built openclaw runtime image (~683 MB):
+curl -fsSL https://raw.githubusercontent.com/ab0t-com/claws/main/scripts/install.sh | bash
+claws image bootstrap --from-tarball --yes        # SHA256-verified download + docker load
+claws setup                                        # interactive — picks up the loaded image
+```
+
+`claws setup` also auto-detects boxes with < 4 GB RAM and offers the tarball path by default — you don't need to remember the flag.
+
 ## Prerequisites
 
 claws shells out to Docker. On a fresh box, you'll need:
@@ -239,7 +252,8 @@ claws shells out to Docker. On a fresh box, you'll need:
 | **docker** (engine + daemon) | yes | Every agent runs in a container |
 | **docker compose** (v2 plugin) | yes | Per-agent compose orchestration |
 | **bash + curl** | yes | The installer scripts |
-| **git** | optional | Source builds only |
+| **git** | optional | Source builds only (skip with `--from-tarball`) |
+| **~4 GB RAM** | for source build only | Small boxes use `claws image bootstrap --from-tarball` to skip the build |
 
 ### One command, any OS
 

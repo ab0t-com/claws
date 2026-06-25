@@ -104,6 +104,9 @@ docker-compose.override.yml
 # elevation. Mirrored to ~/claw/workspace/private-claws-fleet/ for the
 # canonical copy.
 /tickets/agent-privilege-tiers-*/
+/tickets/image-from-tarball-integration-*/
+/tickets/image-distribution-*/
+/tickets/auth-oauth-recovery-*/
 /tasklist_*.md
 /tasklist.md
 

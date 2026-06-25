@@ -1,12 +1,29 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 )
+
+// defaultTarballURL is the pre-built openclaw:local image used by
+// `claws image bootstrap --from-tarball` (no URL). Bumped whenever a
+// new openclaw runtime snapshot is published. Override at runtime via
+// --from-tarball=<URL> or the CLAWS_OPENCLAW_TARBALL_URL env var.
+const defaultTarballURL = "https://github.com/ab0t-com/claws/releases/download/openclaw-image-2026.3.9-slim/openclaw-local-2026.3.9-slim-2026-03-09.tar.gz"
+
+// tarballMinDiskFreeBytes is the disk-free pre-flight threshold. The
+// 683 MB gzipped tarball decompresses to ~2.6 GB on docker load; we need
+// headroom for both the temp file and the loaded image layers.
+const tarballMinDiskFreeBytes = 3 * 1024 * 1024 * 1024 // 3 GB
 
 // cmdImageBootstrap — `claws image bootstrap [--source=<url>] [--yes] [--no-build]`
 //
@@ -24,19 +41,27 @@ import (
 //
 // All steps print what they're about to do before running.
 func cmdImageBootstrap(args []string) error {
-	var source, sourceRepo, addSwapSize string
-	var yes, noBuild, addSwap, noSwap bool
+	var source, sourceRepo, addSwapSize, tarballURL string
+	var yes, noBuild, addSwap, noSwap, fromTarball bool
 	for _, a := range args {
 		switch {
 		case a == "-h" || a == "--help":
-			fmt.Println(`Usage: claws image bootstrap [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build] [--add-swap[=SIZE] | --no-swap]
+			fmt.Println(`Usage: claws image bootstrap [--from-tarball[=<URL>]] [--source=<image:tag>] [--source-repo=<git-url>] [--yes] [--no-build] [--add-swap[=SIZE] | --no-swap]
 
 Ensure openclaw:local is present on this host. Order of operations:
   1. If openclaw:local already exists → no-op.
-  2. If --source= or OPENCLAW_IMAGE_SOURCE is set → docker pull from it.
-  3. Else, clone + build from --source-repo (default: github.com/openclaw/openclaw).
+  2. If --from-tarball is set → download a pre-built image tarball and
+     ` + "`" + `docker load` + "`" + ` it. Skips the build entirely. Best for low-RAM hosts.
+  3. If --source= or OPENCLAW_IMAGE_SOURCE is set → docker pull from it.
+  4. Else, clone + build from --source-repo (default: github.com/openclaw/openclaw).
 
 Flags:
+  --from-tarball[=<URL>]       Download pre-built openclaw:local tarball + docker load.
+                                Without URL: uses the default for this claws version.
+                                Override default: --from-tarball=<URL>  OR
+                                                  CLAWS_OPENCLAW_TARBALL_URL=<URL>
+                                The download is SHA256-verified (sibling .sha256 file).
+                                Skips the build step entirely — no RAM gymnastics needed.
   --source=<image:tag>         Pull this image and tag it openclaw:local
   --source-repo=<git-url>      Git source to clone + build (default: github.com/openclaw/openclaw)
   --yes                        Skip the "about to run docker build" confirmation
@@ -53,13 +78,21 @@ Auto-swap (default with --yes): if the host has < 4 GB free RAM AND --yes is set
                                 every exit path including Ctrl-C.
 
 Examples:
+  claws image bootstrap --from-tarball --yes                     # download pre-built image (FAST)
+  claws image bootstrap --from-tarball=https://your-host/img.tar.gz --yes
   claws image bootstrap                                          # try repo build (interactive)
   claws image bootstrap --yes                                    # builds; auto-swaps on small boxes
   claws image bootstrap --source=openclaw/runtime:v2026.5        # pull from a registry
   claws image bootstrap --add-swap=4g --yes                      # explicit smaller swapfile
   claws image bootstrap --no-swap --yes                          # accept OOM risk; no swap
-  OPENCLAW_IMAGE_SOURCE=openclaw/runtime:latest claws image bootstrap`)
+  OPENCLAW_IMAGE_SOURCE=openclaw/runtime:latest claws image bootstrap
+  CLAWS_OPENCLAW_TARBALL_URL=https://… claws image bootstrap --from-tarball --yes`)
 			return nil
+		case a == "--from-tarball":
+			fromTarball = true
+		case strings.HasPrefix(a, "--from-tarball="):
+			fromTarball = true
+			tarballURL = strings.TrimPrefix(a, "--from-tarball=")
 		case strings.HasPrefix(a, "--source="):
 			source = strings.TrimPrefix(a, "--source=")
 		case strings.HasPrefix(a, "--source-repo="):
@@ -75,6 +108,16 @@ Examples:
 			addSwapSize = strings.TrimPrefix(a, "--add-swap=")
 		case a == "--no-swap":
 			noSwap = true
+		}
+	}
+
+	// Tarball URL resolution: explicit flag value > env override > built-in default.
+	if fromTarball {
+		if tarballURL == "" {
+			tarballURL = os.Getenv("CLAWS_OPENCLAW_TARBALL_URL")
+		}
+		if tarballURL == "" {
+			tarballURL = defaultTarballURL
 		}
 	}
 
@@ -95,6 +138,23 @@ Examples:
 		return nil
 	}
 	fmt.Printf("  %sopenclaw:local not present.%s\n\n", dim, nc)
+
+	// Step 1.5 — tarball path. Skips git clone + docker build entirely.
+	// Designed for low-RAM hosts where building OOMs even with swap.
+	// Uses an SHA256-verified download from CLAWS_OPENCLAW_TARBALL_URL /
+	// --from-tarball=<URL> / defaultTarballURL.
+	if fromTarball {
+		fmt.Printf("  %sStep 2 — fetching pre-built image (no build needed)%s\n", bold, nc)
+		fmt.Printf("    %surl:   %s%s\n", dim, tarballURL, nc)
+		if err := bootstrapFromTarball(tarballURL); err != nil {
+			return errorf("from-tarball failed: %v", err)
+		}
+		if imageExists("openclaw:local") {
+			fmt.Printf("\n  %s✓ openclaw:local loaded from tarball%s\n", green, nc)
+			return nil
+		}
+		return errorf("tarball load completed but openclaw:local not present — investigate manually")
+	}
 
 	// Step 2 — try pull from --source / OPENCLAW_IMAGE_SOURCE.
 	if source == "" {
@@ -281,4 +341,224 @@ func runVerbose(name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// ---------------------------------------------------------------------------
+// Tarball bootstrap path — `claws image bootstrap --from-tarball[=<URL>]`
+//
+// Downloads a pre-built `docker save` tarball of openclaw:local, verifies
+// SHA256 against a sibling `.sha256` file, runs `docker load`, retags as
+// openclaw:local. Skips the source build entirely — designed for hosts
+// without the ~4 GB RAM the openclaw build needs.
+// ---------------------------------------------------------------------------
+
+// bootstrapFromTarball fetches the URL, verifies SHA256, docker-loads,
+// and re-tags as openclaw:local. Self-contained: any intermediate file
+// lands in a per-invocation tmpdir that's removed on every exit path.
+func bootstrapFromTarball(url string) error {
+	const dim = "\033[0;90m"
+	const green = "\033[0;32m"
+	const nc = "\033[0m"
+
+	// Disk-free pre-flight. The tarball + the loaded image content + temp
+	// docker layers need headroom. Fail fast if we're going to OOM mid-load.
+	if err := requireDiskFree("/", tarballMinDiskFreeBytes); err != nil {
+		return err
+	}
+
+	tmpdir, err := os.MkdirTemp("", "claws-tarball-*")
+	if err != nil {
+		return fmt.Errorf("create tmpdir: %w", err)
+	}
+	// Per feedback_no_rm_rf.md, mktemp-d-scoped removal is the right pattern —
+	// we own the dir, only created files under it, never bulk-delete elsewhere.
+	defer os.RemoveAll(tmpdir)
+
+	tarPath := filepath.Join(tmpdir, "openclaw.tar.gz")
+	fmt.Printf("    %s$ download → %s%s\n", dim, tarPath, nc)
+	gotHash, err := fetchTarball(url, tarPath)
+	if err != nil {
+		return fmt.Errorf("download: %w", err)
+	}
+
+	expected, err := fetchExpectedSha256(url + ".sha256")
+	if err != nil {
+		return fmt.Errorf("sha256 sidecar: %w", err)
+	}
+	if !strings.EqualFold(expected, gotHash) {
+		return fmt.Errorf("sha256 mismatch:\n    expected: %s\n    got:      %s\n  refusing to load tarball that doesn't match its sidecar", expected, gotHash)
+	}
+	fmt.Printf("    %s✓ sha256 verified: %s%s\n", green, gotHash[:16]+"...", nc)
+
+	// docker load reads the tarball + adds layers. Parse the loaded tag
+	// from stdout — usually "Loaded image: openclaw:local" but the tarball
+	// may carry a different tag if someone built from a fork.
+	fmt.Printf("    %s$ docker load -i %s%s\n", dim, tarPath, nc)
+	loaded, err := dockerLoad(tarPath)
+	if err != nil {
+		return fmt.Errorf("docker load: %w", err)
+	}
+	fmt.Printf("    %s✓ loaded image: %s%s\n", green, loaded, nc)
+
+	if loaded != "openclaw:local" {
+		fmt.Printf("    %s$ docker tag %s openclaw:local%s\n", dim, loaded, nc)
+		if err := exec.Command("docker", "tag", loaded, "openclaw:local").Run(); err != nil {
+			return fmt.Errorf("docker tag: %w", err)
+		}
+	}
+	return nil
+}
+
+// fetchTarball streams URL into dest, computing SHA256 in-flight via
+// io.TeeReader so we don't need a second pass over the 683 MB file.
+// Returns the hex-encoded SHA256 of what was downloaded.
+func fetchTarball(url, dest string) (string, error) {
+	// Total budget 30 min — slow VPS-to-GitHub links can take ages.
+	client := &http.Client{Timeout: 30 * time.Minute}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "claws image bootstrap")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d %s", resp.StatusCode, resp.Status)
+	}
+
+	f, err := os.Create(dest)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	pr := &progressReader{r: resp.Body, total: resp.ContentLength, label: filepath.Base(dest)}
+	if _, err := io.Copy(f, io.TeeReader(pr, h)); err != nil {
+		return "", err
+	}
+	pr.done()
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// fetchExpectedSha256 fetches the small sidecar URL and parses the first
+// whitespace-separated token as the expected hex digest. Format mirrors
+// `sha256sum <file>` output: "<hex> <filename>".
+func fetchExpectedSha256(url string) (string, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "claws image bootstrap")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d fetching %s — cannot verify download integrity", resp.StatusCode, url)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if err != nil {
+		return "", err
+	}
+	tok := strings.Fields(string(body))
+	if len(tok) == 0 || len(tok[0]) != 64 {
+		return "", fmt.Errorf("sidecar at %s doesn't look like a sha256sum file (need 64-char hex)", url)
+	}
+	return tok[0], nil
+}
+
+// dockerLoad runs `docker load -i <tarPath>` and parses the loaded tag.
+// Returns the first reasonable image reference found in stdout.
+func dockerLoad(tarPath string) (string, error) {
+	cmd := exec.Command("docker", "load", "-i", tarPath)
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(string(ee.Stderr)))
+		}
+		return "", err
+	}
+	// Each "Loaded image:" line indicates a tag added. We take the first.
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		const prefix = "Loaded image: "
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimPrefix(line, prefix), nil
+		}
+		// Some docker versions print "Loaded image ID: sha256:..." when no
+		// tag was attached — that's a degenerate tarball we can't usefully
+		// retag without more work; surface it for the operator.
+		const idPrefix = "Loaded image ID: "
+		if strings.HasPrefix(line, idPrefix) {
+			return "", fmt.Errorf("tarball loaded by ID only (no tag) — was it built with `docker save <hash>`? need `docker save openclaw:local`")
+		}
+	}
+	return "", fmt.Errorf("docker load completed but no 'Loaded image:' line in output:\n%s", string(out))
+}
+
+// requireDiskFree returns an error if the filesystem holding `path` has
+// fewer than `bytes` free. Pre-flight for the tarball download + load.
+func requireDiskFree(path string, bytes uint64) error {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err != nil {
+		return nil // best-effort; don't fail the install on a non-Linux statfs
+	}
+	free := st.Bavail * uint64(st.Bsize)
+	if free < bytes {
+		return fmt.Errorf("only %s free on %s — need %s for tarball + image load", formatBytes(free), path, formatBytes(bytes))
+	}
+	return nil
+}
+
+// progressReader wraps an io.Reader and prints a progress line every ~1s.
+// Quiet when stdout is not a TTY (cloud-init, cron, piped to file).
+type progressReader struct {
+	r           io.Reader
+	read, total int64
+	label       string
+	lastPrint   time.Time
+	isTTY       bool
+	initOnce    bool
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	if !p.initOnce {
+		p.initOnce = true
+		// Best-effort TTY detection — if stdout's mode lookup fails, assume not.
+		if fi, err := os.Stdout.Stat(); err == nil {
+			p.isTTY = (fi.Mode() & os.ModeCharDevice) != 0
+		}
+	}
+	n, err := p.r.Read(b)
+	p.read += int64(n)
+	now := time.Now()
+	if now.Sub(p.lastPrint) > 750*time.Millisecond {
+		p.lastPrint = now
+		if p.isTTY {
+			if p.total > 0 {
+				pct := 100 * p.read / p.total
+				fmt.Fprintf(os.Stdout, "\r    \033[0;90m%s  %s / %s  (%d%%)\033[0m", p.label, formatBytes(uint64(p.read)), formatBytes(uint64(p.total)), pct)
+			} else {
+				fmt.Fprintf(os.Stdout, "\r    \033[0;90m%s  %s\033[0m", p.label, formatBytes(uint64(p.read)))
+			}
+		}
+	}
+	return n, err
+}
+func (p *progressReader) done() {
+	if p.isTTY {
+		// Clear line + newline. Otherwise the next print lands on top.
+		fmt.Fprintf(os.Stdout, "\r\033[K")
+	}
+	if p.total > 0 {
+		fmt.Printf("    \033[0;90m✓ downloaded %s%s\n", formatBytes(uint64(p.read)), "\033[0m")
+	} else {
+		fmt.Printf("    \033[0;90m✓ downloaded %s%s\n", formatBytes(uint64(p.read)), "\033[0m")
+	}
 }

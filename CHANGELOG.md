@@ -7,7 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws image bootstrap --from-tarball` for low-RAM hosts
+
+The openclaw runtime build needs ~4 GB RAM. Small VPS / EC2 boxes
+(t3.micro, $5 droplets, 4 GB-class instances) hit V8 mark-compact OOM
+during `docker build` even with v1.6.23's auto-swap fix — the build
+process itself thrashes too hard for swap to rescue.
+
+`--from-tarball[=<URL>]` skips the build entirely: downloads a pre-built
+`openclaw:local` image as a `docker save` tarball, verifies SHA256
+against a sidecar file, loads via `docker load`. Total RAM during
+install: < 100 MB. Total time on a normal connection: ~1 minute.
+
+```bash
+# Default URL (current pinned openclaw 2026.3.9-slim build):
+claws image bootstrap --from-tarball --yes
+
+# Custom URL (e.g. your own pre-built image):
+claws image bootstrap --from-tarball=https://example.com/openclaw.tar.gz --yes
+
+# Via env:
+CLAWS_OPENCLAW_TARBALL_URL=https://… claws image bootstrap --from-tarball --yes
+```
+
+Verification: a sibling `.sha256` file is fetched and the downloaded
+tarball's hash is checked against it. Mismatch refuses with both
+hashes shown. No way to skip verification — protects against tampering
++ truncated downloads.
+
+Disk-free pre-flight: refuses upfront if < 3 GB free (tarball + image
+layers won't fit). Cleaner failure than mid-`docker load` OOM.
+
+### Improved — `claws setup` auto-prefers tarball path on low-RAM hosts
+
+When `claws setup` finds the image absent AND the box has < 4 GB total
+RAM, the wizard now offers the tarball path by default — both
+interactive ("Bootstrap openclaw:local now? (Y/n)") and non-interactive
+modes. Non-technical clients on small VPSes get the fast path without
+knowing the flag exists.
+
+On boxes with ≥ 4 GB RAM, behavior is unchanged (still offers the
+source build).
+
+### Improved — `claws doctor` surfaces tarball hint when image missing
+
+If `openclaw:local` is absent AND box has < 4 GB RAM, doctor's
+remediation hint becomes `claws image bootstrap --from-tarball --yes`
+instead of the build path. On beefier hosts, the build hint is
+unchanged.
 
 ## [v1.6.26] — 2026-06-16
 
