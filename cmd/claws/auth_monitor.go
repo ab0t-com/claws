@@ -276,16 +276,17 @@ func scanLogsForAuthFailure(name string, since time.Duration) bool {
 // looksLikeAPIKey is a cheap sanity check on the fallback key — catches
 // "Mike pasted his Telegram token by mistake" or empty-file regressions.
 // We can't validate without burning a model call; this just makes sure
-// the value has the right shape.
+// the value has the right shape: 20-512 chars, alphanum + a tight set of
+// delimiters. Rejects whitespace, slashes, colons (the Telegram bot token
+// shape `<id>:<secret>`), and any unicode.
+//
+// Accepts sk- / sk-ant- / sk-or- / generic alphanum tokens. The sk- prefix
+// is NOT a free pass — char validation still runs after the prefix check
+// so a "sk-foo bar baz qux quux" pasted string is rejected.
 func looksLikeAPIKey(s string) bool {
 	if len(s) < 20 || len(s) > 512 {
 		return false
 	}
-	// OpenAI: sk-..., Anthropic: sk-ant-..., OpenRouter: sk-or-..., generic.
-	if strings.HasPrefix(s, "sk-") {
-		return true
-	}
-	// Some providers use plain hex tokens. Accept if it's alphanum-ish.
 	for _, c := range s {
 		if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
 			return false

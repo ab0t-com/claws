@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -194,6 +195,89 @@ func TestTierDescribe(t *testing.T) {
 		if d := tier.describe(); d == "" {
 			t.Errorf("tier %s has empty describe()", tier)
 		}
+	}
+}
+
+// TestWriteSecurityTierAudit — tier transitions must land in the audit log
+// as parseable JSONL with the keys downstream tooling expects.
+func TestWriteSecurityTierAudit(t *testing.T) {
+	tmpdir := t.TempDir()
+	paths := Paths{Root: tmpdir}
+
+	writeSecurityTierAudit(paths, "team/sarah", TierStandard, TierPrivileged, true)
+	writeSecurityTierAudit(paths, "team/sarah", TierPrivileged, TierStandard, false) // demote: accept_risk omitted
+
+	data, err := os.ReadFile(filepath.Join(paths.Root, auditLogFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 audit lines, got %d", len(lines))
+	}
+
+	// First line: promotion with accept_risk=true.
+	var entry1 map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &entry1); err != nil {
+		t.Fatalf("line 0 not valid JSON: %v", err)
+	}
+	if entry1["kind"] != "security.tier.change" {
+		t.Errorf("kind: got %v, want security.tier.change", entry1["kind"])
+	}
+	if entry1["agent"] != "team/sarah" {
+		t.Errorf("agent: got %v", entry1["agent"])
+	}
+	if entry1["from"] != string(TierStandard) {
+		t.Errorf("from: got %v", entry1["from"])
+	}
+	if entry1["to"] != string(TierPrivileged) {
+		t.Errorf("to: got %v", entry1["to"])
+	}
+	if entry1["accept_risk"] != true {
+		t.Errorf("accept_risk: got %v, want true", entry1["accept_risk"])
+	}
+
+	// Second line: demotion. accept_risk=false → key omitted due to omitempty tag.
+	var entry2 map[string]any
+	if err := json.Unmarshal([]byte(lines[1]), &entry2); err != nil {
+		t.Fatalf("line 1 not valid JSON: %v", err)
+	}
+	if _, present := entry2["accept_risk"]; present {
+		t.Errorf("accept_risk should be omitted on demotion (omitempty); got %v", entry2["accept_risk"])
+	}
+}
+
+// TestPrivilegedAllowlistPatterns — the runtime exec gate is opened to a
+// curated set of binary paths when an agent moves to privileged tier.
+// Guard against accidental deletion of any of the core entries (sudo, bash,
+// apt) since their absence would silently break sudo-via-bash.
+func TestPrivilegedAllowlistPatterns(t *testing.T) {
+	mustHave := []string{
+		"/usr/bin/sudo",
+		"/usr/bin/apt",
+		"/usr/bin/apt-get",
+		"/usr/bin/bash",
+		"/usr/bin/sh",
+		"/bin/bash",
+		"/bin/sh",
+	}
+	got := make(map[string]bool, len(privilegedAllowlistPatterns))
+	for _, p := range privilegedAllowlistPatterns {
+		got[p] = true
+	}
+	for _, p := range mustHave {
+		if !got[p] {
+			t.Errorf("privilegedAllowlistPatterns missing %q — would break privileged tier sudo", p)
+		}
+	}
+}
+
+// TestCurrentOperatorNonEmpty — the audit-log operator field should never
+// be blank. Either reports user@host or the literal "unknown" sentinel.
+func TestCurrentOperatorNonEmpty(t *testing.T) {
+	op := currentOperator()
+	if op == "" {
+		t.Error("currentOperator() returned empty — audit entries would lose attribution")
 	}
 }
 
