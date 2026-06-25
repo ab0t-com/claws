@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added — `claws image bootstrap` prints next-step hints
+
+Previously every success path of `claws image bootstrap` ended at
+`✓ openclaw:local <result>` with no guidance — non-technical users hit
+the success message and had no idea what to do next. Now after every
+success (already-present / loaded-from-tarball / pulled / built) the
+CLI prints a context-aware "Next:" block:
+
+- **Fresh box (no instances yet):** suggests `claws setup` (the
+  interactive wizard) + the manual create+auth+channel alternative.
+- **Existing fleet:** suggests `claws list`, `claws start-all`, and
+  `claws agent ping <name>`.
+
+Also prints a `Verify:` line with `docker images openclaw:local` so
+operators can confirm the image landed. Trivial fix, big UX win on
+the EC2-low-RAM client install path.
 
 ## [v1.6.28] — 2026-06-25
 
