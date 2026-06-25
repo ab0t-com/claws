@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+## [v1.6.28] — 2026-06-25
+
 ### Fixed — `auth-monitor` rejected fallback keys with whitespace/slashes
 
 `looksLikeAPIKey` in `cmd/claws/auth_monitor.go` short-circuited on any
